@@ -1,0 +1,15 @@
+{
+  "versionCode": 6,
+  "versionName": "1.0.5",
+  "apkUrl": "https://github.com/tw1nss/superapp-release/raw/main/app-debug.apk",
+  "forceUpdate": false,
+  "title": "Pembaruan Superapp MTG v1.0.5",
+  "changelog": [
+    "Fitur 1: Mode Offline & Auto-Sync (Data aman di HP & otomatis terkirim saat sinyal kembali)",
+    "Fitur 3: Audio & Haptic Feedback Pro (Nada Sukses, Warning, dan Buzzer Expired)",
+    "Fitur 5: Kalkulator Otomatis MSLTC & Deteksi Kelayakan Shelf-Life Real-Time",
+    "Fitur 6: Foto Kamera Langsung (Bukan Galeri) + Dukungan Multi-Foto hingga 3 Bukti",
+    "Penyimpanan bukti foto ke Google Drive & tautan otomatis di Sheet MTG"
+  ],
+  "releasedAt": "2026-09-02"
+}
