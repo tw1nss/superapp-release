@@ -1,14 +1,14 @@
 {
-  "versionCode": 9,
-  "versionName": "1.0.8",
+  "versionCode": 10,
+  "versionName": "1.0.9",
   "apkUrl": "https://github.com/tw1nss/superapp-release/raw/main/app-debug.apk",
   "forceUpdate": false,
-  "title": "Pembaruan Superapp MTG v1.0.8",
+  "title": "Pembaruan Superapp MTG v1.0.9",
   "changelog": [
-    "Perbaikan Kritis PDF: Ekspor / Cetak PDF DCC kini 100% tampil bersih dan tidak blank lagi",
-    "Perbaikan Kritis PDF: Cetak Matrix & Roster Jadwal kini responsif membuka menu Simpan sebagai PDF Android",
-    "Perbaikan UI Roster: Perapihan layout nama & job desk MP agar tidak bertubrukan dengan badge shift",
-    "Peningkatan Native Bridge: Integrasi cetak dokumen Android terstandarisasi untuk semua modul"
+    "Peningkatan Responsivitas Cek Update: Animasi loading langsung aktif saat tombol diklik",
+    "Fitur Baru: Dialog interaktif konfirmasi versi terbaru dan opsi unduh ulang APK manual",
+    "Perbaikan Notifikasi: Toast mengambang global yang selalu terlihat di halaman menu utama",
+    "Perbaikan Struktur Modal: Penutupan tag modal pembaruan yang kini presisi dan tidak bentrok"
   ],
   "releasedAt": "2026-09-02"
 }
