@@ -1,15 +1,14 @@
 {
-  "versionCode": 6,
-  "versionName": "1.0.5",
+  "versionCode": 7,
+  "versionName": "1.0.6",
   "apkUrl": "https://github.com/tw1nss/superapp-release/raw/main/app-debug.apk",
   "forceUpdate": false,
-  "title": "Pembaruan Superapp MTG v1.0.5",
+  "title": "Pembaruan Superapp MTG v1.0.6",
   "changelog": [
-    "Fitur 1: Mode Offline & Auto-Sync (Data aman di HP & otomatis terkirim saat sinyal kembali)",
-    "Fitur 3: Audio & Haptic Feedback Pro (Nada Sukses, Warning, dan Buzzer Expired)",
-    "Fitur 5: Kalkulator Otomatis MSLTC & Deteksi Kelayakan Shelf-Life Real-Time",
-    "Fitur 6: Foto Kamera Langsung (Bukan Galeri) + Dukungan Multi-Foto hingga 3 Bukti",
-    "Penyimpanan bukti foto ke Google Drive & tautan otomatis di Sheet MTG"
+    "Fitur Baru: Unduh Rekap DCC ke Excel (.csv) langsung ke folder Download HP",
+    "Fitur Baru: Bagikan Ringkasan Laporan DCC ke WhatsApp dengan 1-klik",
+    "Fitur Baru: Cetak / Simpan Laporan DCC ke format PDF siap cetak",
+    "Perbaikan: Peningkatan performa dan integrasi penyimpanan native Android"
   ],
   "releasedAt": "2026-09-02"
 }
