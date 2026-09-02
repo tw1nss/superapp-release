@@ -1,14 +1,14 @@
 {
-  "versionCode": 8,
-  "versionName": "1.0.7",
+  "versionCode": 9,
+  "versionName": "1.0.8",
   "apkUrl": "https://github.com/tw1nss/superapp-release/raw/main/app-debug.apk",
   "forceUpdate": false,
-  "title": "Pembaruan Superapp MTG v1.0.7",
+  "title": "Pembaruan Superapp MTG v1.0.8",
   "changelog": [
-    "Perbaikan Kritis: Sinkronisasi PIC Penginput otomatis sesuai shift (Shift Pagi: Bintang, Shift Siang: Indra / Petugas 2)",
-    "Perbaikan Kritis: Hasil input Task 2 langsung tampil dan tersinkron ke Google Sheets tanpa hilang",
-    "Perbaikan Kritis: Validasi Reason Bad resmi Google Sheet sehingga foto bukti 100% sukses terunggah menjadi link Google Drive",
-    "Peningkatan: Tampilan kartu PIC penginput yang jelas & tombol Ganti PIC langsung di form DCC"
+    "Perbaikan Kritis PDF: Ekspor / Cetak PDF DCC kini 100% tampil bersih dan tidak blank lagi",
+    "Perbaikan Kritis PDF: Cetak Matrix & Roster Jadwal kini responsif membuka menu Simpan sebagai PDF Android",
+    "Perbaikan UI Roster: Perapihan layout nama & job desk MP agar tidak bertubrukan dengan badge shift",
+    "Peningkatan Native Bridge: Integrasi cetak dokumen Android terstandarisasi untuk semua modul"
   ],
   "releasedAt": "2026-09-02"
 }
