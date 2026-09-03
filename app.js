@@ -7459,7 +7459,7 @@
             const sheetRemaks = (row[18] || '').trim();
             const sheetFisik = (row[19] || '').trim();
 
-            // ── AUTO-POPULATE: Done, Remaks DCC, Fisik/System ──
+            // ── STATUS HANYA DONE JIKA SKU BENAR-BENAR TERCATAT DI HASIL EDS ──
             let isDone = false;
             let doneVal = 'Belum';
             let remaksVal = '-';
@@ -7471,11 +7471,6 @@
               doneVal = 'Done';
               remaksVal = audit.reasonBad || audit.reasonSloc || audit.remaks || 'Sesuai';
               fisikSystemVal = `${audit.fisikGood}/${qtySystem}`;
-            } else if (sheetDone && sheetDone.toLowerCase() !== 'belum' && !sheetDone.includes('#ERROR')) {
-              isDone = true;
-              doneVal = sheetDone;
-              remaksVal = sheetRemaks && !sheetRemaks.includes('#ERROR') ? sheetRemaks : 'Sesuai';
-              fisikSystemVal = sheetFisik && !sheetFisik.includes('#ERROR') ? sheetFisik : `${stockAvail}/${qtySystem}`;
               edsSubmittedSkuSet.add(cleanSku.toLowerCase());
             }
 
@@ -7592,18 +7587,6 @@
       list = list.filter(item => !item.isDone);
     }
 
-    // Alert filter
-    if (currentEdsAlertFilter === 'warning') {
-      list = list.filter(item => {
-        const a = (item.alert || '').toUpperCase();
-        return a.includes('WARNING') || a.includes('CRITICAL') || item.remainingDays <= 3;
-      });
-    } else if (currentEdsAlertFilter === 'safe') {
-      list = list.filter(item => {
-        const a = (item.alert || '').toUpperCase();
-        return a.includes('SAFE') || (!a.includes('WARNING') && !a.includes('CRITICAL') && item.remainingDays > 3);
-      });
-    }
 
     // Category filter
     if (currentEdsCategoryFilter !== 'all') {
