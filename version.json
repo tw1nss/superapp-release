@@ -1,14 +1,15 @@
 {
-  "versionCode": 10,
-  "versionName": "1.0.9",
+  "versionCode": 12,
+  "versionName": "1.1.1",
   "apkUrl": "https://github.com/tw1nss/superapp-release/raw/main/app-debug.apk",
   "forceUpdate": false,
-  "title": "Pembaruan Superapp MTG v1.0.9",
+  "title": "Pembaruan Superapp MTG v1.1.1",
   "changelog": [
-    "Peningkatan Responsivitas Cek Update: Animasi loading langsung aktif saat tombol diklik",
-    "Fitur Baru: Dialog interaktif konfirmasi versi terbaru dan opsi unduh ulang APK manual",
-    "Perbaikan Notifikasi: Toast mengambang global yang selalu terlihat di halaman menu utama",
-    "Perbaikan Struktur Modal: Penutupan tag modal pembaruan yang kini presisi dan tidak bentrok"
+    "Perbaikan: Tampilan Main List SKU hanya menampilkan daftar tugas sebenarnya",
+    "Perbaikan: Hapus tombol 'i' di samping tombol refresh",
+    "Perbaikan: Tab Scan / Input sekarang tampil normal (tidak blank)",
+    "Perbaikan: Tab Report & Rekap kini berfungsi penuh dengan fitur Bagikan ke WhatsApp format DCC",
+    "Sinkronisasi: Dukungan tarik data darurat langsung dari Supersheet Data Update"
   ],
-  "releasedAt": "2026-09-02"
+  "releasedAt": "2026-09-03"
 }
