@@ -6979,10 +6979,9 @@
   }
 
   function getEdsWebappUrl() {
-    const saved = (localStorage.getItem(EDS_WEBAPP_KEY) || '').trim();
-    if (saved && saved.startsWith('https://script.google.com/macros/s/') && !saved.includes('AKfycbzRrR_j-8bV29djmaLl85Uhe3KOHd8PsW_7GQWAYIIciNvDeDoYrTtPs0377F63stid0Q')) {
-      return saved;
-    }
+    try {
+      localStorage.removeItem(EDS_WEBAPP_KEY);
+    } catch (e) { }
     return EDS_DEFAULT_WEBAPP_URL;
   }
 
@@ -7354,6 +7353,7 @@
       // 2. Parse Hasil EDS
       edsAuditResultsMap.clear();
       edsHasilRows = [];
+      edsSubmittedSkuSet.clear();
       if (hasilRes) {
         const hasilLines = parseCSV(hasilRes);
         if (hasilLines && hasilLines.length > 1) {
@@ -7445,7 +7445,14 @@
 
             let alertText = (row[16] || '').trim();
             if (!alertText || alertText.includes('#ERROR')) {
-              alertText = fallback.alertText || (remainingDays <= 3 ? '🟡 WARNING' : '🟢 SAFE');
+              alertText = fallback.alertText || (remainingDays <= 0 ? '🔴 CRITICAL' : (remainingDays === 1 ? '🔴 HARD WARNING' : (remainingDays <= 3 ? '🟡 WARNING' : '🟢 SAFE')));
+            }
+
+            // 🎯 FILTER HANYA PRODUK DENGAN ALERT CRITICAL & HARD WARNING SAJA
+            const alertClean = alertText.toLowerCase();
+            const isCriticalOrHard = alertClean.includes('critical') || alertClean.includes('hard warning') || alertClean.includes('hard_warning') || remainingDays <= 1;
+            if (!isCriticalOrHard) {
+              continue;
             }
 
             const sheetDone = (row[17] || '').trim();
@@ -7470,11 +7477,6 @@
               remaksVal = sheetRemaks && !sheetRemaks.includes('#ERROR') ? sheetRemaks : 'Sesuai';
               fisikSystemVal = sheetFisik && !sheetFisik.includes('#ERROR') ? sheetFisik : `${stockAvail}/${qtySystem}`;
               edsSubmittedSkuSet.add(cleanSku.toLowerCase());
-            } else if (edsSubmittedSkuSet.has(cleanSku.toLowerCase())) {
-              isDone = true;
-              doneVal = 'Done';
-              remaksVal = 'Sesuai';
-              fisikSystemVal = `${stockAvail}/${qtySystem}`;
             }
 
             list.push({
