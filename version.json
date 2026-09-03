@@ -1,14 +1,14 @@
 {
-  "versionCode": 13,
-  "versionName": "1.1.2",
+  "versionCode": 14,
+  "versionName": "1.1.3",
   "apkUrl": "https://github.com/tw1nss/superapp-release/raw/main/app-debug.apk",
   "forceUpdate": false,
-  "title": "Pembaruan Superapp MTG v1.1.2",
+  "title": "Pembaruan Superapp MTG v1.1.3",
   "changelog": [
-    "Perbaikan Alert: Menampilkan 🔴 CRITICAL dan 🔴 HARD WARNING persis sesuai data sheet Main List",
-    "Tema Seragam Astro Blue: Tag pill sisa hari dan filter sortir diperbarui ke tema biru elegan Astro",
-    "Koneksi WebApp Hasil EDS: Banner status koneksi WebApp dan panduan mudah agar data masuk ke sheet Hasil EDS",
-    "Auto-Sync Sheet: Otomatis mengisi kolom Done, Remaks, dan Fisik/System di Main List SKU saat audit dikirim"
+    "Koneksi Otomatis Hasil EDS: WebApp endpoint resmi tertanam langsung di sistem (tanpa perlu input manual)",
+    "Auto-Sync Real-Time: Hasil input audit langsung masuk ke sheet Hasil EDS dan mengisi otomatis kolom Done, Remaks, dan Fisik/System",
+    "Perbaikan Alert Sesuai Sheet: Menampilkan 🔴 CRITICAL dan 🔴 HARD WARNING persis seperti data Main List",
+    "Tema Seragam Astro Blue: Wadah luar sisa hari dan tombol sortir kini seragam dengan warna biru Astro"
   ],
   "releasedAt": "2026-09-03"
 }
