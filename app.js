@@ -3639,7 +3639,7 @@
   // ── Universal Native Print Engine (Guarantees no blank PDF & responsive bridge) ──
   window.triggerNativePrint = function (printModeClass, documentTitle = 'SuperApp_MTG') {
     playSuccessBeep();
-    document.body.classList.remove('print-mode-dcc', 'print-mode-mps-matrix', 'print-mode-mps-daily', 'print-mode-slip');
+    document.body.classList.remove('print-mode-dcc', 'print-mode-mps-matrix', 'print-mode-mps-daily', 'print-mode-slip', 'print-mode-eds');
     if (printModeClass) {
       document.body.classList.add(printModeClass);
     }
@@ -3658,7 +3658,7 @@
 
     setTimeout(() => {
       document.title = oldTitle;
-      document.body.classList.remove('print-mode-dcc', 'print-mode-mps-matrix', 'print-mode-mps-daily', 'print-mode-slip');
+      document.body.classList.remove('print-mode-dcc', 'print-mode-mps-matrix', 'print-mode-mps-daily', 'print-mode-slip', 'print-mode-eds');
     }, 3000);
   };
 
@@ -7935,6 +7935,10 @@
     }
   }
 
+  function getEdsSavedPic() {
+    return (localStorage.getItem(EDS_PIC_KEY) || document.getElementById('edsInputBy')?.value || '').trim();
+  }
+
   window.saveEdsDefaultPic = function () {
     const input = document.getElementById('edsInputBy');
     if (!input || !input.value.trim()) {
@@ -8286,16 +8290,35 @@
 
     playSuccessBeep();
 
-    if (window.AndroidUpdateBridge && typeof window.AndroidUpdateBridge.shareReport === 'function') {
-      window.AndroidUpdateBridge.shareReport('Ringkasan EDS MTG', text);
-      return;
+    // Copy to clipboard as quick backup
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).catch(() => {});
     }
 
+    // 1. Android Native Share Bridge
+    if (window.AndroidUpdateBridge && typeof window.AndroidUpdateBridge.shareReport === 'function') {
+      try {
+        window.AndroidUpdateBridge.shareReport('Ringkasan EDS MTG', text);
+        showDccToast('success', 'Buka WhatsApp', 'Membuka pilihan aplikasi untuk membagikan laporan EDS.');
+        return;
+      } catch (e) {
+        console.warn('Bridge share error:', e);
+      }
+    }
+
+    // 2. Web Share API
     if (navigator.share) {
-      navigator.share({ title: 'Ringkasan EDS MTG', text: text }).catch(() => {});
+      navigator.share({ title: 'Ringkasan EDS MTG', text: text })
+        .then(() => showDccToast('success', 'Berbagi', 'Laporan berhasil dibagikan.'))
+        .catch(() => {
+          const waUrl = `https://wa.me/?text=${encodeURIComponent(text)}`;
+          window.open(waUrl, '_blank');
+        });
     } else {
+      // 3. Fallback direct WhatsApp URL
       const waUrl = `https://wa.me/?text=${encodeURIComponent(text)}`;
       window.open(waUrl, '_blank');
+      showDccToast('success', 'Buka WhatsApp', 'Membuka WhatsApp web/app.');
     }
   };
 
@@ -8305,42 +8328,91 @@
       return;
     }
 
-    let csvContent = '\uFEFF'; // UTF-8 BOM
-    csvContent += 'SKU,Nama Produk,Rack SLOC,Stok Sistem,Fisik Good,Fisik Bad,SLOC Actual,Expired Date,Reason Bad,PIC,Status Done,Fisik/System\n';
-
-    edsMainListData.forEach(item => {
-      const audit = edsAuditResultsMap.get(item.sku.toLowerCase()) || {};
-      const row = [
-        `"${item.sku}"`,
-        `"${(item.productName || '').replace(/"/g, '""')}"`,
-        `"${item.lokasiRack || ''}"`,
-        item.qty_system || item.stockAvailable || 0,
-        audit.fisikGood !== undefined ? audit.fisikGood : (item.isDone ? item.stockAvailable : ''),
-        audit.fisikBad !== undefined ? audit.fisikBad : '',
-        `"${audit.slocActual || 'Match'}"`,
-        `"${formatEdsDateDisplay(audit.expiredDate || item.expiryDate)}"`,
-        `"${audit.reasonBad || ''}"`,
-        `"${audit.inputBy || ''}"`,
-        `"${item.doneVal}"`,
-        `"${item.fisikSystemVal}"`
-      ];
-      csvContent += row.join(',') + '\n';
-    });
-
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
     const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
-    link.setAttribute('download', `Hasil_ED_Sweeper_MTG_${dateStr}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    showDccToast('success', 'Download Dimulai', 'File rekap Excel/CSV berhasil diunduh.');
+    const filename = `Hasil_ED_Sweeper_MTG_${dateStr}.csv`;
+
+    let csvContent = '\uFEFF'; // UTF-8 BOM
+    csvContent += 'No,SKU,Nama Produk,Rack SLOC,Stok Sistem,Fisik Good,Fisik Bad,SLOC Actual,Expired Date,Reason Bad,PIC,Status Done,Fisik/System\r\n';
+
+    let rowIdx = 1;
+    if (edsHasilRows.length > 0) {
+      edsHasilRows.forEach(r => {
+        const row = [
+          rowIdx++,
+          `"${r.sku || ''}"`,
+          `"${(r.namaSku || '').replace(/"/g, '""')}"`,
+          `"${r.slocExisting || ''}"`,
+          r.sales || 0,
+          r.fisikGood || 0,
+          r.fisikBad || 0,
+          `"${r.slocActual || 'Match'}"`,
+          `"${formatEdsDateDisplay(r.expiredDate)}"`,
+          `"${(r.reasonBad || '').replace(/"/g, '""')}"`,
+          `"${r.inputBy || ''}"`,
+          `"Done"`,
+          `"${(parseInt(r.fisikGood, 10) || 0) + (parseInt(r.fisikBad, 10) || 0)}"`
+        ];
+        csvContent += row.join(',') + '\r\n';
+      });
+    } else {
+      edsMainListData.forEach(item => {
+        const audit = edsAuditResultsMap.get(item.sku.toLowerCase()) || {};
+        const row = [
+          rowIdx++,
+          `"${item.sku}"`,
+          `"${(item.productName || '').replace(/"/g, '""')}"`,
+          `"${item.lokasiRack || ''}"`,
+          item.qty_system || item.stockAvailable || 0,
+          audit.fisikGood !== undefined ? audit.fisikGood : (item.isDone ? item.stockAvailable : ''),
+          audit.fisikBad !== undefined ? audit.fisikBad : '',
+          `"${audit.slocActual || 'Match'}"`,
+          `"${formatEdsDateDisplay(audit.expiredDate || item.expiryDate)}"`,
+          `"${audit.reasonBad || ''}"`,
+          `"${audit.inputBy || ''}"`,
+          `"${item.doneVal || (item.isDone ? 'Done' : '')}"`,
+          `"${item.fisikSystemVal || ''}"`
+        ];
+        csvContent += row.join(',') + '\r\n';
+      });
+    }
+
+    playSuccessBeep();
+
+    // 1. Android Native Bridge Download to /Downloads folder
+    if (window.AndroidUpdateBridge && typeof window.AndroidUpdateBridge.saveFileToDownloads === 'function') {
+      try {
+        const base64 = btoa(unescape(encodeURIComponent(csvContent)));
+        window.AndroidUpdateBridge.saveFileToDownloads(filename, base64, 'text/csv');
+        showDccToast('success', 'Excel/CSV Terunduh', `File tersimpan di folder Download: ${filename}`);
+        return;
+      } catch (e) {
+        console.warn('Bridge save error, fallback to blob:', e);
+      }
+    }
+
+    // 2. Web Blob Download Fallback
+    try {
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', filename);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      showDccToast('success', 'Excel/CSV Terunduh', `Laporan berhasil diunduh: ${filename}`);
+    } catch (e) {
+      console.error('Download error:', e);
+      showDccToast('error', 'Gagal Mengunduh', 'Browser tidak mengizinkan unduhan file.');
+    }
   };
 
   window.printEdsPdf = function () {
-    window.print();
+    const todayStr = new Date().toLocaleDateString('id-ID', {
+      day: '2-digit', month: '2-digit', year: 'numeric'
+    }).replace(/\//g, '-');
+    triggerNativePrint('print-mode-eds', `Laporan_ED_Sweeper_MTG_${todayStr}`);
   };
 
   // ── Init
