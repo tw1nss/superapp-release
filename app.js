@@ -8214,6 +8214,8 @@
 
   // ── Report & Export Engine ──
   function renderEdsReport() {
+    renderEdsPrintTable();
+
     const total = edsMainListData.length;
     const doneCount = edsMainListData.filter(i => i.isDone).length;
     const pendingCount = total - doneCount;
@@ -8256,19 +8258,29 @@
     `).join('');
 
     listContainer.innerHTML = html;
-    renderEdsPrintTable();
   }
 
   function renderEdsPrintTable() {
     const tbody = document.getElementById('edsPrintTableBody');
     if (!tbody) return;
 
-    if (edsMainListData.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="12" style="text-align:center; padding: 20px; color: var(--text-muted);">Belum ada data produk di Main List SKU.</td></tr>';
+    let list = edsMainListData;
+    if (!list || list.length === 0) {
+      try {
+        const cached = localStorage.getItem(EDS_MAIN_CACHE_KEY);
+        if (cached) {
+          list = JSON.parse(cached);
+          edsMainListData = list;
+        }
+      } catch (e) { }
+    }
+
+    if (!list || list.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="12" style="text-align:center; padding: 20px; color: #64748b;">Belum ada data produk di Main List SKU. Silakan refresh data.</td></tr>';
       return;
     }
 
-    const rows = edsMainListData.map((item, idx) => {
+    const rows = list.map((item, idx) => {
       const audit = edsAuditResultsMap.get(item.sku.toLowerCase()) || {};
       const isDone = item.isDone;
       const statusBadge = isDone
@@ -8475,7 +8487,9 @@
     const todayStr = new Date().toLocaleDateString('id-ID', {
       day: '2-digit', month: '2-digit', year: 'numeric'
     }).replace(/\//g, '-');
-    triggerNativePrint('print-mode-eds', `Laporan_ED_Sweeper_MTG_${todayStr}`);
+    setTimeout(() => {
+      triggerNativePrint('print-mode-eds', `Laporan_ED_Sweeper_MTG_${todayStr}`);
+    }, 120);
   };
 
   // ── Init
