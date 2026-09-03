@@ -1,0 +1,1748 @@
+<!DOCTYPE html>
+<html lang="id">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport"
+    content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="description"
+    content="Super App MTG — Sistem integrasi warehouse: Barcode SLOC, Barcode Produk, dan Cek Masa MSLTC.">
+  <meta name="theme-color" content="#0a0e17">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Super App MTG</title>
+
+  <!-- Favicon -->
+  <link rel="icon" href="app-logo.jpg" type="image/jpeg">
+
+  <!-- PWA & Mobile Meta Tags -->
+  <link rel="manifest" href="manifest.json">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Super App MTG">
+  <link rel="apple-touch-icon" href="icon-192.png">
+
+  <!-- Flatpickr (Calendar Dropdown) -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/themes/dark.css">
+  <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/id.js"></script>
+
+  <!-- Stylesheets -->
+  <link rel="stylesheet" href="style.css?v=26">
+
+  <!-- QR Code & Barcode Libraries -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
+  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+</head>
+
+<body>
+  <!-- ═══ Space Loading Overlay ═══ -->
+  <div id="loadingOverlay" class="space-loading-overlay">
+    <!-- Star particles & ambient cosmic glow -->
+    <div class="space-loading-stars"></div>
+    <div class="space-loading-nebula"></div>
+
+    <div class="space-loading-content">
+      <!-- Orbital Reactor / Astro Helmet Loader -->
+      <div class="space-orbital-reactor">
+        <div class="orbital-ring ring-outer"></div>
+        <div class="orbital-ring ring-middle"></div>
+        <div class="orbital-ring ring-inner"></div>
+        <div class="reactor-core">
+          <svg width="46" height="46" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+            stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="9" stroke="#38bdf8" stroke-width="2" />
+            <path d="M7 12a5 5 0 0 1 10 0v1a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2v-1z" fill="rgba(56, 189, 248, 0.35)"
+              stroke="#38bdf8" />
+            <path d="M12 3v3M4 12H2M22 12h-2M8 12a4 4 0 0 1 8 0" stroke="#94a3b8" />
+          </svg>
+        </div>
+      </div>
+
+      <!-- Loading Title -->
+      <div class="space-loading-title">Loading...</div>
+
+      <!-- Animated Cyber Progress Bar -->
+      <div class="space-progress-bar-wrap">
+        <div class="space-progress-bar-fill"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ App Container ═══ -->
+  <div class="app-container">
+
+    <!-- ── Header (Professional MTG Space Dashboard) ── -->
+    <header class="app-header">
+      <button id="backToMenuBtn" class="btn-back hidden" onclick="goBackToMenu()" title="Kembali ke Menu Utama">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+          stroke-linecap="round" stroke-linejoin="round">
+          <line x1="19" y1="12" x2="5" y2="12"></line>
+          <polyline points="12 19 5 12 12 5"></polyline>
+        </svg>
+      </button>
+
+      <div class="space-header-container">
+        <div class="space-helmet-icon">
+          <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+            stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="9" stroke="#38bdf8" stroke-width="2" />
+            <path d="M7 12a5 5 0 0 1 10 0v1a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2v-1z" fill="rgba(56, 189, 248, 0.25)"
+              stroke="#38bdf8" />
+            <path d="M12 3v3M4 12H2M22 12h-2M8 12a4 4 0 0 1 8 0" stroke="#94a3b8" />
+          </svg>
+        </div>
+        <div class="space-header-text">
+          <h1 class="space-app-title">Superapp MTG</h1>
+        </div>
+      </div>
+      <p class="space-app-subtitle">Sistem integrasi: Barcode SLOC, Barcode Produk, dan Cek MSLTC.</p>
+      <div class="home-version-wrap">
+        <button type="button" class="home-version-chip" onclick="checkForAppUpdates(true)" title="Klik untuk memeriksa pembaruan aplikasi">
+          <span class="home-version-dot"></span>
+          <span id="homeAppVersionText">v1.1.0</span> • Cek Update
+        </button>
+      </div>
+    </header>
+
+    <!-- ── Home Menu Section (3x3 Space Glass Tiles) ── -->
+    <section id="homeMenuSection" class="home-menu-section">
+      <!-- PWA Android Install Banner -->
+      <div id="pwaInstallBanner" class="pwa-install-container hidden">
+        <button type="button" id="pwaInstallBtn" class="btn-install-pwa">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+            <polyline points="7 10 12 15 17 10" />
+            <line x1="12" y1="15" x2="12" y2="3" />
+          </svg>
+          <span>Install Aplikasi di Android</span>
+        </button>
+      </div>
+
+      <!-- 3x3 Space Glass Tiles Grid -->
+      <div class="space-grid-3x3">
+        <!-- 1. Barcode -->
+        <div class="menu-card space-glass-card" onclick="openAppMenu('barcode')">
+          <div class="space-glass-sheen"></div>
+          <div class="space-icon-wrap">
+            <svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+              stroke-linecap="round" stroke-linejoin="round">
+              <path d="M3 5v14M7 5v14M11 5v14M15 5v14M19 5v14M21 5v14" stroke="#94a3b8" stroke-width="2" />
+              <path d="M1 12h22" stroke="#ef4444" stroke-width="2.5" stroke-linecap="round" />
+              <path d="M3 3h3v3M21 3h-3v3M3 21h3v-3M21 21h-3v-3" stroke="#38bdf8" stroke-width="2" />
+            </svg>
+          </div>
+          <div class="menu-card-title">Barcode</div>
+        </div>
+
+        <!-- 2. Complain -->
+        <div class="menu-card space-glass-card" onclick="openAppMenu('complain')">
+          <div class="space-glass-sheen"></div>
+          <div class="space-icon-wrap">
+            <svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+              stroke-linecap="round" stroke-linejoin="round">
+              <rect x="1" y="3" width="15" height="13" rx="2" fill="rgba(245, 158, 11, 0.2)" stroke="#f59e0b" />
+              <polygon points="16 8 20 8 23 11 23 16 16 16 16 8" fill="rgba(56, 189, 248, 0.3)" stroke="#38bdf8" />
+              <circle cx="5.5" cy="18.5" r="2.5" fill="#334155" stroke="#94a3b8" />
+              <circle cx="18.5" cy="18.5" r="2.5" fill="#334155" stroke="#94a3b8" />
+              <line x1="1" y1="6" x2="4" y2="6" stroke="#f59e0b" stroke-width="2" />
+              <line x1="2" y1="9" x2="6" y2="9" stroke="#f59e0b" stroke-width="2" />
+            </svg>
+          </div>
+          <div class="menu-card-title">Complain</div>
+        </div>
+
+        <!-- 3. Retur Task -->
+        <div class="menu-card space-glass-card" onclick="openAppMenu('retur')">
+          <div class="space-glass-sheen"></div>
+          <div class="space-icon-wrap">
+            <svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+              stroke-linecap="round" stroke-linejoin="round">
+              <path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z"
+                fill="rgba(168, 85, 247, 0.3)" stroke="#a855f7" />
+              <path d="M12 15l-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z"
+                fill="rgba(56, 189, 248, 0.25)" stroke="#38bdf8" />
+              <path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0" stroke="#818cf8" />
+              <path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5" stroke="#818cf8" />
+            </svg>
+          </div>
+          <div class="menu-card-title">Retur Task</div>
+        </div>
+
+        <!-- 4. DCC -->
+        <div class="menu-card space-glass-card" onclick="openAppMenu('dcc')">
+          <div class="space-glass-sheen"></div>
+          <div class="space-icon-wrap">
+            <svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+              stroke-linecap="round" stroke-linejoin="round">
+              <path
+                d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"
+                fill="rgba(245, 158, 11, 0.25)" stroke="#f59e0b" />
+              <polyline points="3.27 6.96 12 12.01 20.73 6.96" stroke="#fbbf24" />
+              <line x1="12" y1="22.08" x2="12" y2="12" stroke="#d97706" />
+            </svg>
+          </div>
+          <div class="menu-card-title">DCC</div>
+        </div>
+
+        <!-- 5. Gaji -->
+        <div class="menu-card space-glass-card" onclick="openAppMenu('slip_gaji')">
+          <div class="space-glass-sheen"></div>
+          <div class="space-icon-wrap">
+            <svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+              stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="9" fill="rgba(16, 185, 129, 0.2)" stroke="#10b981" />
+              <path
+                d="M12 6v12M15 9.5a2.5 2.5 0 0 0-2.5-2.5h-1a2.5 2.5 0 0 0 0 5h1a2.5 2.5 0 0 1 0 5h-1a2.5 2.5 0 0 1-2.5-2.5"
+                stroke="#34d399" stroke-width="2" />
+            </svg>
+          </div>
+          <div class="menu-card-title">Gaji</div>
+        </div>
+
+        <!-- 6. Expired Date Sweeper -->
+        <div class="menu-card space-glass-card" onclick="openAppMenu('ed_sweeper')">
+          <div class="space-glass-sheen"></div>
+          <div class="space-icon-wrap">
+            <svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+              stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="9" stroke="#f59e0b" fill="rgba(245, 158, 11, 0.2)" />
+              <polyline points="12 7 12 12 15 14" stroke="#fbbf24" stroke-width="2" stroke-linecap="round" />
+              <path d="M12 3v2M12 19v2M3 12h2M19 12h2" stroke="#f59e0b" stroke-width="1.5" stroke-linecap="round" />
+              <path d="M8 21h8" stroke="#10b981" stroke-width="2.5" stroke-linecap="round" />
+            </svg>
+          </div>
+          <div class="menu-card-title">Expired Date Sweeper</div>
+        </div>
+
+        <!-- 7. MP Schedule -->
+        <div class="menu-card space-glass-card" onclick="openAppMenu('mp_schedule')">
+          <div class="space-glass-sheen"></div>
+          <div class="space-icon-wrap">
+            <svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+              stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="4" width="18" height="18" rx="2" ry="2" stroke="#38bdf8" fill="rgba(56, 189, 248, 0.2)" />
+              <line x1="16" y1="2" x2="16" y2="6" stroke="#38bdf8" stroke-width="2" />
+              <line x1="8" y1="2" x2="8" y2="6" stroke="#38bdf8" stroke-width="2" />
+              <line x1="3" y1="10" x2="21" y2="10" stroke="#38bdf8" />
+              <path d="M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01M16 18h.01" stroke="#06d6a0" stroke-width="3"
+                stroke-linecap="round" />
+            </svg>
+          </div>
+          <div class="menu-card-title">MP Schedule</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── App Workspace (Hidden by Default) ── -->
+    <div id="appWorkspace" class="hidden">
+      <!-- ── Data Status Bar ── -->
+      <div id="dataStatus" class="data-status loading">
+        <span class="status-dot"></span>
+        <span id="statusText">Memuat data...</span>
+        <button id="refreshBtn" class="refresh-btn" title="Refresh data dari Google Sheets" aria-label="Refresh data">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="23 4 23 10 17 10"></polyline>
+            <polyline points="1 20 1 14 7 14"></polyline>
+            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+          </svg>
+        </button>
+      </div>
+
+      <!-- ── Main Navigation Tabs ── -->
+      <nav class="main-nav" id="mainNav">
+        <button type="button" class="main-tab active" id="tabBarcode" data-main-mode="barcode"
+          onclick="switchMainMenu('barcode')">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="3" width="7" height="7"></rect>
+            <rect x="14" y="3" width="7" height="7"></rect>
+            <rect x="14" y="14" width="7" height="7"></rect>
+            <rect x="3" y="14" width="7" height="7"></rect>
+          </svg>
+          <span>Barcode Generator</span>
+        </button>
+        <button type="button" class="main-tab" id="tabMsltc" data-main-mode="msltc" onclick="switchMainMenu('msltc')">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"></circle>
+            <polyline points="12 6 12 12 16 14"></polyline>
+          </svg>
+          <span>Cek MSLTC Produk</span>
+        </button>
+      </nav>
+
+      <!-- ── Search Card ── -->
+      <section class="search-card" id="searchCard">
+        <label for="skuInput" class="search-label">Masukkan / Scan SKU atau Nama Produk</label>
+        <form id="searchForm" class="search-input-group" autocomplete="off">
+          <div class="input-with-scan">
+            <input type="text" id="skuInput" class="search-input" placeholder="Ketik SKU / Nama Produk (misal: Ultra Milk;25122026)..." autofocus
+              spellcheck="false" autocomplete="off" inputmode="text">
+            <button type="button" id="scanBtn" class="btn-scan" title="Scan Barcode Kamera">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                stroke-linecap="round" stroke-linejoin="round">
+                <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
+                <circle cx="12" cy="13" r="4"></circle>
+              </svg>
+            </button>
+            <!-- Dropdown Pilihan Produk / SKU Autocomplete -->
+            <div id="searchDropdown" class="search-dropdown hidden"></div>
+          </div>
+          <button type="submit" id="submitBtn" class="btn-submit">
+            <span>Submit</span>
+          </button>
+        </form>
+      </section>
+
+      <!-- ── Results Section (injected by JS) ── -->
+      <section id="resultSection"></section>
+
+      <!-- ── Search History ── -->
+      <section id="historySection" class="history-section hidden">
+        <div class="history-title">Pencarian Terakhir</div>
+        <div id="historyList" class="history-list"></div>
+      </section>
+
+    </div> <!-- End App Workspace -->
+
+    <!-- ── DCC Workspace (Hidden by Default) ── -->
+    <div id="dccWorkspace" class="hidden">
+      <!-- DCC Top Action Bar -->
+      <div class="dcc-top-bar">
+        <button type="button" class="dcc-top-back-btn" onclick="handleDccBackPressed()" title="Kembali">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+            stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="15 18 9 12 15 6"></polyline>
+          </svg>
+        </button>
+        <div class="dcc-title-wrap">
+          <div class="dcc-title">DCC Screening</div>
+          <button type="button" class="dcc-shift-badge-btn pagi" id="dccActiveShiftBadge" onclick="openDccShiftSelectorOnly()" title="Klik untuk ganti shift">☀️ Shift Pagi</button>
+          <button type="button" class="dcc-offline-badge-btn hidden" id="dccOfflineQueueBadge" onclick="syncDccOfflineQueue(true)" title="Klik untuk sinkronisasi data offline"></button>
+        </div>
+        <button class="dcc-refresh-btn" onclick="refreshDccData()" title="Muat Ulang Data">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="23 4 23 10 17 10"></polyline>
+            <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+          </svg>
+        </button>
+      </div>
+
+      <!-- DCC Tab Content: Main List SKU -->
+      <div id="dccTabMainList" class="dcc-tab-content active">
+        <!-- Search & Filter Bar -->
+        <div class="dcc-filter-container">
+          <!-- Row 1: Full-width Search Input -->
+          <div class="dcc-filter-input-wrapper">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+              stroke-linecap="round" stroke-linejoin="round" class="dcc-filter-icon">
+              <circle cx="11" cy="11" r="8"></circle>
+              <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+            </svg>
+            <input type="text" id="dccFilterInput" class="dcc-filter-input"
+              placeholder="Cari SKU, nama produk, atau SLOC..." autocomplete="off">
+            <button type="button" id="dccFilterClearBtn" class="dcc-filter-clear-btn hidden"
+              onclick="clearDccFilter()" title="Hapus pencarian">✕</button>
+          </div>
+
+          <!-- Row 2: Segmented Status Filter Buttons (Semua, Sudah Diinput, Belum Diinput) -->
+          <div class="dcc-status-pills">
+            <button type="button" class="dcc-status-btn active" data-status="all" onclick="setDccStatusFilter('all')" title="Tampilkan Semua SKU">
+              <span class="dcc-status-btn-text">📋 Semua</span>
+              <span class="dcc-status-badge" id="dccStatusCountAll">0</span>
+            </button>
+            <button type="button" class="dcc-status-btn btn-submitted" data-status="submitted" onclick="setDccStatusFilter('submitted')" title="Tampilkan SKU yang Sudah Diinput">
+              <span class="dcc-status-btn-text">✅ Sudah</span>
+              <span class="dcc-status-badge badge-submitted" id="dccStatusCountSubmitted">0</span>
+            </button>
+            <button type="button" class="dcc-status-btn btn-pending" data-status="pending" onclick="setDccStatusFilter('pending')" title="Tampilkan SKU yang Belum Diinput">
+              <span class="dcc-status-btn-text">⏳ Belum</span>
+              <span class="dcc-status-badge badge-pending" id="dccStatusCountPending">0</span>
+            </button>
+          </div>
+
+          <!-- Row 3: Progress & Shift Info Strip -->
+          <div class="dcc-filter-meta">
+            <span id="dccListCountBadge" class="dcc-count-badge">0 Selesai / 0 SKU</span>
+          </div>
+        </div>
+
+        <!-- DCC Task Filter Segment (hidden - shift controls filter) -->
+        <div class="dcc-task-filter-bar hidden" id="dccTaskFilterBar">
+          <button type="button" class="dcc-task-filter-btn active" id="taskFilterAll" data-task="all" onclick="setDccTaskFilter('all')">
+            <span class="dcc-task-btn-title">📋 Semua SKU</span>
+            <span class="dcc-task-badge" id="countAll">0/0</span>
+          </button>
+          <button type="button" class="dcc-task-filter-btn task-bintang" id="taskFilter1" data-task="task1" onclick="setDccTaskFilter('task1')">
+            <span class="dcc-task-btn-title">👤 Task 1 (Bintang)</span>
+            <span class="dcc-task-badge" id="countTask1">0/0</span>
+          </button>
+          <button type="button" class="dcc-task-filter-btn task-petugas2" id="taskFilter2" data-task="task2" onclick="setDccTaskFilter('task2')">
+            <span class="dcc-task-btn-title" id="labelTask2Btn">👤 Task 2 (Petugas Lain)</span>
+            <span class="dcc-task-badge" id="countTask2">0/0</span>
+          </button>
+        </div>
+
+        <!-- Sort Bar (Nama A-Z, Nama Z-A, SLOC A-Z, Jumlah Stock) -->
+        <div class="dcc-sort-bar">
+          <span class="dcc-sort-label">Urutkan:</span>
+          <button type="button" class="dcc-sort-btn" id="sortNameAsc" onclick="toggleDccSort('name_asc')">
+            Nama A-Z ↑
+          </button>
+          <button type="button" class="dcc-sort-btn" id="sortNameDesc" onclick="toggleDccSort('name_desc')">
+            Nama Z-A ↓
+          </button>
+          <button type="button" class="dcc-sort-btn" id="sortSlocAsc" onclick="toggleDccSort('sloc_asc')">
+            SLOC A-Z
+          </button>
+          <button type="button" class="dcc-sort-btn" id="sortStockDesc" onclick="toggleDccSort('stock_desc')">
+            Jumlah Stock ↓
+          </button>
+        </div>
+
+        <!-- Clean Card List View (AppSheet Mobile Style) -->
+        <div class="dcc-card-container" id="dccCardContainer">
+          <div style="text-align:center; padding: 30px; color: var(--text-muted);">Memuat data dari Main List SKU...
+          </div>
+        </div>
+      </div>
+
+      <!-- DCC Tab Content: Scan SKU -->
+      <div id="dccTabScan" class="dcc-tab-content hidden">
+        <div class="dcc-scan-container">
+
+          <!-- SKU No -->
+          <div class="dcc-field-group">
+            <label class="dcc-field-label">SKU No <span class="dcc-required">*</span></label>
+            <div class="dcc-input-row">
+              <input type="text" id="dccSkuInput" class="dcc-field-input" placeholder="Scan atau ketik SKU..."
+                inputmode="text" autocomplete="off">
+              <button type="button" class="dcc-scan-btn" onclick="startDccCameraScan()" title="Buka Scanner Barcode">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <rect x="3" y="3" width="7" height="7" />
+                  <rect x="14" y="3" width="7" height="7" />
+                  <rect x="14" y="14" width="7" height="7" />
+                  <rect x="3" y="14" width="7" height="7" />
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          <!-- Nama SKU (auto-fill, readonly) -->
+          <div class="dcc-field-group">
+            <label class="dcc-field-label">Nama SKU</label>
+            <input type="text" id="dccNamaSku" class="dcc-field-input dcc-readonly" readonly
+              placeholder="Otomatis terisi...">
+          </div>
+
+          <!-- SLOC Existing (auto-fill, readonly) -->
+          <div class="dcc-field-group">
+            <label class="dcc-field-label">SLOC Existing</label>
+            <input type="text" id="dccSlocExisting" class="dcc-field-input dcc-readonly" readonly
+              placeholder="Otomatis terisi...">
+          </div>
+
+          <!-- SLOC Actual (Match / Unmatch) -->
+          <div class="dcc-field-group">
+            <label class="dcc-field-label">SLOC Actual <span class="dcc-required">*</span></label>
+            <div class="dcc-toggle-group" id="dccSlocActualGroup">
+              <button type="button" class="dcc-toggle-btn" data-value="Match"
+                onclick="setDccToggle('dccSlocActualGroup', 'Match')">Match</button>
+              <button type="button" class="dcc-toggle-btn" data-value="Unmatch"
+                onclick="setDccToggle('dccSlocActualGroup', 'Unmatch')">Unmatch</button>
+            </div>
+          </div>
+
+          <!-- Expired Date -->
+          <div class="dcc-field-group">
+            <div class="dcc-field-header-row">
+              <label class="dcc-field-label">Expired Date <span class="dcc-required">*</span></label>
+              <button type="button" class="dcc-info-tooltip-btn" onclick="openMsltcInfoModal()" title="Klik untuk panduan kalkulator MSLTC">ℹ️ Info MSLTC</button>
+            </div>
+            <input type="text" id="dccExpiredDate" class="dcc-field-input" placeholder="Pilih tanggal expired..."
+              style="cursor: pointer;">
+            <!-- Kalkulator Otomatis Status MSLTC & Shelf-Life -->
+            <div id="dccMsltcCalcBadge" class="dcc-msltc-badge hidden"></div>
+          </div>
+
+          <!-- Fisik Good -->
+          <div class="dcc-field-group">
+            <label class="dcc-field-label">Fisik Good</label>
+            <div class="dcc-number-input">
+              <button type="button" class="dcc-num-btn" onclick="adjustDccNumber('dccFisikGood', -1)">−</button>
+              <input type="number" id="dccFisikGood" class="dcc-field-input dcc-num-field" value="0" min="0">
+              <button type="button" class="dcc-num-btn" onclick="adjustDccNumber('dccFisikGood', 1)">+</button>
+            </div>
+          </div>
+
+          <!-- Fisik Bad -->
+          <div class="dcc-field-group">
+            <label class="dcc-field-label">Fisik Bad</label>
+            <div class="dcc-number-input">
+              <button type="button" class="dcc-num-btn" onclick="adjustDccNumber('dccFisikBad', -1)">−</button>
+              <input type="number" id="dccFisikBad" class="dcc-field-input dcc-num-field" value="0" min="0">
+              <button type="button" class="dcc-num-btn" onclick="adjustDccNumber('dccFisikBad', 1)">+</button>
+            </div>
+          </div>
+
+          <!-- Sales (jika ada) -->
+          <div class="dcc-field-group">
+            <label class="dcc-field-label">Sales (jika ada)</label>
+            <div class="dcc-number-input">
+              <button type="button" class="dcc-num-btn" onclick="adjustDccNumber('dccSales', -1)">−</button>
+              <input type="number" id="dccSales" class="dcc-field-input dcc-num-field" value="0" min="0">
+              <button type="button" class="dcc-num-btn" onclick="adjustDccNumber('dccSales', 1)">+</button>
+            </div>
+          </div>
+
+          <!-- Reason SLOC (shown when Unmatch) -->
+          <div class="dcc-field-group hidden" id="dccReasonSlocGroup">
+            <label class="dcc-field-label">Reason SLOC <span class="dcc-required">*</span></label>
+            <input type="text" id="dccReasonSloc" class="dcc-field-input" placeholder="Alasan SLOC tidak match...">
+          </div>
+
+          <!-- Reason Bad (shown when Fisik Bad > 0) -->
+          <div class="dcc-field-group hidden" id="dccReasonBadGroup">
+            <label class="dcc-field-label">Reason Bad <span class="dcc-required">*</span></label>
+            <select id="dccReasonBad" class="dcc-field-input">
+              <option value="" disabled selected>-- Pilih Alasan Kerusakan (Wajib) --</option>
+              <option value="Kemasan Rusak / Robek / Berlubang / Loss Vacum">Kemasan Rusak / Robek / Berlubang / Loss Vacum</option>
+              <option value="Tidak Segar / Layu / Keriput">Tidak Segar / Layu / Keriput</option>
+              <option value="Produk Kadaluarsa">Produk Kadaluarsa</option>
+              <option value="Busuk / Berjamur / Bau Menyengat">Busuk / Berjamur / Bau Menyengat</option>
+              <option value="Badstock Karantina">Badstock Karantina</option>
+            </select>
+          </div>
+
+          <!-- Foto Evidence (Multi-Foto hingga 3 gambar) -->
+          <div class="dcc-field-group hidden" id="dccPhotoEvidenceGroup">
+            <div class="dcc-field-header-row">
+              <label class="dcc-field-label">Foto Bukti Kerusakan / Evidence <span class="dcc-required">*</span></label>
+              <span class="dcc-photo-counter-badge" id="dccPhotoCountBadge">0/3 Foto</span>
+            </div>
+            <div class="dcc-photo-buttons">
+              <button type="button" id="dccCameraBtn" class="dcc-photo-action-btn"
+                onclick="document.getElementById('dccCameraInput').click()">
+                📷 Foto Kamera
+              </button>
+              <button type="button" id="dccGalleryBtn" class="dcc-photo-action-btn secondary"
+                onclick="document.getElementById('dccGalleryInput').click()">
+                📁 Dari Galeri
+              </button>
+              <input type="file" id="dccCameraInput" accept="image/*" capture="environment" class="hidden"
+                onchange="handleDccImageUpload(event)">
+              <input type="file" id="dccGalleryInput" accept="image/*" class="hidden"
+                onchange="handleDccImageUpload(event)">
+            </div>
+
+            <!-- Multi-Photo Thumbnails Grid -->
+            <div id="dccPhotoThumbnailsGrid" class="dcc-photo-grid">
+              <div class="dcc-no-photo-hint">Belum ada foto bukti yang diambil</div>
+            </div>
+          </div>
+
+          <!-- Evidance 1 (Catatan teks opsional) -->
+          <div class="dcc-field-group">
+            <label class="dcc-field-label">Catatan Evidance (Opsional)</label>
+            <input type="text" id="dccEvidance" class="dcc-field-input" placeholder="Catatan tambahan...">
+          </div>
+
+          <!-- PIC Penginput (Input By) -->
+          <div class="dcc-field-group" id="dccInputByGroup">
+            <label class="dcc-field-label">PIC Penginput <span class="dcc-required">*</span></label>
+            <div class="dcc-pic-card-wrap">
+              <div class="dcc-pic-active-badge">
+                <span id="dccActivePicIcon" style="font-size:1.2rem;">☀️</span>
+                <span id="dccActivePicName" class="dcc-pic-name">Bintang</span>
+                <span id="dccActiveShiftTag" class="dcc-pic-tag">Shift Pagi (Task 1)</span>
+              </div>
+              <button type="button" class="btn-dcc-change-pic" id="btnChangePic" onclick="toggleDccCustomPicInput()" title="Ubah Nama Penginput">
+                ✏️ Ganti PIC
+              </button>
+            </div>
+            <!-- Custom Input By Name (shown when clicked Ganti PIC) -->
+            <div class="dcc-custom-pic-row hidden" id="dccCustomInputByGroup">
+              <input type="text" id="dccCustomInputByName" class="dcc-field-input" placeholder="Ketik nama petugas..." autocomplete="off">
+              <button type="button" class="dcc-btn-save" style="width:auto; padding:0 16px; white-space:nowrap; font-size:0.85rem;" onclick="saveDccPetugas2Name()">Simpan</button>
+            </div>
+          </div>
+
+          <!-- Label Barcode Product (Ada / Tidak ada) -->
+          <div class="dcc-field-group">
+            <label class="dcc-field-label">Label Barcode Product</label>
+            <div class="dcc-toggle-group" id="dccLabelProductGroup">
+              <button type="button" class="dcc-toggle-btn selected" data-value="Ada"
+                onclick="setDccToggle('dccLabelProductGroup', 'Ada')">Ada</button>
+              <button type="button" class="dcc-toggle-btn" data-value="Tidak ada"
+                onclick="setDccToggle('dccLabelProductGroup', 'Tidak ada')">Tidak ada</button>
+            </div>
+          </div>
+
+          <!-- Label Sloc (Ada / Tidak ada) -->
+          <div class="dcc-field-group">
+            <label class="dcc-field-label">Label Sloc</label>
+            <div class="dcc-toggle-group" id="dccLabelSlocGroup">
+              <button type="button" class="dcc-toggle-btn selected" data-value="Ada"
+                onclick="setDccToggle('dccLabelSlocGroup', 'Ada')">Ada</button>
+              <button type="button" class="dcc-toggle-btn" data-value="Tidak ada"
+                onclick="setDccToggle('dccLabelSlocGroup', 'Tidak ada')">Tidak ada</button>
+            </div>
+          </div>
+
+          <!-- Action Buttons -->
+          <div class="dcc-form-actions">
+            <button type="button" class="dcc-btn-cancel" onclick="handleDccCancelScan()">Cancel</button>
+            <button type="button" class="dcc-btn-save" id="dccSubmitBtn" onclick="submitDccData()">Save</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- DCC Floating Toast Notification -->
+      <div id="dccToast" class="dcc-toast hidden">
+        <span id="dccToastIcon" class="dcc-toast-icon">✅</span>
+        <div class="dcc-toast-body">
+          <div id="dccToastTitle" class="dcc-toast-title">Berhasil!</div>
+          <div id="dccToastMessage" class="dcc-toast-message">Data berhasil disimpan ke sheet MTG.</div>
+        </div>
+      </div>
+
+      <!-- DCC Tab Content: Report -->
+      <div id="dccTabReport" class="dcc-tab-content hidden">
+        <div class="dcc-report-container">
+
+          <!-- Report Header Banner -->
+          <div class="dcc-report-header-card">
+            <div class="dcc-report-title-group">
+              <div class="dcc-report-badge">SUMMARY DCC STOCK KEEPER</div>
+              <div class="dcc-report-subtitle" id="dccReportShiftLabel">Shift Pagi</div>
+            </div>
+            <div class="dcc-report-meta-row">
+              <div class="dcc-report-meta-item">
+                <span class="meta-label">📅 Tanggal</span>
+                <span class="meta-val" id="dccReportTanggal">30 Juli 2026</span>
+              </div>
+              <div class="dcc-report-meta-item">
+                <span class="meta-label">🏬 Hub</span>
+                <span class="meta-val" id="dccReportHub">MTG - Menteng</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Report Action Toolbar (Excel, WA, Print) -->
+          <div class="dcc-report-actions-toolbar">
+            <button type="button" class="btn-dcc-action btn-dcc-excel" onclick="exportDccReportToExcel()" id="btnExportDccExcel" title="Unduh hasil rekap ke file Excel / CSV">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                <polyline points="7 10 12 15 17 10"></polyline>
+                <line x1="12" y1="15" x2="12" y2="3"></line>
+              </svg>
+              <span>Unduh Excel</span>
+            </button>
+            <button type="button" class="btn-dcc-action btn-dcc-wa" onclick="shareDccReportWhatsApp()" id="btnShareDccWa" title="Bagikan ringkasan laporan ke WhatsApp">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12.031 6.172c-3.181 0-5.767 2.586-5.768 5.766-.001 1.298.38 2.27 1.019 3.287l-.582 2.128 2.182-.573c.978.58 1.911.928 3.145.929 3.178 0 5.767-2.587 5.768-5.766.001-3.187-2.575-5.771-5.764-5.771zm3.392 8.244c-.144.405-.837.774-1.17.824-.299.045-.677.063-1.092-.069-.252-.08-.575-.187-.988-.365-1.739-.751-2.874-2.502-2.961-2.617-.087-.116-.708-.94-.708-1.793s.448-1.273.607-1.446c.159-.173.346-.217.462-.217l.332.006c.106.005.249-.04.39.298.144.347.491 1.2.534 1.287.043.087.072.188.014.304-.058.116-.087.188-.173.289l-.26.304c-.087.086-.177.18-.076.354.101.174.449.741.964 1.201.662.591 1.221.774 1.394.86.174.086.275.072.376-.043.101-.116.433-.506.549-.68.116-.173.231-.145.39-.087s1.011.477 1.184.564.289.13.332.202c.043.073.043.419-.101.824z"/>
+              </svg>
+              <span>Bagikan WA</span>
+            </button>
+            <button type="button" class="btn-dcc-action btn-dcc-print" onclick="printDccReport()" id="btnPrintDcc" title="Cetak atau simpan sebagai PDF">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="6 9 6 2 18 2 18 9"></polyline>
+                <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
+                <rect x="6" y="14" width="12" height="8"></rect>
+              </svg>
+              <span>Cetak / PDF</span>
+            </button>
+          </div>
+
+          <!-- KPI Summary Row (Progress + SLOC Match + SLOC Unmatch) -->
+          <div class="dcc-report-kpi-row">
+            <!-- Progress Overview Card -->
+            <div class="dcc-report-stat-card primary">
+              <div class="stat-card-header">
+                <span>% Counting Progress</span>
+                <span class="stat-main-number" id="dccReportProgress">0%</span>
+              </div>
+              <div class="dcc-progress-bar-bg">
+                <div class="dcc-progress-bar-fill" id="dccProgressBarFill" style="width: 0%;"></div>
+              </div>
+            </div>
+
+            <!-- SLOC Match -->
+            <div class="dcc-report-stat-card success">
+              <span class="stat-card-title">% SLOC Match</span>
+              <span class="stat-metric-val text-success" id="dccReportSlocMatch">0,00%</span>
+            </div>
+
+            <!-- SLOC Unmatch -->
+            <div class="dcc-report-stat-card warning">
+              <span class="stat-card-title">% SLOC Unmatch</span>
+              <span class="stat-metric-val text-warning" id="dccReportSlocUnmatch">0,00%</span>
+            </div>
+          </div>
+
+          <!-- Key Metrics Grid (4x2 Full Width Grid) -->
+          <div class="dcc-report-metrics-grid">
+            <div class="dcc-metric-box">
+              <span class="metric-box-label">Total SKU</span>
+              <span class="metric-box-val" id="dccReportTotalSku">0</span>
+            </div>
+            <div class="dcc-metric-box">
+              <span class="metric-box-label">Total QTY</span>
+              <span class="metric-box-val" id="dccReportTotalQty">0</span>
+            </div>
+            <div class="dcc-metric-box success">
+              <span class="metric-box-label">SKU Counted</span>
+              <span class="metric-box-val text-success" id="dccReportSkuCounted">0</span>
+            </div>
+            <div class="dcc-metric-box muted">
+              <span class="metric-box-label">SKU Not Counted</span>
+              <span class="metric-box-val" id="dccReportSkuNotCounted">0</span>
+            </div>
+            <div class="dcc-metric-box success">
+              <span class="metric-box-label">QTY Counted</span>
+              <span class="metric-box-val text-success" id="dccReportQtyCounted">0</span>
+            </div>
+            <div class="dcc-metric-box warning">
+              <span class="metric-box-label">QTY Not Counted</span>
+              <span class="metric-box-val text-warning" id="dccReportQtyNotCounted">0</span>
+            </div>
+            <div class="dcc-metric-box info">
+              <span class="metric-box-label">QTY Sales</span>
+              <span class="metric-box-val text-info" id="dccReportQtySales">0</span>
+            </div>
+            <div class="dcc-metric-box info">
+              <span class="metric-box-label">% FEFO</span>
+              <span class="metric-box-val text-info" id="dccReportFefo">-</span>
+            </div>
+          </div>
+
+          <!-- Detailed Summary Table (Exact Sheet Match) -->
+          <div class="dcc-report-table-section">
+            <div class="dcc-report-table-title">Detail Ringkasan Sheet Report</div>
+            <div class="dcc-report-table-wrapper">
+              <table class="dcc-report-table">
+                <thead>
+                  <tr>
+                    <th>Indikator / Metrik</th>
+                    <th style="text-align: right;">Nilai</th>
+                  </tr>
+                </thead>
+                <tbody id="dccReportTableBody">
+                  <tr>
+                    <td colspan="2" style="text-align:center; padding: 20px; color: var(--text-muted);">Memuat data
+                      Report...</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Bottom Navigation for DCC -->
+      <nav class="dcc-bottom-nav">
+        <button class="dcc-nav-item" id="navDccScan" onclick="switchDccTab('scan')">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+            <line x1="3" y1="9" x2="21" y2="9"></line>
+            <line x1="9" y1="21" x2="9" y2="9"></line>
+          </svg>
+          <span>Scan SKU</span>
+        </button>
+        <button class="dcc-nav-item active" id="navDccMain" onclick="switchDccTab('main')">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round">
+            <line x1="8" y1="6" x2="21" y2="6"></line>
+            <line x1="8" y1="12" x2="21" y2="12"></line>
+            <line x1="8" y1="18" x2="21" y2="18"></line>
+            <line x1="3" y1="6" x2="3.01" y2="6"></line>
+            <line x1="3" y1="12" x2="3.01" y2="12"></line>
+            <line x1="3" y1="18" x2="3.01" y2="18"></line>
+          </svg>
+          <span>Main List SKU</span>
+        </button>
+        <button class="dcc-nav-item" id="navDccReport" onclick="switchDccTab('report')">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round">
+            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+          </svg>
+          <span>Report</span>
+        </button>
+      </nav>
+    </div> <!-- End DCC Workspace -->
+
+    <!-- ── Expired Date Sweeper Workspace (Hidden by Default) ── -->
+    <div id="edSweeperWorkspace" class="hidden">
+      <!-- EDS Top Action Bar -->
+      <div class="eds-top-bar">
+        <button type="button" class="eds-top-back-btn" onclick="handleEdsBackPressed()" title="Kembali ke Menu Utama">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+            stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="15 18 9 12 15 6"></polyline>
+          </svg>
+        </button>
+        <div class="eds-title-wrap">
+          <div class="eds-title">Expired Date Sweeper</div>
+          <button type="button" class="eds-offline-badge-btn hidden" id="edsOfflineQueueBadge" onclick="syncEdsOfflineQueue(true)" title="Klik untuk sinkronisasi data offline"></button>
+        </div>
+        <div class="eds-top-actions">
+          <button type="button" class="eds-refresh-btn" onclick="refreshEdsData()" title="Muat Ulang Data dari Sheet">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+              stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="23 4 23 10 17 10"></polyline>
+              <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- EDS Tab Content: Main List SKU -->
+      <div id="edsTabMainList" class="eds-tab-content active">
+        <!-- Search & Filter Bar -->
+        <div class="eds-filter-container">
+          <!-- Row 1: Full-width Search Input -->
+          <div class="eds-filter-input-wrapper">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+              stroke-linecap="round" stroke-linejoin="round" class="eds-filter-icon">
+              <circle cx="11" cy="11" r="8"></circle>
+              <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+            </svg>
+            <input type="text" id="edsFilterInput" class="eds-filter-input"
+              placeholder="Cari SKU, nama produk, rack, atau kategori..." autocomplete="off">
+            <button type="button" id="edsFilterClearBtn" class="eds-filter-clear-btn hidden"
+              onclick="clearEdsFilter()" title="Hapus pencarian">✕</button>
+          </div>
+
+          <!-- Row 2: Status Pills (Semua, Sudah Diinput, Belum Diinput) -->
+          <div class="eds-status-pills">
+            <button type="button" class="eds-status-btn active" data-status="all" onclick="setEdsStatusFilter('all')" title="Tampilkan Semua SKU">
+              <span>📋 Semua</span>
+              <span class="eds-status-badge" id="edsStatusCountAll">0</span>
+            </button>
+            <button type="button" class="eds-status-btn btn-submitted" data-status="submitted" onclick="setEdsStatusFilter('submitted')" title="Tampilkan SKU yang Sudah Diinput">
+              <span>✅ Sudah</span>
+              <span class="eds-status-badge badge-submitted" id="edsStatusCountSubmitted">0</span>
+            </button>
+            <button type="button" class="eds-status-btn btn-pending" data-status="pending" onclick="setEdsStatusFilter('pending')" title="Tampilkan SKU yang Belum Diinput">
+              <span>⏳ Belum</span>
+              <span class="eds-status-badge badge-pending" id="edsStatusCountPending">0</span>
+            </button>
+          </div>
+
+          <!-- Row 3: Alert Filter Pills (Semua Alert, Warning, Safe) -->
+          <div class="eds-alert-pills">
+            <button type="button" class="eds-alert-btn active" data-alert="all" onclick="setEdsAlertFilter('all')">
+              Semua Alert
+            </button>
+            <button type="button" class="eds-alert-btn btn-warning" data-alert="warning" onclick="setEdsAlertFilter('warning')">
+              🟡 Warning (≤3 Hari)
+            </button>
+            <button type="button" class="eds-alert-btn btn-safe" data-alert="safe" onclick="setEdsAlertFilter('safe')">
+              🟢 Safe
+            </button>
+          </div>
+
+          <!-- Row 4: Category Pills -->
+          <div class="eds-category-strip" id="edsCategoryStrip">
+            <button type="button" class="eds-cat-chip active" data-cat="all" onclick="setEdsCategoryFilter('all')">Semua Kategori</button>
+            <button type="button" class="eds-cat-chip" data-cat="Buah Segar" onclick="setEdsCategoryFilter('Buah Segar')">🍎 Buah Segar</button>
+            <button type="button" class="eds-cat-chip" data-cat="Sayur Segar" onclick="setEdsCategoryFilter('Sayur Segar')">🥬 Sayur Segar</button>
+            <button type="button" class="eds-cat-chip" data-cat="Makanan Beku" onclick="setEdsCategoryFilter('Makanan Beku')">❄️ Makanan Beku</button>
+            <button type="button" class="eds-cat-chip" data-cat="Susu & Olahan Susu" onclick="setEdsCategoryFilter('Susu & Olahan Susu')">🥛 Susu & Olahan</button>
+            <button type="button" class="eds-cat-chip" data-cat="Bahan Masak & Bumbu" onclick="setEdsCategoryFilter('Bahan Masak & Bumbu')">🧂 Bahan Masak</button>
+          </div>
+
+          <!-- Progress Meta Strip -->
+          <div class="eds-filter-meta">
+            <div class="eds-progress-bar-wrap">
+              <div class="eds-progress-bar-fill" id="edsProgressBarFill" style="width: 0%"></div>
+            </div>
+            <span id="edsListCountBadge" class="eds-count-badge">0 Selesai / 0 SKU (0%)</span>
+          </div>
+        </div>
+
+        <!-- Sort Bar -->
+        <div class="eds-sort-bar">
+          <span class="eds-sort-label">Urutkan:</span>
+          <button type="button" class="eds-sort-btn active" id="edsSortDaysAsc" onclick="toggleEdsSort('days_asc')">
+            Sisa Hari ↑
+          </button>
+          <button type="button" class="eds-sort-btn" id="edsSortNameAsc" onclick="toggleEdsSort('name_asc')">
+            Nama A-Z
+          </button>
+          <button type="button" class="eds-sort-btn" id="edsSortSlocAsc" onclick="toggleEdsSort('sloc_asc')">
+            Rack A-Z
+          </button>
+          <button type="button" class="eds-sort-btn" id="edsSortStockDesc" onclick="toggleEdsSort('stock_desc')">
+            Stok ↓
+          </button>
+        </div>
+
+        <!-- Card Container -->
+        <div class="eds-card-container" id="edsCardContainer">
+          <div style="text-align:center; padding: 30px; color: var(--text-muted);">Memuat data dari Main List SKU...</div>
+        </div>
+      </div>
+
+      <!-- EDS Tab Content: Scan / Input SKU -->
+      <div id="edsTabScan" class="eds-tab-content">
+        <div class="eds-scan-container">
+          <!-- WebApp Connection Banner -->
+          <div class="eds-webapp-banner not-connected" id="edsWebappBanner" onclick="openEdsSetupModal()" title="Klik untuk cek / ganti URL WebApp">
+            <div class="eds-webapp-banner-icon">🔗</div>
+            <div class="eds-webapp-banner-content">
+              <div class="eds-webapp-banner-title">Koneksi Spreadsheet Hasil EDS</div>
+              <div class="eds-webapp-banner-status" id="edsWebappBannerStatus">⚠️ Belum Disambungkan (Klik untuk Pasang URL)</div>
+            </div>
+            <button type="button" class="eds-webapp-banner-btn" onclick="event.stopPropagation(); openEdsSetupModal();">⚙️ Atur</button>
+          </div>
+
+          <!-- Active SKU Header Banner (if selected from list) -->
+          <div id="edsSelectedBanner" class="eds-selected-banner hidden">
+            <div class="eds-selected-info">
+              <span class="eds-selected-badge">Mode Input SKU</span>
+              <span id="edsSelectedTitle" class="eds-selected-title"></span>
+            </div>
+            <button type="button" class="eds-selected-clear" onclick="clearEdsSelectedSku()" title="Batal pilihan">✕</button>
+          </div>
+
+          <!-- SKU No -->
+          <div class="eds-field-group">
+            <label class="eds-field-label">SKU No <span class="eds-required">*</span></label>
+            <div class="eds-input-row">
+              <input type="text" id="edsSkuInput" class="eds-field-input" placeholder="Scan atau ketik SKU..."
+                inputmode="text" autocomplete="off">
+              <button type="button" class="eds-scan-btn" onclick="startEdsCameraScan()" title="Buka Scanner Barcode">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <rect x="3" y="3" width="7" height="7" />
+                  <rect x="14" y="3" width="7" height="7" />
+                  <rect x="14" y="14" width="7" height="7" />
+                  <rect x="3" y="14" width="7" height="7" />
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          <!-- Nama SKU (auto-fill, readonly) -->
+          <div class="eds-field-group">
+            <label class="eds-field-label">Nama SKU</label>
+            <input type="text" id="edsNamaSku" class="eds-field-input eds-readonly" readonly
+              placeholder="Otomatis terisi dari sistem...">
+          </div>
+
+          <!-- SLOC Existing & Qty System -->
+          <div class="eds-field-row">
+            <div class="eds-field-group" style="flex: 2;">
+              <label class="eds-field-label">SLOC Existing (Rack)</label>
+              <input type="text" id="edsSlocExisting" class="eds-field-input eds-readonly" readonly
+                placeholder="Lokasi rack...">
+            </div>
+            <div class="eds-field-group" style="flex: 1;">
+              <label class="eds-field-label">Stok Sistem</label>
+              <input type="text" id="edsQtySystem" class="eds-field-input eds-readonly" readonly
+                placeholder="0">
+            </div>
+          </div>
+
+          <!-- SLOC Actual (Match / Unmatch) -->
+          <div class="eds-field-group">
+            <label class="eds-field-label">SLOC Actual <span class="eds-required">*</span></label>
+            <div class="eds-toggle-group" id="edsSlocActualGroup">
+              <button type="button" class="eds-toggle-btn active" data-value="Match"
+                onclick="setEdsToggle('edsSlocActualGroup', 'Match')">Match</button>
+              <button type="button" class="eds-toggle-btn" data-value="Unmatch"
+                onclick="setEdsToggle('edsSlocActualGroup', 'Unmatch')">Unmatch</button>
+            </div>
+          </div>
+
+          <!-- Reason SLOC (shown when Unmatch) -->
+          <div class="eds-field-group hidden" id="edsReasonSlocGroup">
+            <label class="eds-field-label">Alasan SLOC Unmatch <span class="eds-required">*</span></label>
+            <select id="edsReasonSloc" class="eds-field-select">
+              <option value="">-- Pilih Alasan SLOC --</option>
+              <option value="Barang di Luar Rack">Barang di Luar Rack</option>
+              <option value="Salah Penempatan Rack">Salah Penempatan Rack</option>
+              <option value="Rack Penuh">Rack Penuh</option>
+              <option value="SLOC Belum Terdaftar">SLOC Belum Terdaftar</option>
+              <option value="Lainnya">Lainnya</option>
+            </select>
+          </div>
+
+          <!-- Expired Date -->
+          <div class="eds-field-group">
+            <div class="eds-field-header-row">
+              <label class="eds-field-label">Expired Date Produk <span class="eds-required">*</span></label>
+              <span id="edsMsltcHelper" class="eds-helper-tag"></span>
+            </div>
+            <input type="text" id="edsExpiredDate" class="eds-field-input flatpickr-input" placeholder="Pilih Tanggal ED (YYYY-MM-DD)">
+          </div>
+
+          <!-- Fisik Good & Fisik Bad -->
+          <div class="eds-field-row">
+            <div class="eds-field-group" style="flex: 1;">
+              <label class="eds-field-label">Fisik Good <span class="eds-required">*</span></label>
+              <div class="eds-stepper-wrap">
+                <button type="button" class="eds-step-btn" onclick="stepEdsValue('edsFisikGood', -1)">-</button>
+                <input type="number" id="edsFisikGood" class="eds-field-input eds-num-input" value="0" min="0">
+                <button type="button" class="eds-step-btn" onclick="stepEdsValue('edsFisikGood', 1)">+</button>
+              </div>
+            </div>
+            <div class="eds-field-group" style="flex: 1;">
+              <label class="eds-field-label">Fisik Bad</label>
+              <div class="eds-stepper-wrap">
+                <button type="button" class="eds-step-btn" onclick="stepEdsValue('edsFisikBad', -1)">-</button>
+                <input type="number" id="edsFisikBad" class="eds-field-input eds-num-input" value="0" min="0">
+                <button type="button" class="eds-step-btn" onclick="stepEdsValue('edsFisikBad', 1)">+</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Sales (jika ada) -->
+          <div class="eds-field-group">
+            <label class="eds-field-label">Sales (jika ada)</label>
+            <input type="number" id="edsSales" class="eds-field-input" placeholder="0" min="0">
+          </div>
+
+          <!-- Reason Bad (conditional on Fisik Bad > 0) -->
+          <div class="eds-field-group" id="edsReasonBadGroup">
+            <label class="eds-field-label">Reason Bad (Jika Ada Bad)</label>
+            <select id="edsReasonBad" class="eds-field-select">
+              <option value="">-- Pilih Alasan Bad --</option>
+              <option value="Expired">Expired</option>
+              <option value="Rusak / Bocor">Rusak / Bocor</option>
+              <option value="Kering / Layu">Kering / Layu</option>
+              <option value="Busuk">Busuk</option>
+              <option value="Berjamur">Berjamur</option>
+              <option value="Kemasan Rusak / Sobek">Kemasan Rusak / Sobek</option>
+              <option value="Pecah">Pecah</option>
+              <option value="Hama / Serangga">Hama / Serangga</option>
+              <option value="Beda Batch / Kualitas Jelek">Beda Batch / Kualitas Jelek</option>
+              <option value="Lainnya">Lainnya</option>
+            </select>
+          </div>
+
+          <!-- Foto Evidance (Bukti Fisik) -->
+          <div class="eds-field-group">
+            <label class="eds-field-label">Foto Evidance (Maksimal 2 Foto)</label>
+            <div class="eds-photo-actions">
+              <button type="button" class="eds-photo-btn" onclick="captureEdsPhoto('camera')">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
+                  <circle cx="12" cy="13" r="4"></circle>
+                </svg>
+                <span>Ambil Kamera</span>
+              </button>
+              <button type="button" class="eds-photo-btn btn-gallery" onclick="captureEdsPhoto('gallery')">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                  <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                  <polyline points="21 15 16 10 5 21"></polyline>
+                </svg>
+                <span>Pilih Galeri</span>
+              </button>
+              <input type="file" id="edsPhotoCameraInput" accept="image/*" capture="environment" class="hidden" onchange="handleEdsPhotoFile(event)">
+              <input type="file" id="edsPhotoGalleryInput" accept="image/*" class="hidden" onchange="handleEdsPhotoFile(event)">
+            </div>
+            <div id="edsPhotoPreviewList" class="eds-photo-grid"></div>
+          </div>
+
+          <!-- Input by (PIC) -->
+          <div class="eds-field-group">
+            <label class="eds-field-label">Input by (Nama PIC) <span class="eds-required">*</span></label>
+            <div class="eds-pic-selector-row">
+              <input type="text" id="edsInputBy" class="eds-field-input" placeholder="Masukkan nama Anda (misal: Bintang)...">
+              <button type="button" class="eds-pic-save-btn" onclick="saveEdsDefaultPic()" title="Simpan sebagai default">Ingat Saya</button>
+            </div>
+          </div>
+
+          <!-- Catatan Tambahan (Remaks) -->
+          <div class="eds-field-group">
+            <label class="eds-field-label">Catatan Tambahan (Opsional)</label>
+            <input type="text" id="edsRemaksInput" class="eds-field-input" placeholder="Catatan khusus...">
+          </div>
+
+          <!-- Submit Button -->
+          <button type="button" id="edsSubmitBtn" class="eds-submit-btn" onclick="submitEdsForm()">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
+              <polyline points="17 21 17 13 7 13 7 21"></polyline>
+              <polyline points="7 3 7 8 15 8"></polyline>
+            </svg>
+            <span>Simpan Hasil Sweeper</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- EDS Tab Content: Report -->
+      <div id="edsTabReport" class="eds-tab-content">
+        <div class="eds-report-container">
+          <!-- Summary Cards Grid -->
+          <div class="eds-report-grid">
+            <div class="eds-stat-card">
+              <div class="eds-stat-num" id="edsStatTotal">0</div>
+              <div class="eds-stat-lbl">Total SKU</div>
+            </div>
+            <div class="eds-stat-card card-success">
+              <div class="eds-stat-num" id="edsStatDone">0</div>
+              <div class="eds-stat-lbl">Sudah Diperiksa</div>
+            </div>
+            <div class="eds-stat-card card-pending">
+              <div class="eds-stat-num" id="edsStatPending">0</div>
+              <div class="eds-stat-lbl">Belum Diperiksa</div>
+            </div>
+            <div class="eds-stat-card card-danger">
+              <div class="eds-stat-num" id="edsStatBad">0</div>
+              <div class="eds-stat-lbl">Fisik Bad Ditemukan</div>
+            </div>
+          </div>
+
+          <!-- Export Action Buttons -->
+          <div class="eds-export-actions">
+            <button type="button" class="eds-btn-export btn-wa" onclick="shareEdsToWhatsApp()">
+              <span>📱 Share WhatsApp</span>
+            </button>
+            <button type="button" class="eds-btn-export btn-excel" onclick="exportEdsToExcel()">
+              <span>📊 Download Excel</span>
+            </button>
+            <button type="button" class="eds-btn-export btn-pdf" onclick="printEdsPdf()">
+              <span>🖨️ Cetak PDF</span>
+            </button>
+          </div>
+
+          <!-- List of Submitted Items Today -->
+          <div class="eds-report-section-title">Riwayat Hasil Audit (Hari Ini)</div>
+          <div id="edsReportTableContainer" class="eds-report-list">
+            <div style="text-align:center; padding: 25px; color: var(--text-muted);">Belum ada riwayat audit yang tercatat.</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- EDS Bottom Navigation Bar -->
+      <nav class="eds-bottom-nav">
+        <button type="button" class="eds-nav-item" id="navEdsScan" onclick="switchEdsTab('scan')">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+            <line x1="3" y1="9" x2="21" y2="9"></line>
+            <line x1="9" y1="21" x2="9" y2="9"></line>
+          </svg>
+          <span>Scan / Input</span>
+        </button>
+        <button type="button" class="eds-nav-item active" id="navEdsMain" onclick="switchEdsTab('main')">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="8" y1="6" x2="21" y2="6"></line>
+            <line x1="8" y1="12" x2="21" y2="12"></line>
+            <line x1="8" y1="18" x2="21" y2="18"></line>
+            <line x1="3" y1="6" x2="3.01" y2="6"></line>
+            <line x1="3" y1="12" x2="3.01" y2="12"></line>
+            <line x1="3" y1="18" x2="3.01" y2="18"></line>
+          </svg>
+          <span>Main List SKU</span>
+        </button>
+        <button type="button" class="eds-nav-item" id="navEdsReport" onclick="switchEdsTab('report')">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+          </svg>
+          <span>Report & Rekap</span>
+        </button>
+      </nav>
+    </div> <!-- End Expired Date Sweeper Workspace -->
+
+    <!-- EDS Setup & Formula Modal -->
+    <div id="edsSetupModal" class="eds-modal hidden">
+      <div class="eds-modal-backdrop" onclick="closeEdsSetupModal()"></div>
+      <div class="eds-modal-card">
+        <div class="eds-modal-header">
+          <div class="eds-modal-title">⚙️ Panduan Rumus & WebApp Endpoint</div>
+          <button type="button" class="eds-modal-close" onclick="closeEdsSetupModal()">✕</button>
+        </div>
+        <div class="eds-modal-body">
+          <div class="eds-guide-block">
+            <h4>1. Rumus Otomatis Kolom R, S, T (Google Sheets)</h4>
+            <p>Untuk mengisi otomatis kolom R (Done), S (Remaks DCC), dan T (Fisik/System) tanpa delay, masukkan rumus berikut di baris 2:</p>
+            <div class="eds-formula-box">
+              <label>Kolom R (Done) [Cell R2]:</label>
+              <code>=IF(B2="","", IFERROR(IF(MATCH(B2, 'Hasil EDS'!A:A, 0)>0, "Done", ""), ""))</code>
+            </div>
+            <div class="eds-formula-box">
+              <label>Kolom S (Remaks DCC) [Cell S2]:</label>
+              <code>=IF(B2="","", IFERROR(IF(VLOOKUP(B2, 'Hasil EDS'!A:J, 10, FALSE)&lt;&gt;"", VLOOKUP(B2, 'Hasil EDS'!A:J, 10, FALSE), VLOOKUP(B2, 'Hasil EDS'!A:I, 9, FALSE)), ""))</code>
+            </div>
+            <div class="eds-formula-box">
+              <label>Kolom T (Fisik/System) [Cell T2]:</label>
+              <code>=IF(B2="","", IFERROR(VLOOKUP(B2, 'Hasil EDS'!A:F, 6, FALSE) &amp; "/" &amp; K2, ""))</code>
+            </div>
+          </div>
+
+          <div class="eds-guide-block">
+            <h4>2. Konfigurasi Web App URL (Google Apps Script)</h4>
+            <p>URL Web App untuk menerima submission data dan upload foto ke Drive:</p>
+            <input type="text" id="edsWebappUrlInput" class="eds-field-input" placeholder="https://script.google.com/macros/s/.../exec">
+            <button type="button" class="eds-submit-btn" style="margin-top: 8px;" onclick="saveEdsWebappUrl()">Simpan WebApp URL</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Slip Gaji Workspace (Hidden by Default) ── -->
+    <div id="slipGajiWorkspace" class="hidden">
+      <!-- Slip Gaji Top Action Bar -->
+      <div class="sg-top-bar">
+        <button type="button" class="sg-top-back-btn" onclick="goBackToMenu()" title="Kembali ke Menu Utama">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+            stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="15 18 9 12 15 6"></polyline>
+          </svg>
+        </button>
+        <div class="sg-title">Slip Gaji Manpower MTG</div>
+        <button class="sg-refresh-btn" onclick="refreshSlipGajiData()" title="Muat Ulang Data Slip Gaji">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="23 4 23 10 17 10"></polyline>
+            <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+          </svg>
+        </button>
+      </div>
+
+      <!-- Search & MP Selector Section -->
+      <div class="sg-filter-container">
+        <div class="sg-filter-input-wrapper">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round" class="sg-filter-icon">
+            <circle cx="11" cy="11" r="8"></circle>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+          </svg>
+          <input type="text" id="sgFilterInput" class="sg-filter-input" placeholder="Cari Nama MP atau ID..."
+            autocomplete="off">
+          <button type="button" id="sgFilterClearBtn" class="sg-filter-clear-btn hidden"
+            onclick="clearSlipGajiFilter()">✕</button>
+        </div>
+
+        <div class="sg-meta-bar">
+          <span id="sgListCountBadge" class="sg-count-badge">0 Manpower</span>
+          <span id="sgLastSyncBadge" class="sg-sync-badge">Live Google Sheets</span>
+        </div>
+      </div>
+
+      <!-- Single Active Payslip Detail View -->
+      <div id="sgDetailSection" class="sg-detail-section hidden"></div>
+
+      <!-- MP List Grid Cards -->
+      <div id="sgCardContainer" class="sg-card-container">
+        <div class="sg-empty-state">
+          <div style="font-size: 38px; margin-bottom: 10px;">🔍</div>
+          <div style="font-weight: 700; font-size: 1.05rem; color: var(--text-primary); margin-bottom: 6px;">
+            Cari Slip Gaji Manpower
+          </div>
+          <div
+            style="font-size: 0.85rem; color: var(--text-muted); line-height: 1.5; max-width: 340px; margin: 0 auto;">
+            Ketik nama Manpower atau ID pada kolom pencarian di atas untuk melihat rincian slip gaji.
+          </div>
+        </div>
+      </div>
+    </div> <!-- End Slip Gaji Workspace -->
+
+    <!-- ── MP Schedule Workspace (Hidden by Default) ── -->
+    <div id="mpScheduleWorkspace" class="hidden">
+      <!-- Top Action Bar -->
+      <div class="mps-top-bar">
+        <button type="button" class="mps-top-back-btn" onclick="goBackToMenu()" title="Kembali ke Menu Utama">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+            stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="15 18 9 12 15 6"></polyline>
+          </svg>
+        </button>
+        <div class="mps-title-wrap">
+          <div class="mps-title">MP Schedule MTG 2026</div>
+          <div class="mps-subtitle">Jadwal Shift Kerja QA & Stock Keeper Hub MTG</div>
+        </div>
+        <button class="mps-refresh-btn" onclick="refreshMpScheduleData()" title="Muat Ulang Data Jadwal">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="23 4 23 10 17 10"></polyline>
+            <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+          </svg>
+        </button>
+      </div>
+
+      <!-- Navigation Tabs (Per Manpower | Jadwal Harian | Matrix & Rekap) -->
+      <nav class="mps-nav-tabs">
+        <button type="button" class="mps-tab-btn active" id="tabMpsManpower" onclick="switchMpsTab('manpower')">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round">
+            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+            <circle cx="9" cy="7" r="4"></circle>
+            <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+            <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+          </svg>
+          <span>Per Manpower</span>
+        </button>
+        <button type="button" class="mps-tab-btn" id="tabMpsDaily" onclick="switchMpsTab('daily')">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+            <line x1="16" y1="2" x2="16" y2="6"></line>
+            <line x1="8" y1="2" x2="8" y2="6"></line>
+            <line x1="3" y1="10" x2="21" y2="10"></line>
+          </svg>
+          <span>Jadwal Harian</span>
+        </button>
+        <button type="button" class="mps-tab-btn" id="tabMpsMatrix" onclick="switchMpsTab('matrix')">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+            <line x1="3" y1="9" x2="21" y2="9"></line>
+            <line x1="3" y1="15" x2="21" y2="15"></line>
+            <line x1="9" y1="3" x2="9" y2="21"></line>
+            <line x1="15" y1="3" x2="15" y2="21"></line>
+          </svg>
+          <span>Matrix & Rekap</span>
+        </button>
+      </nav>
+
+      <!-- ── TAB 1: PER MANPOWER ── -->
+      <div id="mpsTabContentManpower" class="mps-tab-pane active">
+        <!-- Search & Filter Card -->
+        <div class="mps-filter-container">
+          <div class="mps-filter-input-wrapper">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+              stroke-linecap="round" stroke-linejoin="round" class="mps-filter-icon">
+              <circle cx="11" cy="11" r="8"></circle>
+              <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+            </svg>
+            <input type="text" id="mpsFilterInput" class="mps-filter-input"
+              placeholder="Cari Nama MP, ID, Job Desk, atau Shift (cth: P7, S13, M21)..." autocomplete="off">
+            <button type="button" id="mpsFilterClearBtn" class="mps-filter-clear-btn hidden"
+              onclick="clearMpScheduleFilter()">✕</button>
+          </div>
+
+          <!-- Role Filter Chips -->
+          <div class="mps-role-chips" id="mpsRoleChips">
+            <button type="button" class="mps-chip-btn active" data-role="all" onclick="setMpsRoleFilter('all')">Semua
+              Role</button>
+            <button type="button" class="mps-chip-btn" data-role="lead" onclick="setMpsRoleFilter('lead')">Shift
+              Lead</button>
+            <button type="button" class="mps-chip-btn" data-role="fresh" onclick="setMpsRoleFilter('fresh')">QA
+              Fresh</button>
+            <button type="button" class="mps-chip-btn" data-role="stockkeeper"
+              onclick="setMpsRoleFilter('stockkeeper')">Stock Keeper</button>
+          </div>
+
+          <!-- Meta Bar -->
+          <div class="mps-meta-bar">
+            <span id="mpsListCountBadge" class="mps-count-badge">0 Manpower</span>
+            <span id="mpsLastSyncBadge" class="mps-sync-badge">Live Google Sheets</span>
+          </div>
+        </div>
+
+        <!-- Single Selected MP Schedule Detailed View -->
+        <div id="mpsDetailSection" class="mps-detail-section hidden"></div>
+
+        <!-- MP Schedule Cards Grid -->
+        <div id="mpsCardContainer" class="mps-card-container">
+          <div class="mps-loading-placeholder">
+            <div class="loading-spinner" style="width:32px;height:32px;margin:0 auto 12px auto;"></div>
+            <div>Mengambil jadwal Manpower dari Google Sheets...</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── TAB 2: JADWAL HARIAN (DAILY ROSTER) ── -->
+      <div id="mpsTabContentDaily" class="mps-tab-pane hidden">
+        <!-- Date Selector Scroll -->
+        <div class="mps-date-section">
+          <div class="mps-section-header">
+            <div class="mps-sec-title">📅 Pilih Tanggal Roster</div>
+            <div class="mps-sec-actions">
+              <button type="button" class="mps-btn-today" onclick="selectTodayDate()">Hari Ini</button>
+            </div>
+          </div>
+          <div class="mps-date-scroll-bar" id="mpsDateScrollContainer"></div>
+        </div>
+
+        <!-- Daily Overview Stat Banner -->
+        <div class="mps-daily-stat-card" id="mpsDailyStatCard">
+          <div class="mps-daily-stat-header">
+            <div>
+              <div class="mps-daily-date-title" id="mpsDailyDateTitle">-</div>
+              <div class="mps-daily-hub-sub">Hub MTG — Roster Harian Operasional</div>
+            </div>
+            <div class="mps-total-duty-badge" id="mpsDailyTotalDuty">0 MP Bertugas</div>
+          </div>
+          <div class="mps-daily-stats-row">
+            <div class="mps-dstat-item pagi">
+              <span class="dstat-lbl">☀️ Pagi/Mid</span>
+              <span class="dstat-val" id="mpsDailyPagiCount">0</span>
+            </div>
+            <div class="mps-dstat-item siang">
+              <span class="dstat-lbl">🌤️ Siang</span>
+              <span class="dstat-val" id="mpsDailySiangCount">0</span>
+            </div>
+            <div class="mps-dstat-item malam">
+              <span class="dstat-lbl">🌙 Malam</span>
+              <span class="dstat-val" id="mpsDailyMalamCount">0</span>
+            </div>
+            <div class="mps-dstat-item off">
+              <span class="dstat-lbl">🏖️ Off Day</span>
+              <span class="dstat-val" id="mpsDailyOffCount">0</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Quick Share Action Bar -->
+        <div class="mps-daily-actions-bar">
+          <button type="button" class="mps-btn-action-primary mps-btn-wa" onclick="copyDailyRosterText()">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+            </svg>
+            <span>Salin Roster ke WhatsApp</span>
+          </button>
+          <button type="button" class="mps-btn-action-secondary" onclick="printMpSchedule()">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="6 9 6 2 18 2 18 9"></polyline>
+              <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
+              <rect x="6" y="14" width="12" height="8"></rect>
+            </svg>
+            <span>Cetak Roster</span>
+          </button>
+        </div>
+
+        <!-- Daily Shift Groups Container -->
+        <div id="mpsDailyRosterContainer" class="mps-daily-roster-container"></div>
+      </div>
+
+      <!-- ── TAB 3: MATRIX & REKAP SHIFT ── -->
+      <div id="mpsTabContentMatrix" class="mps-tab-pane hidden">
+        <!-- Matrix Top Action Bar -->
+        <div class="mps-matrix-actions-bar">
+          <div class="mps-matrix-kpi-group">
+            <span class="mps-kpi-badge kpi-green">💼 <strong>15 MP</strong> Bertugas/Hari</span>
+            <span class="mps-kpi-badge kpi-blue">👥 <strong>20 MP</strong> Total Manpower</span>
+            <span class="mps-kpi-badge kpi-red">🏖️ <strong>5 MP</strong> Off Day/Hari</span>
+          </div>
+          <button type="button" class="mps-btn-action-primary mps-btn-pdf" onclick="exportMatrixToPdf()">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+              stroke-linecap="round" stroke-linejoin="round">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+              <polyline points="14 2 14 8 20 8"></polyline>
+              <line x1="16" y1="13" x2="8" y2="13"></line>
+              <line x1="16" y1="17" x2="8" y2="17"></line>
+              <polyline points="10 9 9 9 8 9"></polyline>
+            </svg>
+            <span>Cetak / Ekspor PDF Matrix</span>
+          </button>
+        </div>
+
+        <div class="mps-matrix-wrapper">
+          <div class="mps-matrix-header">
+            <div>
+              <div class="mps-matrix-title">📊 Matrix Rekap Jadwal Manpower (17-Aug s/d 23-Aug 2026)</div>
+              <div class="mps-matrix-hint">Jadwal Shift Kerja Mingguan Hub MTG</div>
+            </div>
+          </div>
+          <div class="mps-table-scroll-wrap" id="mpsMatrixContainer"></div>
+        </div>
+
+        <!-- Shift Summary Matrix (P5-M24, Off Day, Total) -->
+        <div class="mps-matrix-wrapper" style="margin-top: 16px;">
+          <div class="mps-matrix-header">
+            <div>
+              <div class="mps-matrix-title">📈 Ringkasan Kebutuhan Shift & Total Manpower Per-Day</div>
+              <div class="mps-matrix-hint">Rekapitulasi Kebutuhan MP per Shift & Status Operasional Harian</div>
+            </div>
+          </div>
+          <div class="mps-table-scroll-wrap" id="mpsSummaryMatrixContainer"></div>
+        </div>
+      </div>
+
+    </div> <!-- End MP Schedule Workspace -->
+
+    <!-- ── Footer ── -->
+    <footer class="app-footer">
+      <p>&copy; Project Star 2026</p>
+    </footer>
+
+  </div>
+
+  <!-- ═══ Camera Scanner Modal ═══ -->
+  <div id="scannerModal" class="scanner-modal hidden">
+    <div class="scanner-modal-backdrop" id="scannerBackdrop"></div>
+    <div class="scanner-modal-content">
+      <div class="scanner-header">
+        <div class="scanner-title-group">
+          <h3>📷 Scan Barcode / QR Code</h3>
+          <span class="scanner-subtitle">Auto Focus 1.0x & High Speed Engine</span>
+        </div>
+        <button type="button" id="closeScannerBtn" class="btn-close-scanner" title="Tutup Scanner">&times;</button>
+      </div>
+
+      <div id="qr-reader-container">
+        <div id="qr-reader"></div>
+        <div class="scanner-laser-line"></div>
+        <div class="scanner-corner top-left"></div>
+        <div class="scanner-corner top-right"></div>
+        <div class="scanner-corner bottom-left"></div>
+        <div class="scanner-corner bottom-right"></div>
+      </div>
+
+      <!-- Quick Camera Controls (Zoom & Torch) -->
+      <div class="scanner-controls-bar" id="scannerControlsBar">
+        <button type="button" class="scanner-ctrl-btn scanner-zoom-btn active" data-zoom="1.0"
+          onclick="applyScannerZoom(1.0)">1x</button>
+        <button type="button" class="scanner-ctrl-btn scanner-zoom-btn" data-zoom="1.5"
+          onclick="applyScannerZoom(1.5)">1.5x</button>
+        <button type="button" class="scanner-ctrl-btn scanner-zoom-btn" data-zoom="2.0"
+          onclick="applyScannerZoom(2.0)">2x</button>
+        <button type="button" class="scanner-ctrl-btn" id="scannerTorchBtn" onclick="toggleScannerTorch()">🔦
+          Senter</button>
+        <button type="button" class="scanner-ctrl-btn" id="scannerSwitchBtn" onclick="switchScannerCamera()">🔄
+          Lensa</button>
+      </div>
+
+      <p class="scanner-hint">Arahkan kamera ke Barcode Produk atau QR Code Rak</p>
+    </div>
+  </div>
+
+  <!-- ═══ Print Barcode Produk Modal ═══ -->
+  <div id="printProdukModal" class="print-produk-modal hidden">
+    <div class="print-produk-backdrop" id="printProdukBackdrop"></div>
+    <div class="print-produk-content">
+      <div class="print-produk-header">
+        <h3>🖨️ Cetak Barcode Produk</h3>
+        <button type="button" id="closePrintProdukBtn" class="btn-close-print-modal">&times;</button>
+      </div>
+      <div class="print-produk-body">
+        <div class="print-field-group">
+          <label class="print-field-label">Expiry Date (ED)</label>
+          <input type="text" id="printEdInput" class="print-field-input" placeholder="Pilih atau ketik tanggal ED...">
+        </div>
+        <div class="print-field-group">
+          <label class="print-field-label">Manufacturing Date (MFG)</label>
+          <input type="text" id="printMfgInput" class="print-field-input" placeholder="Pilih Tanggal MFG...">
+        </div>
+        <div class="print-field-group">
+          <label class="print-field-label">Product Age</label>
+          <div class="print-field-readonly" id="printProductAge">-</div>
+        </div>
+        <div class="print-field-group">
+          <label class="print-field-label">Jumlah Cetak</label>
+          <input type="number" id="printQtyInput" class="print-field-input" value="1" min="1" max="50"
+            style="width:100px;">
+        </div>
+      </div>
+      <div class="print-produk-footer">
+        <button type="button" id="executePrintProdukBtn" class="btn-execute-print">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="6 9 6 2 18 2 18 9"></polyline>
+            <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
+            <rect x="6" y="14" width="12" height="8"></rect>
+          </svg>
+          Cetak Barcode Produk
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ QR Zoom / Lightbox Modal ═══ -->
+  <div id="qrZoomModal" class="qr-zoom-modal hidden" onclick="closeQrZoomModal(event)">
+    <div class="qr-zoom-card" onclick="event.stopPropagation()">
+      <div class="qr-zoom-header">
+        <h3 id="qrZoomTitle">🔍 QR Code Preview</h3>
+        <button type="button" class="btn-close-qr-zoom" onclick="closeQrZoomModal()">&times;</button>
+      </div>
+      <div class="qr-zoom-body">
+        <div id="qrZoomContainer" class="qr-zoom-wrapper"></div>
+        <div id="qrZoomSubtitle" class="qr-zoom-sub"></div>
+        <div id="qrZoomProduct" class="qr-zoom-product-name hidden"></div>
+      </div>
+      <div class="qr-zoom-footer">
+        <button type="button" class="btn-close-zoom-action" onclick="closeQrZoomModal()">Tutup</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ DCC Security Lock & Shift Selector Modal ═══ -->
+  <div id="dccLockModal" class="dcc-lock-overlay hidden" onclick="closeDccLockModal(event)">
+    <div class="dcc-lock-card" onclick="event.stopPropagation()">
+      <div class="dcc-lock-header">
+        <div class="dcc-lock-badge-icon">
+          <div class="dcc-lock-icon-circle">
+            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+              <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+            </svg>
+          </div>
+        </div>
+        <h3 class="dcc-lock-title">Kunci Akses DCC</h3>
+        <p class="dcc-lock-subtitle">Masukkan PIN keamanan dan pilih shift Anda</p>
+      </div>
+
+      <!-- PIN Input Group -->
+      <div class="dcc-lock-group">
+        <label class="dcc-lock-label">PIN Akses DCC</label>
+        <div class="dcc-pin-wrapper">
+          <input type="password" id="dccPinInput" class="dcc-pin-input" placeholder="Masukkan PIN Akses"
+            maxlength="12" inputmode="numeric" autocomplete="off">
+          <button type="button" class="dcc-pin-eye-btn" id="dccPinEyeBtn" onclick="toggleDccPinVisibility()" title="Lihat/Sembunyikan PIN">👁️</button>
+        </div>
+        <div id="dccPinError" class="dcc-pin-error hidden">❌ PIN salah! Silakan coba lagi.</div>
+      </div>
+
+      <!-- Shift Selection Cards -->
+      <div class="dcc-lock-group">
+        <label class="dcc-lock-label">Pilih Shift Kerja</label>
+        <div class="dcc-shift-grid">
+          <!-- Shift Pagi -->
+          <div class="dcc-shift-card selected" id="shiftCardPagi" onclick="selectDccShift('pagi')">
+            <div class="dcc-shift-emoji">☀️</div>
+            <div class="dcc-shift-heading">Shift Pagi</div>
+            <div class="dcc-shift-tag">Auto-Filter Task 1</div>
+          </div>
+          <!-- Shift Siang -->
+          <div class="dcc-shift-card" id="shiftCardMalam" onclick="selectDccShift('siang')">
+            <div class="dcc-shift-emoji">🌤️</div>
+            <div class="dcc-shift-heading">Shift Siang</div>
+            <div class="dcc-shift-tag">Auto-Filter Task 2</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Modal Footer Action Buttons -->
+      <div class="dcc-lock-actions">
+        <button type="button" class="dcc-lock-btn-cancel" onclick="closeDccLockModal()">Batal</button>
+        <button type="button" class="dcc-lock-btn-submit" onclick="verifyAndEnterDcc()">
+          <span>Masuk DCC</span> &rarr;
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ In-App Update Modal ═══ -->
+  <div id="appUpdateModal" class="app-update-overlay hidden">
+    <div class="app-update-card" onclick="event.stopPropagation()">
+      <div class="app-update-glow"></div>
+      
+      <div class="app-update-header">
+        <div class="app-update-icon-circle">
+          <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#06d6a0" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z" />
+            <path d="M12 15l-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z" />
+            <path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0" />
+            <path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5" />
+          </svg>
+        </div>
+        <h3 class="app-update-title" id="updateModalTitle">Pembaruan Tersedia!</h3>
+        <p class="app-update-subtitle">Versi terbaru aplikasi siap diinstal</p>
+        
+        <div class="app-update-version-row">
+          <span class="app-update-badge new" id="updateBadgeNew">Versi Baru: v1.0.4</span>
+          <span class="app-update-badge current" id="updateBadgeCurrent">Versi Anda: v1.0.3</span>
+        </div>
+      </div>
+
+      <div class="app-update-body">
+        <div class="app-update-notes-title">Catatan Pembaruan:</div>
+        <ul class="app-update-changelog" id="updateChangelogList">
+          <li>Pembaruan langsung dari aplikasi tanpa download manual.</li>
+        </ul>
+
+        <!-- Progress bar during download -->
+        <div id="updateDownloadProgressWrap" class="update-progress-wrap hidden">
+          <div class="update-progress-bar">
+            <div class="update-progress-bar-fill" id="updateProgressBarFill"></div>
+          </div>
+          <div class="update-progress-text" id="updateProgressText">Mengunduh file APK terbaru...</div>
+        </div>
+      </div>
+
+      <div class="app-update-actions">
+        <button type="button" id="btnUpdateDismiss" class="btn-update-dismiss" onclick="dismissAppUpdate()">Nanti</button>
+        <button type="button" id="btnUpdateNow" class="btn-update-now" onclick="triggerAppUpdate()">
+          <span>Update Sekarang</span> &rarr;
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ In-App Already Latest Modal ═══ -->
+  <div id="appAlreadyLatestModal" class="app-update-overlay hidden" onclick="closeAppAlreadyLatestModal()">
+    <div class="app-update-card" onclick="event.stopPropagation()">
+      <div class="app-update-glow" style="background: radial-gradient(circle, rgba(34,197,94,0.2) 0%, transparent 70%);"></div>
+      <div class="app-update-header">
+        <div class="app-update-icon-circle" style="background: rgba(34, 197, 94, 0.15); border-color: rgba(34, 197, 94, 0.5);">
+          <span style="font-size: 30px;">✅</span>
+        </div>
+        <h3 class="app-update-title" style="color: #4ade80;">Versi Anda Terbaru!</h3>
+        <p class="app-update-subtitle" id="alreadyLatestSubtitle">Aplikasi Super App MTG sudah diperbarui</p>
+        <div class="app-update-version-row">
+          <span class="app-update-badge current" id="alreadyLatestBadge">Versi Aktif: v1.0.8</span>
+        </div>
+      </div>
+      <div class="app-update-body">
+        <div style="font-size: 0.88rem; color: #cbd5e1; line-height: 1.5; text-align: center; padding: 6px 0;">
+          Semua fitur terbaru (perbaikan PDF DCC, cetak Jadwal Matrix responsif, dan layout roster) sudah terpasang.
+        </div>
+      </div>
+      <div class="app-update-actions" style="flex-direction: column; gap: 8px;">
+        <button type="button" class="btn-primary" style="width: 100%;" onclick="closeAppAlreadyLatestModal()">Oke, Mengerti</button>
+        <button type="button" class="btn-secondary" style="width: 100%; font-size: 0.82rem; border-color: rgba(255,255,255,0.15);" onclick="forceDownloadLatestApk()">
+          🔄 Unduh Ulang Berkas APK
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Global Toast Notification (Accessible anywhere in the app) -->
+  <div id="globalToast" class="global-toast hidden">
+    <span id="globalToastIcon" class="global-toast-icon">ℹ️</span>
+    <div class="global-toast-content">
+      <div id="globalToastTitle" class="global-toast-title">Notifikasi</div>
+      <div id="globalToastMessage" class="global-toast-message">Pesan notifikasi</div>
+    </div>
+  </div>
+
+  <!-- Modal Photo Full Viewer -->
+  <div id="dccPhotoViewerModal" class="dcc-photo-viewer-modal hidden" onclick="closePhotoViewerModal()">
+    <div class="dcc-photo-viewer-content" onclick="event.stopPropagation()">
+      <button type="button" class="dcc-photo-viewer-close" onclick="closePhotoViewerModal()" title="Tutup">✕</button>
+      <img id="dccPhotoViewerImg" src="" alt="Full Preview" class="dcc-photo-viewer-img">
+    </div>
+  </div>
+
+  <!-- Modal Panduan / Info MSLTC -->
+  <div id="dccMsltcInfoModal" class="dcc-modal-backdrop hidden">
+    <div class="dcc-modal-card">
+      <div class="dcc-modal-title">ℹ️ Panduan Kalkulator MSLTC</div>
+      <div class="dcc-modal-subtitle" style="text-align: left; margin-bottom: 12px; line-height: 1.5;">
+        <strong>MSLTC (Minimum Shelf-Life to Customer)</strong> adalah batas minimum sisa umur simpan produk yang diizinkan untuk display di hub MTG:
+        <ul style="margin-top: 8px; padding-left: 20px; font-size: 0.85rem; color: #cbd5e1;">
+          <li><span style="color: #10b981; font-weight: bold;">🟢 CLEARANCE AMAN:</span> Sisa hari expired ≥ standar MSLTC. Produk lolos display!</li>
+          <li><span style="color: #fbbf24; font-weight: bold;">🟡 NEAR EXPIRY:</span> Sisa hari expired &lt; standar MSLTC. Wajib koordinasi/clearance promo!</li>
+          <li><span style="color: #ef4444; font-weight: bold;">🔴 REJECT / EXPIRED:</span> Tanggal expired sudah lewat (≤ 0 hari). Barang dilarang display!</li>
+        </ul>
+        <div style="margin-top: 10px; font-size: 0.8rem; color: #94a3b8; background: rgba(255,255,255,0.04); padding: 8px 10px; border-radius: 8px;">
+          📊 <em>Data MSLTC disinkronkan langsung dari Google Sheet tab MSLTC (5.780 produk). Kalkulator otomatis menghitung begitu tanggal dipilih.</em>
+        </div>
+      </div>
+      <div class="dcc-modal-actions">
+        <button type="button" class="btn-primary" style="width: 100%;" onclick="closeMsltcInfoModal()">Mengerti</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- App Logic -->
+  <script src="app.js?v=47"></script>
+</body>
+
+</html>

@@ -1,0 +1,24 @@
+{
+  "name": "Super App MTG",
+  "short_name": "Super App MTG",
+  "description": "Aplikasi integrasi warehouse: Barcode SLOC, Barcode Produk, dan Cek Masa MSLTC Produk MTG.",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#0a0e17",
+  "theme_color": "#06d6a0",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
