@@ -7219,12 +7219,20 @@
       if (nav) nav.classList.add('active');
     } else if (tabName === 'scan') {
       const el = document.getElementById('edsTabScan');
-      if (el) el.classList.add('active');
+      if (el) {
+        el.classList.add('active');
+        el.scrollTop = 0;
+      }
       const nav = document.getElementById('navEdsScan');
       if (nav) nav.classList.add('active');
       initEdsFlatpickr();
       loadEdsSavedPic();
       updateEdsWebappBannerStatus();
+      window.scrollTo({ top: 0, behavior: 'instant' });
+      document.body.scrollTop = 0;
+      document.documentElement.scrollTop = 0;
+      const ws = document.getElementById('edSweeperWorkspace');
+      if (ws) ws.scrollTop = 0;
     } else if (tabName === 'report') {
       const el = document.getElementById('edsTabReport');
       if (el) el.classList.add('active');
@@ -8000,7 +8008,29 @@
     selectedEdsSku = null;
     document.getElementById('edsSelectedBanner')?.classList.add('hidden');
     loadEdsSavedPic();
+
+    // Reset scroll ke paling atas
+    window.scrollTo({ top: 0, behavior: 'instant' });
+    document.body.scrollTop = 0;
+    document.documentElement.scrollTop = 0;
+    const scanTab = document.getElementById('edsTabScan');
+    if (scanTab) scanTab.scrollTop = 0;
+    const ws = document.getElementById('edSweeperWorkspace');
+    if (ws) ws.scrollTop = 0;
   }
+
+  window.proceedEdsConfirmedSubmit = function () {
+    const modal = document.getElementById('edsConfirmEditModal');
+    if (modal) modal.classList.add('hidden');
+    window.__edsBypassConfirmEdit = true;
+    submitEdsForm();
+  };
+
+  window.closeEdsConfirmEditModal = function () {
+    const modal = document.getElementById('edsConfirmEditModal');
+    if (modal) modal.classList.add('hidden');
+    window.__edsBypassConfirmEdit = false;
+  };
 
   // ── SUBMISSION HANDLER & AUTO-FILL COLS R, S, T ──
   window.submitEdsForm = async function () {
@@ -8047,12 +8077,37 @@
       return;
     }
 
+    // 📸 Validasi Wajib Foto jika Fisik Bad > 0
+    if (fisikBad > 0 && edsPhotoList.length === 0) {
+      playWarningBeep();
+      showDccToast('warning', 'Foto Produk Wajib', 'Terdapat stok Fisik Bad (>0). Anda wajib menyertakan minimal 1 foto bukti fisik produk.');
+      const photoEl = document.getElementById('edsPhotoPreviewList')?.closest('.eds-field-group');
+      if (photoEl) {
+        photoEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+      return;
+    }
+
     if (!inputBy) {
       playWarningBeep();
       showDccToast('warning', 'Nama PIC Wajib', 'Masukkan nama petugas / PIC yang melakukan audit.');
       document.getElementById('edsInputBy')?.focus();
       return;
     }
+
+    // ⚠️ POPUP KONFIRMASI JIKA MENGEDIT SKU YANG SUDAH PERNAH DIINPUT
+    const cleanSku = skuNo.toLowerCase();
+    const isAlreadyAudited = edsAuditResultsMap.has(cleanSku);
+    if (isAlreadyAudited && !window.__edsBypassConfirmEdit) {
+      const modal = document.getElementById('edsConfirmEditModal');
+      const desc = document.getElementById('edsConfirmEditDesc');
+      if (modal && desc) {
+        desc.innerHTML = `Produk <strong>${namaSku || skuNo}</strong> (SKU: <code>${skuNo}</code>) sudah pernah diinput sebelumnya.<br><br>Apakah Anda yakin ingin <strong>menambahkan / mengedit</strong> data audit produk ini?`;
+        modal.classList.remove('hidden');
+        return;
+      }
+    }
+    window.__edsBypassConfirmEdit = false;
 
     // Lookup item details for qty_system
     const item = edsMainListData.find(i => i.sku.toLowerCase() === skuNo.toLowerCase()) || {};
