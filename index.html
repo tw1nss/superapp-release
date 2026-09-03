@@ -896,15 +896,6 @@
       <!-- EDS Tab Content: Scan / Input SKU -->
       <div id="edsTabScan" class="eds-tab-content">
         <div class="eds-scan-container">
-          <!-- WebApp Connection Banner -->
-          <div class="eds-webapp-banner not-connected" id="edsWebappBanner" onclick="openEdsSetupModal()" title="Klik untuk cek / ganti URL WebApp">
-            <div class="eds-webapp-banner-icon">🔗</div>
-            <div class="eds-webapp-banner-content">
-              <div class="eds-webapp-banner-title">Koneksi Spreadsheet Hasil EDS</div>
-              <div class="eds-webapp-banner-status" id="edsWebappBannerStatus">⚠️ Belum Disambungkan (Klik untuk Pasang URL)</div>
-            </div>
-            <button type="button" class="eds-webapp-banner-btn" onclick="event.stopPropagation(); openEdsSetupModal();">⚙️ Atur</button>
-          </div>
 
           <!-- Active SKU Header Banner (if selected from list) -->
           <div id="edsSelectedBanner" class="eds-selected-banner hidden">
@@ -1122,6 +1113,34 @@
           <div class="eds-report-section-title">Riwayat Hasil Audit (Hari Ini)</div>
           <div id="edsReportTableContainer" class="eds-report-list">
             <div style="text-align:center; padding: 25px; color: var(--text-muted);">Belum ada riwayat audit yang tercatat.</div>
+          </div>
+
+          <!-- Printable & Viewable Full Product List with Status -->
+          <div class="eds-print-product-section" id="edsPrintProductSection">
+            <div class="eds-report-section-title">Detail Produk & Status Sweeper (Semua SKU)</div>
+            <div class="eds-print-table-wrap">
+              <table class="eds-print-table" id="edsPrintTable">
+                <thead>
+                  <tr>
+                    <th style="width:36px; text-align:center;">No</th>
+                    <th>SKU</th>
+                    <th>Nama Produk</th>
+                    <th>Rack SLOC</th>
+                    <th>Stok</th>
+                    <th>Expired Date</th>
+                    <th>Sisa Hari</th>
+                    <th>Alert</th>
+                    <th>Status</th>
+                    <th>Fisik Good</th>
+                    <th>Fisik Bad</th>
+                    <th>Remaks</th>
+                  </tr>
+                </thead>
+                <tbody id="edsPrintTableBody">
+                  <tr><td colspan="12" style="text-align:center; padding: 16px; color: var(--text-muted);">Memuat rincian produk...</td></tr>
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       </div>

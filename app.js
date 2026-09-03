@@ -7253,8 +7253,15 @@
   }
 
   // ── Data Fetching Engine ──
-  window.refreshEdsData = function () {
-    fetchEdSweeperData(true);
+  window.refreshEdsData = async function () {
+    const btn = document.querySelector('.eds-refresh-btn');
+    if (btn) btn.classList.add('spinning');
+    try {
+      showDccToast('info', 'Menyinkronkan...', 'Mengambil data terbaru dari Google Sheets...');
+      await fetchEdSweeperData(true);
+    } finally {
+      if (btn) btn.classList.remove('spinning');
+    }
   };
 
   async function fetchEdSweeperData(forceRefresh = false) {
@@ -7262,7 +7269,11 @@
     isEdsFetching = true;
 
     // Load from cache first for zero-wait rendering
-    if (!forceRefresh) {
+    if (forceRefresh) {
+      try {
+        localStorage.removeItem(EDS_MAIN_CACHE_KEY);
+      } catch (e) { }
+    } else {
       try {
         const cached = localStorage.getItem(EDS_MAIN_CACHE_KEY);
         const subCached = localStorage.getItem(EDS_SUBMITTED_CACHE_KEY);
@@ -7284,10 +7295,18 @@
 
     try {
       const t = Date.now();
+      const nonce = Math.floor(Math.random() * 1000000);
+      const fetchOpts = {
+        cache: 'no-store',
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache'
+        }
+      };
       const [hasilRes, mainRes, updateRes] = await Promise.all([
-        fetch(`${EDS_HASIL_URL}&_t=${t}`).then(r => r.ok ? r.text() : '').catch(() => ''),
-        fetch(`${EDS_MAIN_URL}&_t=${t}`).then(r => r.ok ? r.text() : '').catch(() => ''),
-        fetch(`${EDS_UPDATE_URL}&_t=${t}`).then(r => r.ok ? r.text() : '').catch(() => '')
+        fetch(`${EDS_HASIL_URL}&_t=${t}&_r=${nonce}`, fetchOpts).then(r => r.ok ? r.text() : '').catch(() => ''),
+        fetch(`${EDS_MAIN_URL}&_t=${t}&_r=${nonce}`, fetchOpts).then(r => r.ok ? r.text() : '').catch(() => ''),
+        fetch(`${EDS_UPDATE_URL}&_t=${t}&_r=${nonce}`, fetchOpts).then(r => r.ok ? r.text() : '').catch(() => '')
       ]);
 
       // 1. Parse Data Update untuk fallback referensi jika rumus Main List #ERROR!
@@ -8237,6 +8256,49 @@
     `).join('');
 
     listContainer.innerHTML = html;
+    renderEdsPrintTable();
+  }
+
+  function renderEdsPrintTable() {
+    const tbody = document.getElementById('edsPrintTableBody');
+    if (!tbody) return;
+
+    if (edsMainListData.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="12" style="text-align:center; padding: 20px; color: var(--text-muted);">Belum ada data produk di Main List SKU.</td></tr>';
+      return;
+    }
+
+    const rows = edsMainListData.map((item, idx) => {
+      const audit = edsAuditResultsMap.get(item.sku.toLowerCase()) || {};
+      const isDone = item.isDone;
+      const statusBadge = isDone
+        ? `<span class="eds-status-pill done" style="background:rgba(16,185,129,0.2); color:#10b981; font-weight:700; padding:2px 8px; border-radius:12px; font-size:0.75rem;">Done</span>`
+        : `<span class="eds-status-pill pending" style="background:rgba(245,158,11,0.2); color:#f59e0b; font-weight:700; padding:2px 8px; border-radius:12px; font-size:0.75rem;">Belum</span>`;
+
+      const alertBadge = `<span style="font-size:0.75rem; font-weight:700;">${escapeHtml(item.alert || '-')}</span>`;
+      const fisikGood = audit.fisikGood !== undefined ? audit.fisikGood : (isDone ? item.stockAvailable : '-');
+      const fisikBad = audit.fisikBad !== undefined ? audit.fisikBad : (isDone ? '0' : '-');
+      const remaks = audit.reasonBad || audit.reasonSloc || audit.remaks || (isDone ? item.remaksVal : '-');
+
+      return `
+        <tr>
+          <td style="text-align:center; font-weight:700;">${idx + 1}</td>
+          <td style="font-family:var(--font-mono, monospace); font-weight:700;">${escapeHtml(item.sku)}</td>
+          <td style="font-weight:600;">${escapeHtml(item.productName)}</td>
+          <td style="text-align:center;">${escapeHtml(item.lokasiRack || '-')}</td>
+          <td style="text-align:center; font-weight:700;">${item.qty_system || item.stockAvailable || 0}</td>
+          <td style="text-align:center;">${formatEdsDateDisplay(audit.expiredDate || item.expiryDate)}</td>
+          <td style="text-align:center; font-weight:700;">${item.remainingDays !== 999 ? item.remainingDays : '-'}</td>
+          <td style="text-align:center;">${alertBadge}</td>
+          <td style="text-align:center;">${statusBadge}</td>
+          <td style="text-align:center; color:#10b981; font-weight:700;">${fisikGood}</td>
+          <td style="text-align:center; ${Number(fisikBad) > 0 ? 'color:#ef4444; font-weight:700;' : ''}">${fisikBad}</td>
+          <td style="font-size:0.78rem;">${escapeHtml(remaks || '-')}</td>
+        </tr>
+      `;
+    }).join('');
+
+    tbody.innerHTML = rows;
   }
 
   window.shareEdsToWhatsApp = function () {
@@ -8409,6 +8471,7 @@
   };
 
   window.printEdsPdf = function () {
+    renderEdsPrintTable();
     const todayStr = new Date().toLocaleDateString('id-ID', {
       day: '2-digit', month: '2-digit', year: 'numeric'
     }).replace(/\//g, '-');
