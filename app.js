@@ -2519,7 +2519,7 @@
 
       if (typeof switchEdsTab === 'function') switchEdsTab('main');
       if (typeof initEdsFlatpickr === 'function') initEdsFlatpickr();
-      if (typeof fetchEdSweeperData === 'function') fetchEdSweeperData();
+      if (typeof fetchEdSweeperData === 'function') fetchEdSweeperData(true);
     } else if (menu === 'slip_gaji') {
       document.getElementById('homeMenuSection').classList.add('hidden');
       document.getElementById('appWorkspace').classList.add('hidden');
@@ -6928,10 +6928,20 @@
   const EDS_REPORT_URL = EDS_BASE_SHEET_URL + '&sheet=Report';
   const EDS_DEFAULT_WEBAPP_URL = 'https://script.google.com/macros/s/AKfycbztOsGIAVVfd2SjvkW_euEa7PyU76A4_PJ0HdJgw80eUOHe4XuRuLKoftL9ZxgrDfFLcw/exec';
 
-  const EDS_MAIN_CACHE_KEY = 'EDS_MAIN_CACHE_MTG_V2';
-  const EDS_SUBMITTED_CACHE_KEY = 'EDS_SUBMITTED_CACHE_MTG_V2';
+  const EDS_MAIN_CACHE_KEY = 'EDS_MAIN_CACHE_MTG_V3';
+  const EDS_SUBMITTED_CACHE_KEY = 'EDS_SUBMITTED_CACHE_MTG_V3';
   const EDS_PIC_KEY = 'EDS_DEFAULT_PIC_V2';
-  const EDS_WEBAPP_KEY = 'EDS_CUSTOM_WEBAPP_URL_V2';
+  const EDS_WEBAPP_KEY = 'EDS_CUSTOM_WEBAPP_URL_V3';
+
+  // Bersihkan cache usang V2 agar tidak ada status Done hantu yang nyangkut
+  try {
+    localStorage.removeItem('EDS_MAIN_CACHE_MTG_V2');
+    localStorage.removeItem('EDS_SUBMITTED_CACHE_MTG_V2');
+    localStorage.removeItem('EDS_MAIN_CACHE_MTG');
+    localStorage.removeItem('EDS_SUBMITTED_CACHE_MTG');
+    localStorage.removeItem('EDS_CUSTOM_WEBAPP_URL_V2');
+    localStorage.removeItem('EDS_OFFLINE_QUEUE_LOCAL');
+  } catch (e) { }
 
   let currentEdsTab = 'main'; // 'main' | 'scan' | 'report'
   let currentEdsStatusFilter = 'all'; // 'all' | 'submitted' | 'pending'
