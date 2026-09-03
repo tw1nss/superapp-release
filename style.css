@@ -4583,7 +4583,9 @@ select.dcc-field-input option {
   gap: 6px;
   overflow-x: auto;
   padding: 6px 2px;
+  -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
+  scroll-snap-type: x proximity;
   margin-bottom: 12px;
 }
 
@@ -4601,8 +4603,9 @@ select.dcc-field-input option {
   border: 1px solid rgba(148, 163, 184, 0.1);
   padding: 6px 8px;
   border-radius: 8px;
-  min-width: 58px;
+  min-width: 56px;
   text-align: center;
+  scroll-snap-align: center;
 }
 
 .mps-tday-date {
@@ -4814,19 +4817,27 @@ select.dcc-field-input option {
   display: flex;
   gap: 8px;
   overflow-x: auto;
-  padding-bottom: 4px;
+  padding-bottom: 6px;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  scroll-snap-type: x proximity;
+}
+
+.mps-date-scroll-bar::-webkit-scrollbar {
+  display: none;
 }
 
 .mps-date-chip {
   flex-shrink: 0;
-  padding: 10px 14px;
+  padding: 8px 10px;
   background: rgba(255, 255, 255, 0.04);
   border: 1.5px solid var(--border-color);
-  border-radius: var(--border-radius-md);
+  border-radius: 12px;
   text-align: center;
   cursor: pointer;
   transition: all var(--transition-fast);
-  min-width: 80px;
+  min-width: 66px;
+  scroll-snap-align: center;
 }
 
 .mps-date-chip:hover {
@@ -4888,11 +4899,12 @@ select.dcc-field-input option {
 
 /* Daily Stat Card */
 .mps-daily-stat-card {
-  background: linear-gradient(135deg, rgba(56, 189, 248, 0.15) 0%, rgba(15, 23, 42, 0.85) 100%);
+  background: linear-gradient(135deg, rgba(56, 189, 248, 0.12) 0%, rgba(15, 23, 42, 0.85) 100%);
   border: 1px solid rgba(56, 189, 248, 0.35);
-  border-radius: var(--border-radius-lg);
+  border-radius: 16px;
   padding: 16px;
   margin-bottom: 14px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
 }
 
 .mps-daily-stat-header {
@@ -4905,25 +4917,28 @@ select.dcc-field-input option {
 }
 
 .mps-daily-date-title {
-  font-size: 1.25rem;
+  font-size: 1.2rem;
   font-weight: 800;
   color: #fff;
   letter-spacing: -0.01em;
+  line-height: 1.3;
 }
 
 .mps-daily-hub-sub {
   font-size: 0.78rem;
   color: #38bdf8;
+  margin-top: 2px;
 }
 
 .mps-total-duty-badge {
-  background: rgba(6, 214, 160, 0.2);
+  background: rgba(6, 214, 160, 0.18);
   color: #06d6a0;
-  border: 1px solid rgba(6, 214, 160, 0.4);
-  padding: 6px 14px;
+  border: 1px solid rgba(6, 214, 160, 0.45);
+  padding: 5px 14px;
   border-radius: 20px;
-  font-size: 0.88rem;
+  font-size: 0.82rem;
   font-weight: 800;
+  white-space: nowrap;
 }
 
 .mps-daily-stats-row {
@@ -4934,24 +4949,27 @@ select.dcc-field-input option {
 
 .mps-dstat-item {
   background: rgba(0, 0, 0, 0.3);
-  border: 1px solid rgba(148, 163, 184, 0.1);
+  border: 1px solid rgba(148, 163, 184, 0.12);
   padding: 8px 10px;
-  border-radius: 8px;
+  border-radius: 10px;
   text-align: center;
+  transition: all 0.2s ease;
 }
 
 .mps-dstat-item .dstat-lbl {
   display: block;
   font-size: 0.68rem;
   color: var(--text-muted);
-  margin-bottom: 2px;
+  margin-bottom: 3px;
+  white-space: nowrap;
 }
 
 .mps-dstat-item .dstat-val {
-  font-size: 1.2rem;
+  font-size: 1.25rem;
   font-weight: 800;
-  font-family: var(--font-mono);
+  font-family: var(--font-mono, monospace);
   color: var(--text-primary);
+  line-height: 1.1;
 }
 
 .mps-dstat-item.pagi .dstat-val { color: #06d6a0; }
@@ -4966,20 +4984,22 @@ select.dcc-field-input option {
   margin-bottom: 16px;
 }
 
-.mps-btn-action-primary, .mps-btn-action-secondary {
+.mps-btn-action-primary,
+.mps-btn-action-secondary {
   flex: 1;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
   padding: 12px 16px;
-  border-radius: var(--border-radius-md);
-  font-size: 0.88rem;
+  border-radius: 12px;
+  font-size: 0.86rem;
   font-weight: 700;
   cursor: pointer;
   transition: all var(--transition-fast);
   border: none;
   font-family: var(--font-body);
+  white-space: nowrap;
 }
 
 .mps-btn-wa {
@@ -5009,15 +5029,16 @@ select.dcc-field-input option {
 .mps-daily-roster-container {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 14px;
   margin-bottom: 40px;
 }
 
 .mps-shift-group-card {
   background: var(--bg-card);
   border: 1px solid var(--border-color);
-  border-radius: var(--border-radius-lg);
+  border-radius: 16px;
   overflow: hidden;
+  box-shadow: var(--shadow-sm);
 }
 
 .mps-group-header {
@@ -5030,22 +5051,23 @@ select.dcc-field-input option {
 }
 
 .mps-group-title {
-  font-size: 0.95rem;
+  font-size: 0.94rem;
   font-weight: 700;
   display: flex;
   align-items: center;
   gap: 8px;
+  color: #fff;
 }
 
 .mps-group-badge {
-  font-size: 0.75rem;
+  font-size: 0.74rem;
   font-weight: 700;
-  padding: 3px 8px;
+  padding: 3px 9px;
   border-radius: 12px;
 }
 
 .mps-group-body {
-  padding: 12px;
+  padding: 10px;
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -5055,61 +5077,84 @@ select.dcc-field-input option {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  padding: 12px 14px;
-  background: rgba(15, 23, 42, 0.5);
-  border: 1px solid rgba(148, 163, 184, 0.1);
-  border-radius: var(--border-radius-md);
+  gap: 10px;
+  padding: 10px 12px;
+  background: rgba(15, 23, 42, 0.6);
+  border: 1px solid rgba(148, 163, 184, 0.12);
+  border-radius: 12px;
+  cursor: pointer;
   transition: all var(--transition-fast);
 }
 
 .mps-roster-item:hover {
-  background: rgba(255, 255, 255, 0.05);
-  border-color: rgba(56, 189, 248, 0.3);
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(56, 189, 248, 0.4);
+  transform: translateY(-1px);
 }
 
 .mps-roster-left {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   flex: 1 1 auto;
   min-width: 0;
-  overflow: hidden;
 }
 
 .mps-roster-num {
-  font-size: 0.78rem;
-  font-weight: 700;
-  color: var(--text-muted);
-  width: 18px;
+  font-size: 0.74rem;
+  font-weight: 800;
+  color: #94a3b8;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  width: 24px;
+  height: 24px;
+  border-radius: 7px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   flex-shrink: 0;
-  text-align: center;
 }
 
 .mps-roster-info {
   flex: 1 1 auto;
   min-width: 0;
-  overflow: hidden;
 }
 
 .mps-roster-name {
-  font-size: 0.94rem;
+  font-size: 0.92rem;
   font-weight: 700;
   color: var(--text-primary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  line-height: 1.3;
+  line-height: 1.25;
 }
 
-.mps-roster-job {
-  font-size: 0.74rem;
+.mps-roster-sub {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.72rem;
   color: #94a3b8;
+  margin-top: 2px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  margin-top: 2px;
-  line-height: 1.3;
+  line-height: 1.25;
+}
+
+.mps-roster-job {
+  color: #38bdf8;
+  font-weight: 600;
+}
+
+.mps-roster-dot {
+  color: rgba(255, 255, 255, 0.35);
+  font-size: 0.6rem;
+}
+
+.mps-roster-time {
+  color: #cbd5e1;
 }
 
 .mps-roster-right {
@@ -5118,7 +5163,111 @@ select.dcc-field-input option {
   justify-content: flex-end;
   flex: 0 0 auto;
   flex-shrink: 0;
-  margin-left: 10px;
+}
+
+.mps-shift-badge {
+  font-size: 0.72rem;
+  font-weight: 800;
+  padding: 4px 10px;
+  border-radius: 12px;
+  letter-spacing: 0.02em;
+  min-width: 44px;
+  text-align: center;
+  white-space: nowrap;
+}
+
+/* ── Mobile Responsive Rules for MP Schedule ── */
+@media (max-width: 600px) {
+  .mps-top-bar {
+    padding: 10px 14px;
+    gap: 8px;
+  }
+  .mps-title {
+    font-size: 1rem;
+  }
+  .mps-subtitle {
+    font-size: 0.7rem;
+  }
+  .mps-nav-tabs {
+    padding: 4px;
+    gap: 4px;
+  }
+  .mps-tab-btn {
+    padding: 8px 4px;
+    gap: 4px;
+    font-size: 0.75rem;
+  }
+  .mps-tab-btn svg {
+    width: 15px;
+    height: 15px;
+  }
+  .mps-date-section {
+    padding: 10px 12px;
+  }
+  .mps-daily-stat-card {
+    padding: 12px;
+  }
+  .mps-daily-stat-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+    margin-bottom: 10px;
+  }
+  .mps-daily-date-title {
+    font-size: 1.05rem;
+  }
+  .mps-total-duty-badge {
+    align-self: flex-start;
+    font-size: 0.75rem;
+    padding: 3px 10px;
+  }
+  /* 2x2 Grid for Daily Stats on Mobile: clean, non-wrapping, perfectly aligned */
+  .mps-daily-stats-row {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+  }
+  .mps-dstat-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 9px 12px;
+    border-radius: 10px;
+    text-align: left;
+  }
+  .mps-dstat-item .dstat-lbl {
+    font-size: 0.74rem;
+    font-weight: 600;
+    margin-bottom: 0;
+  }
+  .mps-dstat-item .dstat-val {
+    font-size: 1.25rem;
+    font-weight: 800;
+  }
+  /* Actions bar stacked full width on mobile */
+  .mps-daily-actions-bar {
+    flex-direction: column;
+    gap: 8px;
+  }
+  .mps-btn-action-primary,
+  .mps-btn-action-secondary {
+    width: 100%;
+    padding: 11px 16px;
+    font-size: 0.84rem;
+  }
+  /* Detail Paper responsive */
+  .mps-schedule-paper {
+    padding: 16px 12px;
+    border-radius: 16px;
+  }
+  .mps-paper-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  .sg-breakdown-table th:nth-child(3),
+  .sg-breakdown-table td:nth-child(3) {
+    display: none;
+  }
 }
 
 /* ── TAB 3: MATRIX & REKAP STYLES ── */

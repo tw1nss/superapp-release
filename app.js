@@ -6234,6 +6234,14 @@
           </div>
         `;
       }).join('');
+
+      // Auto-center active chip into view on mobile
+      setTimeout(() => {
+        const activeChip = scrollContainer.querySelector('.mps-date-chip.active');
+        if (activeChip) {
+          activeChip.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+        }
+      }, 80);
     }
 
     const activeDateMeta = mpScheduleDateCols.find(dc => dc.colIndex === selectedDateColIdx) || mpScheduleDateCols[0];
@@ -6266,7 +6274,7 @@
     if (malamCountEl) malamCountEl.textContent = malamList.length;
     if (offCountEl) offCountEl.textContent = offList.length;
 
-    // Helper to render group body
+    // Helper to render group body with responsive, tidy mobile layout
     function buildGroupHtml(title, icon, badgeText, badgeClass, list) {
       if (list.length === 0) {
         return `
@@ -6282,20 +6290,49 @@
         `;
       }
 
-      const itemsHtml = list.map((mp, idx) => `
-        <div class="mps-roster-item" onclick="showMpScheduleDetail('${escapeAttr(mp.id || mp.name)}')">
-          <div class="mps-roster-left">
-            <span class="mps-roster-num">${idx + 1}</span>
-            <div class="mps-roster-info">
-              <div class="mps-roster-name">${escapeHtml(mp.name)}</div>
-              <div class="mps-roster-job">${escapeHtml(mp.jobDesk || mp.role)}</div>
+      const itemsHtml = list.map((mp, idx) => {
+        const rawShift = (mp.activeShift || '').trim();
+        const cat = getShiftCategory(rawShift);
+        const isOff = cat === 'off';
+
+        let shortBadge = rawShift;
+        let shiftTimeDesc = '';
+
+        if (isOff || rawShift.toUpperCase().includes('OFF')) {
+          shortBadge = 'OFF';
+          shiftTimeDesc = 'Libur';
+        } else {
+          const cleanUpper = rawShift.toUpperCase().split(' ')[0];
+          shortBadge = cleanUpper;
+          const timeFromMap = SHIFT_TIME_MAP[cleanUpper];
+          if (timeFromMap) {
+            shiftTimeDesc = timeFromMap;
+          } else if (rawShift.includes('(')) {
+            const m = rawShift.match(/\((.*?)\)/);
+            if (m) shiftTimeDesc = m[1];
+          } else {
+            shiftTimeDesc = rawShift;
+          }
+        }
+
+        return `
+          <div class="mps-roster-item" onclick="showMpScheduleDetail('${escapeAttr(mp.id || mp.name)}')">
+            <div class="mps-roster-left">
+              <span class="mps-roster-num">${idx + 1}</span>
+              <div class="mps-roster-info">
+                <div class="mps-roster-name">${escapeHtml(mp.name)}</div>
+                <div class="mps-roster-sub">
+                  <span class="mps-roster-job">${escapeHtml(mp.jobDesk || mp.role)}</span>
+                  ${shiftTimeDesc ? `<span class="mps-roster-dot">•</span><span class="mps-roster-time">${escapeHtml(shiftTimeDesc)}</span>` : ''}
+                </div>
+              </div>
+            </div>
+            <div class="mps-roster-right">
+              <span class="mps-shift-badge ${badgeClass}">${escapeHtml(shortBadge)}</span>
             </div>
           </div>
-          <div class="mps-roster-right">
-            <span class="mps-shift-badge ${badgeClass}">${escapeHtml(mp.activeShift)}</span>
-          </div>
-        </div>
-      `).join('');
+        `;
+      }).join('');
 
       return `
         <div class="mps-shift-group-card">
