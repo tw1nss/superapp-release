@@ -7360,13 +7360,14 @@
         }
       }
 
-      // 2. Parse Hasil EDS
+      // 2. Parse Hasil EDS (Dedup: 1 SKU hanya 1 catatan terbaru)
       edsAuditResultsMap.clear();
       edsHasilRows = [];
       edsSubmittedSkuSet.clear();
       if (hasilRes) {
         const hasilLines = parseCSV(hasilRes);
         if (hasilLines && hasilLines.length > 1) {
+          const deduplicatedMap = new Map();
           for (let i = 1; i < hasilLines.length; i++) {
             const row = hasilLines[i];
             if (!row || row.length === 0) continue;
@@ -7379,8 +7380,8 @@
               slocExisting: row[2] || '',
               slocActual: row[3] || 'Match',
               expiredDate: excelDateToDateStr(row[4]),
-              fisikGood: row[5] !== '' && row[5] !== undefined ? row[5] : 0,
-              fisikBad: row[6] !== '' && row[6] !== undefined ? row[6] : 0,
+              fisikGood: row[5] !== '' && row[5] !== undefined ? Number(row[5]) : 0,
+              fisikBad: row[6] !== '' && row[6] !== undefined ? Number(row[6]) : 0,
               sales: row[7] || '',
               reasonSloc: row[8] || '',
               reasonBad: row[9] || '',
@@ -7391,10 +7392,15 @@
               remaks: row[9] || row[8] || 'Sesuai'
             };
 
-            edsAuditResultsMap.set(sku.toLowerCase(), auditObj);
-            edsSubmittedSkuSet.add(sku.toLowerCase());
-            edsHasilRows.push(auditObj);
+            // Simpan ke map agar SKU yang sama di-update (menimpa baris lama)
+            deduplicatedMap.set(sku.toLowerCase(), auditObj);
           }
+
+          edsHasilRows = Array.from(deduplicatedMap.values()).reverse();
+          deduplicatedMap.forEach((val, key) => {
+            edsAuditResultsMap.set(key, val);
+            edsSubmittedSkuSet.add(key);
+          });
         }
       }
 
@@ -8129,22 +8135,28 @@
         localStorage.setItem(EDS_MAIN_CACHE_KEY, JSON.stringify(edsMainListData));
       } catch (e) { }
 
-      // Add to Hasil Rows
-      edsHasilRows.unshift({
+      // Update or add to edsHasilRows (1 SKU = 1 Catatan, Update In-Place)
+      const existingIdx = edsHasilRows.findIndex(r => r.sku && String(r.sku).trim().toLowerCase() === skuNo.toLowerCase());
+      const newAuditItem = {
         sku: skuNo,
         namaSku: namaSku,
         slocExisting: slocExisting,
         slocActual: slocActual,
         expiredDate: expiredDate,
-        fisikGood: fisikGood,
-        fisikBad: fisikBad,
+        fisikGood: Number(fisikGood) || 0,
+        fisikBad: Number(fisikBad) || 0,
         sales: sales,
         reasonSloc: reasonSloc,
         reasonBad: reasonBad,
         inputBy: inputBy,
         timestamp: timestamp,
         remaks: autoRemaksVal
-      });
+      };
+
+      if (existingIdx !== -1) {
+        edsHasilRows.splice(existingIdx, 1);
+      }
+      edsHasilRows.unshift(newAuditItem);
 
       filterEdSweeperList();
       renderEdsReport();
