@@ -1,15 +1,15 @@
 {
-  "versionCode": 15,
-  "versionName": "1.2.0",
+  "versionCode": 16,
+  "versionName": "1.2.1",
   "apkUrl": "https://github.com/tw1nss/superapp-release/raw/main/app-debug.apk",
   "forceUpdate": false,
-  "title": "Pembaruan Superapp MTG v1.2.0 (Master OTA Edition)",
+  "title": "Pembaruan Superapp MTG v1.2.1",
   "changelog": [
-    "Teknologi Baru: Live Sync Over-The-Air (OTA) — semua pembaruan fitur, rumus, dan tema ke depan otomatis masuk tanpa perlu install APK lagi selamanya!",
-    "Koneksi Otomatis Hasil EDS: WebApp endpoint resmi tertanam langsung di sistem (tanpa input manual)",
-    "Auto-Sync Real-Time: Hasil audit langsung masuk ke sheet Hasil EDS dan mengisi kolom Done, Remaks, dan Fisik/System",
-    "Perbaikan Alert Sesuai Sheet: Menampilkan 🔴 CRITICAL dan 🔴 HARD WARNING persis seperti data Main List",
-    "Tema Seragam Astro Blue: Wadah luar sisa hari dan filter kini seragam dengan warna biru Astro"
+    "Submenu Filter Kategori Alert di Google Sheet: Opsi filter cepat untuk Warning, Hard Warning & Critical",
+    "Penarikan Data Superset Lengkap: Menyertakan produk berkategori Warning, Hard Warning, dan Critical",
+    "Jadwal MP Schedule: 1 Warna Solid untuk seluruh shift kerja dan Merah Menyala untuk OFF",
+    "Perbaikan Bug Sisa Hari MSLTC: Kalkulasi presisi menampilkan sisa hari Expired dan batas MSLTC secara terpisah & akurat",
+    "Tema Seragam Biru Luar Angkasa (Cosmic Space Blue) pada seluruh elemen layout ED Sweeper"
   ],
-  "releasedAt": "2026-09-03"
+  "releasedAt": "2026-09-04"
 }

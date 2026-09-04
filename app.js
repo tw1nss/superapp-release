@@ -7472,10 +7472,12 @@
               alertText = fallback.alertText || (remainingDays <= 0 ? '🔴 CRITICAL' : (remainingDays === 1 ? '🔴 HARD WARNING' : (remainingDays <= 3 ? '🟡 WARNING' : '🟢 SAFE')));
             }
 
-            // 🎯 FILTER HANYA PRODUK DENGAN ALERT CRITICAL & HARD WARNING SAJA
+            // 🎯 FILTER PRODUK DENGAN ALERT WARNING, HARD WARNING, & CRITICAL
             const alertClean = alertText.toLowerCase();
-            const isCriticalOrHard = alertClean.includes('critical') || alertClean.includes('hard warning') || alertClean.includes('hard_warning') || remainingDays <= 1;
-            if (!isCriticalOrHard) {
+            const isCritical = alertClean.includes('critical') || remainingDays <= 0;
+            const isHardWarning = alertClean.includes('hard warning') || alertClean.includes('hard_warning') || remainingDays === 1;
+            const isWarning = alertClean.includes('warning') || remainingDays <= 3;
+            if (!isCritical && !isHardWarning && !isWarning) {
               continue;
             }
 
@@ -7498,6 +7500,34 @@
               edsSubmittedSkuSet.add(cleanSku.toLowerCase());
             }
 
+            const expDateClean = excelDateToDateStr(expiryDateRaw);
+            const msltcDateClean = excelDateToDateStr(msltcDateRaw);
+
+            // Hitung sisa hari dinamis terhadap hari ini
+            const now = new Date();
+            const todayMid = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+            let daysToExpire = null;
+            if (expDateClean && /^\d{4}-\d{2}-\d{2}$/.test(expDateClean)) {
+              const [ey, em, ed] = expDateClean.split('-').map(Number);
+              const expObj = new Date(ey, em - 1, ed);
+              daysToExpire = Math.round((expObj.getTime() - todayMid.getTime()) / 86400000);
+            }
+
+            let daysToMsltc = remainingDays;
+            if (msltcDateClean && /^\d{4}-\d{2}-\d{2}$/.test(msltcDateClean)) {
+              const [my, mm, md] = msltcDateClean.split('-').map(Number);
+              const msObj = new Date(my, mm - 1, md);
+              daysToMsltc = Math.round((msObj.getTime() - todayMid.getTime()) / 86400000);
+            } else if (!isNaN(remainingDays)) {
+              daysToMsltc = remainingDays;
+            }
+
+            if (daysToExpire === null) {
+              const msDaysNum = Number(msltcDays) || 0;
+              daysToExpire = !isNaN(daysToMsltc) ? (daysToMsltc + msDaysNum) : remainingDays;
+            }
+
             list.push({
               index: i,
               tanggal: row[0] || '',
@@ -7508,15 +7538,17 @@
               stockBad: stockBad,
               stockLdp: stockLdp,
               hub: hub,
-              expiryDate: excelDateToDateStr(expiryDateRaw),
+              expiryDate: expDateClean,
               expiryDateRaw: expiryDateRaw,
               msltc: msltcDays,
               qty_system: qtySystem,
               rackName: lokasiRack,
               l1Category: l1Category,
               l2Category: l2Category,
-              msltcDate: excelDateToDateStr(msltcDateRaw),
-              remainingDays: remainingDays,
+              msltcDate: msltcDateClean,
+              remainingDays: daysToMsltc,
+              daysToMsltc: daysToMsltc,
+              daysToExpire: daysToExpire,
               alert: alertText,
               isDone: isDone,
               doneVal: doneVal,
@@ -7630,7 +7662,11 @@
 
     // Sorting
     list.sort((a, b) => {
-      if (currentEdsSort === 'days_asc') return a.remainingDays - b.remainingDays;
+      if (currentEdsSort === 'days_asc') {
+        const aVal = a.daysToMsltc !== undefined ? a.daysToMsltc : a.remainingDays;
+        const bVal = b.daysToMsltc !== undefined ? b.daysToMsltc : b.remainingDays;
+        return aVal - bVal;
+      }
       if (currentEdsSort === 'name_asc') return a.productName.localeCompare(b.productName);
       if (currentEdsSort === 'sloc_asc') return a.lokasiRack.localeCompare(b.lokasiRack);
       if (currentEdsSort === 'stock_desc') return b.stockAvailable - a.stockAvailable;
@@ -7681,13 +7717,14 @@
       let alertIcon = '🟢 SAFE';
       let alertClass = 'safe';
 
-      if (rawAlert.includes('CRITICAL') || item.remainingDays <= 0) {
+      const msltcVal = item.daysToMsltc !== undefined ? item.daysToMsltc : item.remainingDays;
+      if (rawAlert.includes('CRITICAL') || msltcVal <= 0) {
         alertIcon = '🔴 CRITICAL';
         alertClass = 'critical';
-      } else if (rawAlert.includes('HARD WARNING') || rawAlert.includes('HARD') || item.remainingDays <= 1) {
+      } else if (rawAlert.includes('HARD WARNING') || rawAlert.includes('HARD') || msltcVal === 1) {
         alertIcon = '🔴 HARD WARNING';
         alertClass = 'hard-warning';
-      } else if (rawAlert.includes('WARNING') || item.remainingDays <= 3) {
+      } else if (rawAlert.includes('WARNING') || msltcVal <= 3) {
         alertIcon = '🟡 WARNING';
         alertClass = 'warning';
       } else {
@@ -7704,6 +7741,14 @@
         ? `<span class="eds-chip-remaks" title="Remaks: ${item.remaksVal}">💬 ${item.remaksVal}</span>`
         : '';
 
+      const msltcDiffText = item.daysToMsltc !== undefined
+        ? (item.daysToMsltc >= 0 ? `${item.daysToMsltc} Hari` : `${Math.abs(item.daysToMsltc)} Hari Lewat`)
+        : `${item.remainingDays} Hari`;
+
+      const expDiffText = item.daysToExpire !== undefined
+        ? `${item.daysToExpire} Hari`
+        : `${item.remainingDays} Hari`;
+
       return `
         <div class="eds-card ${isDone ? 'is-done' : ''}" onclick="selectEdsItemForInput('${item.sku}')">
           <div class="eds-card-header">
@@ -7717,7 +7762,9 @@
 
           <div class="eds-card-meta-row">
             <span class="eds-rack-pill">📍 Rack: <strong>${item.lokasiRack || 'Belum Ada Sloc'}</strong></span>
-            <span class="eds-days-pill">⏳ Sisa <strong>${item.remainingDays}</strong> Hari</span>
+            <span class="eds-days-pill" title="Sisa ${expDiffText} menuju Expired | Batas MSLTC: ${msltcDiffText}">
+              ⏳ Exp: <strong>${expDiffText}</strong> <small style="opacity:0.9; font-size:0.7rem; font-weight:700; margin-left:3px;">(MSLTC: ${msltcDiffText})</small>
+            </span>
           </div>
 
           <div class="eds-card-grid-info">
@@ -7727,11 +7774,11 @@
             </div>
             <div class="eds-grid-item">
               <span class="eds-grid-lbl">MSLTC Date</span>
-              <span class="eds-grid-val">${formatEdsDateDisplay(item.msltcDate)}</span>
+              <span class="eds-grid-val">${formatEdsDateDisplay(item.msltcDate)} <small style="font-size:0.7rem; font-weight:700; color:${msltcVal <= 0 ? '#fca5a5' : (msltcVal === 1 ? '#fde68a' : '#93c5fd')};">(${msltcDiffText})</small></span>
             </div>
             <div class="eds-grid-item">
               <span class="eds-grid-lbl">Expired Date</span>
-              <span class="eds-grid-val">${formatEdsDateDisplay(item.expiryDate)}</span>
+              <span class="eds-grid-val">${formatEdsDateDisplay(item.expiryDate)} <small style="font-size:0.7rem; font-weight:700; color:#93c5fd;">(${expDiffText})</small></span>
             </div>
           </div>
 
@@ -7789,7 +7836,9 @@
       if (slocInput) slocInput.value = item.lokasiRack;
       if (qtyInput) qtyInput.value = `${item.qty_system} pcs`;
       if (msltcHelper) {
-        msltcHelper.textContent = `MSLTC: ${formatEdsDateDisplay(item.msltcDate)} (${item.remainingDays} hari)`;
+        const msText = item.daysToMsltc !== undefined ? (item.daysToMsltc >= 0 ? `${item.daysToMsltc} hari` : `${Math.abs(item.daysToMsltc)} hari lewat`) : `${item.remainingDays} hari`;
+        const expText = item.daysToExpire !== undefined ? `${item.daysToExpire} hari` : '-';
+        msltcHelper.textContent = `MSLTC: ${formatEdsDateDisplay(item.msltcDate)} (${msText}) | Expired: ${formatEdsDateDisplay(item.expiryDate)} (${expText})`;
       }
 
       if (item.expiryDate) {
