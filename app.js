@@ -7250,23 +7250,108 @@
     goBackToMenu();
   };
 
+  // ── Real-Time MSLTC & Expired Date Calculation Helper ──
+  function updateEdsMsltcHelperFromDate(dateVal) {
+    const helper = document.getElementById('edsMsltcHelper');
+    if (!helper) return;
+
+    if (!dateVal) {
+      helper.textContent = '';
+      return;
+    }
+
+    const cleanDateStr = excelDateToDateStr(dateVal);
+    let expObj = null;
+    if (/^\d{4}-\d{2}-\d{2}$/.test(cleanDateStr)) {
+      const [y, m, d] = cleanDateStr.split('-').map(Number);
+      expObj = new Date(y, m - 1, d);
+    } else if (dateVal instanceof Date && !isNaN(dateVal.getTime())) {
+      expObj = new Date(dateVal.getFullYear(), dateVal.getMonth(), dateVal.getDate());
+    }
+
+    if (!expObj) {
+      helper.textContent = '';
+      return;
+    }
+
+    const skuInput = document.getElementById('edsSkuInput');
+    const sku = (skuInput?.value || selectedEdsSku || '').trim().toLowerCase();
+    const item = edsMainListData.find(i => i.sku.toLowerCase() === sku) || {};
+
+    const now = new Date();
+    const todayMid = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+    // Hitung Sisa Hari menuju Expired
+    const daysToExpire = Math.round((expObj.getTime() - todayMid.getTime()) / 86400000);
+
+    // Standar MSLTC produk (ambil dari data sheet, atau default 7 hari)
+    let msltcDays = 7;
+    if (item.msltc !== undefined && item.msltc !== null && item.msltc !== '' && !isNaN(Number(item.msltc))) {
+      msltcDays = Number(item.msltc);
+    } else if (item.msltcDays && !isNaN(Number(item.msltcDays))) {
+      msltcDays = Number(item.msltcDays);
+    }
+
+    // Hitung Batas Tanggal MSLTC (Expired Date minus Standar MSLTC)
+    const msltcDateObj = new Date(expObj.getTime() - (msltcDays * 86400000));
+    const daysToMsltc = Math.round((msltcDateObj.getTime() - todayMid.getTime()) / 86400000);
+
+    const expText = daysToExpire >= 0 ? `${daysToExpire} hari` : `${Math.abs(daysToExpire)} hari lewat`;
+    const msText = daysToMsltc >= 0 ? `${daysToMsltc} hari` : `${Math.abs(daysToMsltc)} hari lewat`;
+
+    const my = msltcDateObj.getFullYear();
+    const mm = String(msltcDateObj.getMonth() + 1).padStart(2, '0');
+    const md = String(msltcDateObj.getDate()).padStart(2, '0');
+    const msDateFormatted = `${md}/${mm}/${my}`;
+
+    const ey = expObj.getFullYear();
+    const em = String(expObj.getMonth() + 1).padStart(2, '0');
+    const ed = String(expObj.getDate()).padStart(2, '0');
+    const expDateFormatted = `${ed}/${em}/${ey}`;
+
+    let msColor = '#38bdf8';
+    if (daysToMsltc <= 0) {
+      msColor = '#f87171'; // Critical
+    } else if (daysToMsltc === 1) {
+      msColor = '#fb923c'; // Hard warning
+    } else if (daysToMsltc <= 3) {
+      msColor = '#fde047'; // Warning
+    }
+
+    helper.innerHTML = `<span style="color:${msColor}; font-weight:700;">MSLTC: ${msDateFormatted} (${msText})</span> | <span style="color:#93c5fd; font-weight:600;">Expired: ${expDateFormatted} (${expText})</span>`;
+  }
+
   // ── Flatpickr Initialization ──
   function initEdsFlatpickr() {
-    if (edsFlatpickrInstance) return;
     const input = document.getElementById('edsExpiredDate');
-    if (!input || typeof flatpickr === 'undefined') return;
+    if (!input) return;
 
-    try {
-      edsFlatpickrInstance = flatpickr(input, {
-        dateFormat: 'Y-m-d',
-        altInput: true,
-        altFormat: 'd/m/Y',
-        allowInput: true,
-        locale: typeof flatpickr.l10ns !== 'undefined' && flatpickr.l10ns.id ? flatpickr.l10ns.id : 'default'
-      });
-    } catch (e) {
-      console.warn('Flatpickr init error:', e);
+    if (!edsFlatpickrInstance && typeof flatpickr !== 'undefined') {
+      try {
+        edsFlatpickrInstance = flatpickr(input, {
+          dateFormat: 'Y-m-d',
+          altInput: true,
+          altFormat: 'd/m/Y',
+          allowInput: true,
+          locale: typeof flatpickr.l10ns !== 'undefined' && flatpickr.l10ns.id ? flatpickr.l10ns.id : 'default',
+          onChange: function (selectedDates, dateStr) {
+            updateEdsMsltcHelperFromDate(dateStr || (selectedDates[0] ? selectedDates[0] : ''));
+          }
+        });
+      } catch (e) {
+        console.warn('Flatpickr init error:', e);
+      }
     }
+
+    // Input listeners for direct typing or change
+    input.removeEventListener('change', handleEdsExpiredDateInput);
+    input.removeEventListener('input', handleEdsExpiredDateInput);
+    input.addEventListener('change', handleEdsExpiredDateInput);
+    input.addEventListener('input', handleEdsExpiredDateInput);
+  }
+
+  function handleEdsExpiredDateInput(e) {
+    updateEdsMsltcHelperFromDate(e.target.value);
   }
 
   // ── Data Fetching Engine ──
@@ -7557,6 +7642,68 @@
             });
           }
 
+          if (list.length === 0 && updateDataLookupMap.size > 0) {
+            // Fallback: jika Main List SKU di spreadsheet belum diisi supervisor,
+            // tampilkan seluruh SKU dari Data Update otomatis agar petugas tetap dapat bertugas
+            let idxCounter = 1;
+            updateDataLookupMap.forEach((fallback, uSku) => {
+              const remDays = fallback.remainingDays !== undefined ? fallback.remainingDays : 999;
+              const alertText = fallback.alertText || (remDays <= 0 ? '🔴 CRITICAL' : (remDays === 1 ? '🔴 HARD WARNING' : (remDays <= 3 ? '🟡 WARNING' : '🟢 SAFE')));
+
+              const alertClean = alertText.toLowerCase();
+              const isCritical = alertClean.includes('critical') || remDays <= 0;
+              const isHardWarning = alertClean.includes('hard') || remDays === 1;
+              const isWarning = alertClean.includes('warning') || remDays <= 3;
+              if (!isCritical && !isHardWarning && !isWarning) return;
+
+              const isDone = edsAuditResultsMap.has(uSku);
+              const audit = isDone ? edsAuditResultsMap.get(uSku) : null;
+              const expDateClean = excelDateToDateStr(fallback.expiryDateRaw);
+              const msltcDateClean = excelDateToDateStr(fallback.msltcDateRaw);
+
+              const now = new Date();
+              const todayMid = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+              let daysToExpire = null;
+              if (expDateClean && /^\d{4}-\d{2}-\d{2}$/.test(expDateClean)) {
+                const [ey, em, ed] = expDateClean.split('-').map(Number);
+                daysToExpire = Math.round((new Date(ey, em - 1, ed) - todayMid) / 86400000);
+              }
+              let daysToMsltc = remDays;
+              if (msltcDateClean && /^\d{4}-\d{2}-\d{2}$/.test(msltcDateClean)) {
+                const [my, mm, md] = msltcDateClean.split('-').map(Number);
+                daysToMsltc = Math.round((new Date(my, mm - 1, md) - todayMid) / 86400000);
+              }
+
+              list.push({
+                index: idxCounter++,
+                tanggal: '',
+                sku: uSku,
+                productName: fallback.productName,
+                lokasiRack: fallback.rackName,
+                stockAvailable: fallback.qtySystem,
+                stockBad: 0,
+                stockLdp: 0,
+                hub: fallback.hub,
+                expiryDate: expDateClean,
+                expiryDateRaw: fallback.expiryDateRaw,
+                msltc: fallback.msltcDays,
+                qty_system: fallback.qtySystem,
+                rackName: fallback.rackName,
+                l1Category: fallback.l1Category,
+                l2Category: fallback.l2Category,
+                msltcDate: msltcDateClean,
+                remainingDays: daysToMsltc,
+                daysToMsltc: daysToMsltc,
+                daysToExpire: daysToExpire,
+                alert: alertText,
+                isDone: isDone,
+                doneVal: isDone ? 'Done' : 'Belum',
+                remaksVal: audit ? (audit.reasonBad || audit.reasonSloc || audit.remaks || 'Sesuai') : '-',
+                fisikSystemVal: audit ? `${audit.fisikGood}/${fallback.qtySystem}` : '-'
+              });
+            });
+          }
+
           if (list.length > 0) {
             edsMainListData = list;
             try {
@@ -7835,18 +7982,15 @@
       if (namaInput) namaInput.value = item.productName;
       if (slocInput) slocInput.value = item.lokasiRack;
       if (qtyInput) qtyInput.value = `${item.qty_system} pcs`;
-      if (msltcHelper) {
-        const msText = item.daysToMsltc !== undefined ? (item.daysToMsltc >= 0 ? `${item.daysToMsltc} hari` : `${Math.abs(item.daysToMsltc)} hari lewat`) : `${item.remainingDays} hari`;
-        const expText = item.daysToExpire !== undefined ? `${item.daysToExpire} hari` : '-';
-        msltcHelper.textContent = `MSLTC: ${formatEdsDateDisplay(item.msltcDate)} (${msText}) | Expired: ${formatEdsDateDisplay(item.expiryDate)} (${expText})`;
-      }
-
       if (item.expiryDate) {
         if (edsFlatpickrInstance) {
           edsFlatpickrInstance.setDate(item.expiryDate);
         } else if (dateInput) {
           dateInput.value = item.expiryDate;
         }
+        updateEdsMsltcHelperFromDate(item.expiryDate);
+      } else {
+        updateEdsMsltcHelperFromDate(dateInput ? dateInput.value : '');
       }
 
       // If already audited, prefill previous values
@@ -8232,6 +8376,20 @@
           it.doneVal = autoDoneVal;
           it.remaksVal = autoRemaksVal;
           it.fisikSystemVal = autoFisikSystemVal;
+          if (expiredDate) {
+            it.expiryDate = expiredDate;
+            const now = new Date();
+            const todayMid = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+            const [ey, em, ed] = expiredDate.split('-').map(Number);
+            if (ey && em && ed) {
+              const expObj = new Date(ey, em - 1, ed);
+              it.daysToExpire = Math.round((expObj.getTime() - todayMid.getTime()) / 86400000);
+              const msltcDays = Number(it.msltc) || 7;
+              const msltcObj = new Date(expObj.getTime() - (msltcDays * 86400000));
+              it.daysToMsltc = Math.round((msltcObj.getTime() - todayMid.getTime()) / 86400000);
+              it.msltcDate = msltcObj.toISOString().slice(0, 10);
+            }
+          }
         }
       });
 

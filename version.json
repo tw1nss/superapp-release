@@ -1,15 +1,14 @@
 {
-  "versionCode": 16,
-  "versionName": "1.2.1",
+  "versionCode": 17,
+  "versionName": "1.2.2",
   "apkUrl": "https://github.com/tw1nss/superapp-release/raw/main/app-debug.apk",
   "forceUpdate": false,
-  "title": "Pembaruan Superapp MTG v1.2.1",
+  "title": "Pembaruan Superapp MTG v1.2.2",
   "changelog": [
-    "Submenu Filter Kategori Alert di Google Sheet: Opsi filter cepat untuk Warning, Hard Warning & Critical",
-    "Penarikan Data Superset Lengkap: Menyertakan produk berkategori Warning, Hard Warning, dan Critical",
-    "Jadwal MP Schedule: 1 Warna Solid untuk seluruh shift kerja dan Merah Menyala untuk OFF",
-    "Perbaikan Bug Sisa Hari MSLTC: Kalkulasi presisi menampilkan sisa hari Expired dan batas MSLTC secara terpisah & akurat",
-    "Tema Seragam Biru Luar Angkasa (Cosmic Space Blue) pada seluruh elemen layout ED Sweeper"
+    "Perbaikan Bug Real-Time Sisa Hari ED: Perubahan tanggal Expired Date langsung memperbarui sisa hari Expired & batas MSLTC secara instan",
+    "Sinkronisasi Otomatis Google Sheet: Tarik data Superset otomatis mengisi SKU & rumus di Main List SKU secara lengkap",
+    "Filter Kategori Alert Responsif: Menyesuaikan sheet aktif dan mendeteksi kolom secara dinamis",
+    "Fallback Data Update: Petugas tetap dapat memeriksa tugas meskipun Main List SKU di Spreadsheet belum disinkronkan supervisor"
   ],
   "releasedAt": "2026-09-04"
 }
