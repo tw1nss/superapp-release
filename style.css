@@ -2603,6 +2603,8 @@ body::after {
 }
 
 .dcc-sku-card {
+  content-visibility: auto;
+  contain-intrinsic-size: 0 150px;
   background: rgba(18, 28, 45, 0.7);
   border: 1px solid rgba(148, 163, 184, 0.14);
   border-radius: 14px;
@@ -7238,6 +7240,8 @@ select.dcc-field-input option {
 }
 
 .eds-card {
+  content-visibility: auto;
+  contain-intrinsic-size: 0 165px;
   background: rgba(15, 23, 42, 0.75);
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 16px;

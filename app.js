@@ -34,6 +34,25 @@
   let clockInterval = null;
   let autoSearchTimer = null; // debounce timer for auto-search
 
+  // ── High-Performance Utilities ──
+  function debounce(func, wait = 160) {
+    let timeout;
+    return function (...args) {
+      clearTimeout(timeout);
+      timeout = setTimeout(() => func.apply(this, args), wait);
+    };
+  }
+
+  function safeJsonParse(str, fallback = null) {
+    if (!str) return fallback;
+    try {
+      return JSON.parse(str);
+    } catch (e) {
+      console.warn('safeJsonParse fallback:', e);
+      return fallback;
+    }
+  }
+
   // ── DOM Elements ──
   const loadingOverlay = document.getElementById('loadingOverlay');
   const dataStatus = document.getElementById('dataStatus');
@@ -1264,6 +1283,11 @@
     hideDropdown();
     mainMode = mode;
 
+    if (mainMode === 'barcode' && clockInterval) {
+      clearInterval(clockInterval);
+      clockInterval = null;
+    }
+
     const tabBarcodeEl = document.getElementById('tabBarcode');
     const tabMsltcEl = document.getElementById('tabMsltc');
     const inputEl = document.getElementById('skuInput');
@@ -1984,6 +2008,13 @@
     switchMainMenu('msltc');
   });
 
+  const debouncedSearchSuggestions = debounce((val) => {
+    const parts = val.split(';');
+    const expDate = parts[1] ? parts[1].trim() : null;
+    const suggestions = getSearchSuggestions(val);
+    renderDropdown(suggestions, expDate);
+  }, 150);
+
   skuInput.addEventListener('input', function () {
     const val = this.value.trim();
     submitBtn.disabled = !val;
@@ -1994,10 +2025,7 @@
       return;
     }
 
-    const parts = val.split(';');
-    const expDate = parts[1] ? parts[1].trim() : null;
-    const suggestions = getSearchSuggestions(val);
-    renderDropdown(suggestions, expDate);
+    debouncedSearchSuggestions(val);
   });
 
   skuInput.addEventListener('keydown', function (e) {
@@ -2495,6 +2523,12 @@
     document.documentElement.scrollTop = 0;
     document.body.scrollTop = 0;
 
+    // Clear background ticking clock timer when leaving barcode/MSLTC view
+    if (menu !== 'barcode' && clockInterval) {
+      clearInterval(clockInterval);
+      clockInterval = null;
+    }
+
     if (menu === 'barcode') {
       document.getElementById('homeMenuSection').classList.add('hidden');
       document.getElementById('appWorkspace').classList.remove('hidden');
@@ -2551,6 +2585,12 @@
   };
 
   window.goBackToMenu = function () {
+    // Clear ticking clock timer when returning to home
+    if (clockInterval) {
+      clearInterval(clockInterval);
+      clockInterval = null;
+    }
+
     document.getElementById('homeMenuSection').classList.remove('hidden');
     document.getElementById('appWorkspace').classList.add('hidden');
     document.getElementById('dccWorkspace').classList.add('hidden');
@@ -2732,7 +2772,7 @@
       const db = await openOfflineDb();
       const itemToSave = { ...payload, queuedAt: Date.now() };
       if (!db) {
-        const list = JSON.parse(localStorage.getItem('DCC_OFFLINE_QUEUE_LOCAL') || '[]');
+        const list = safeJsonParse(localStorage.getItem('DCC_OFFLINE_QUEUE_LOCAL'), []);
         itemToSave.id = Date.now();
         list.push(itemToSave);
         localStorage.setItem('DCC_OFFLINE_QUEUE_LOCAL', JSON.stringify(list));
@@ -2754,7 +2794,7 @@
     try {
       const db = await openOfflineDb();
       if (!db) {
-        return JSON.parse(localStorage.getItem('DCC_OFFLINE_QUEUE_LOCAL') || '[]');
+        return safeJsonParse(localStorage.getItem('DCC_OFFLINE_QUEUE_LOCAL'), []);
       }
       return new Promise((resolve) => {
         const tx = db.transaction([OFFLINE_STORE_NAME], 'readonly');
@@ -2772,7 +2812,7 @@
     try {
       const db = await openOfflineDb();
       if (!db) {
-        let list = JSON.parse(localStorage.getItem('DCC_OFFLINE_QUEUE_LOCAL') || '[]');
+        let list = safeJsonParse(localStorage.getItem('DCC_OFFLINE_QUEUE_LOCAL'), []);
         list = list.filter(i => i.id !== id);
         localStorage.setItem('DCC_OFFLINE_QUEUE_LOCAL', JSON.stringify(list));
         updateOfflineQueueBadge();
@@ -3713,7 +3753,10 @@
     return sorted;
   }
 
-  function renderDccMainListCards(list, totalUnfilteredCount) {
+  let currentDccRenderLimit = 50;
+  let currentDccListCache = [];
+
+  function renderDccMainListCards(list, totalUnfilteredCount, isLoadMore = false) {
     const container = document.getElementById('dccCardContainer');
     const badge = document.getElementById('dccListCountBadge');
 
@@ -3732,13 +3775,18 @@
     });
 
     if (badge) {
-      const totalCount = activeShiftList.length || (totalUnfilteredCount !== undefined ? totalUnfilteredCount : list.length);
+      const totalCount = activeShiftList.length || (totalUnfilteredCount !== undefined ? totalUnfilteredCount : (list ? list.length : 0));
       badge.textContent = `${submittedCount} Selesai / ${totalCount} SKU • ${shiftLabel}`;
     }
 
     if (!container) return;
 
-    if (!list || list.length === 0) {
+    if (!isLoadMore) {
+      currentDccListCache = list || [];
+      currentDccRenderLimit = 50;
+    }
+
+    if (!currentDccListCache || currentDccListCache.length === 0) {
       let emptyMsg = `Tidak ada SKU untuk ${escapeHtml(shiftLabel)}.`;
       if (currentDccStatusFilter === 'submitted') {
         emptyMsg = `Belum ada SKU yang berstatus Sudah Diinput untuk ${escapeHtml(shiftLabel)}.`;
@@ -3749,7 +3797,8 @@
       return;
     }
 
-    const cardsHtml = list.map(item => {
+    const itemsToRender = currentDccListCache.slice(0, currentDccRenderLimit);
+    const cardsHtml = itemsToRender.map(item => {
       const stockVal = item.stock !== undefined && item.stock !== '' ? item.stock : '0';
       const slocVal = item.slocExisting || 'Belum ada SLOC';
       const skuClean = (item.sku || '').trim().toLowerCase();
@@ -3792,8 +3841,26 @@
       `;
     }).join('');
 
-    container.innerHTML = cardsHtml;
+    const remaining = currentDccListCache.length - currentDccRenderLimit;
+    let loadMoreBtn = '';
+    if (remaining > 0) {
+      const nextBatch = Math.min(remaining, 50);
+      loadMoreBtn = `
+        <div style="text-align:center; padding: 18px 0;" id="dccLoadMoreBox">
+          <button type="button" class="btn-load-more" onclick="loadMoreDccCards()" style="background: rgba(6, 214, 160, 0.12); border: 1px solid rgba(6, 214, 160, 0.35); color: #06d6a0; padding: 12px 24px; border-radius: 12px; font-weight: 700; font-size: 0.9rem; cursor: pointer; width: 100%; max-width: 340px; box-shadow: 0 4px 12px rgba(0,0,0,0.2);">
+            ⚡ Tampilkan ${nextBatch} SKU Lagi (${remaining} tersisa)
+          </button>
+        </div>
+      `;
+    }
+
+    container.innerHTML = cardsHtml + loadMoreBtn;
   }
+
+  window.loadMoreDccCards = function () {
+    currentDccRenderLimit += 50;
+    renderDccMainListCards(currentDccListCache, undefined, true);
+  };
 
   window.quickFillDccSku = function (sku, assign) {
     if (!sku) return;
@@ -3835,7 +3902,7 @@
       try {
         const cached = localStorage.getItem(DCC_MAIN_CACHE_KEY);
         if (cached) {
-          const parsed = JSON.parse(cached);
+          const parsed = safeJsonParse(cached, null);
           if (parsed && (parsed.task1 || parsed.task2)) {
             dccTask1List = parsed.task1 || [];
             dccTask2List = parsed.task2 || [];
@@ -4087,11 +4154,11 @@
     filterDccMainList();
   };
 
-  // Setup search input listener
+  // Setup search input listener with debounce
   (function initDccFilterListener() {
     const input = document.getElementById('dccFilterInput');
     if (input) {
-      input.addEventListener('input', filterDccMainList);
+      input.addEventListener('input', debounce(filterDccMainList, 160));
     }
     updateDccPetugas2Options();
   })();
@@ -7072,7 +7139,7 @@
       const db = await openEdsOfflineDb();
       const itemToSave = { ...payload, queuedAt: Date.now() };
       if (!db) {
-        const list = JSON.parse(localStorage.getItem('EDS_OFFLINE_QUEUE_LOCAL') || '[]');
+        const list = safeJsonParse(localStorage.getItem('EDS_OFFLINE_QUEUE_LOCAL'), []);
         itemToSave.id = Date.now();
         list.push(itemToSave);
         localStorage.setItem('EDS_OFFLINE_QUEUE_LOCAL', JSON.stringify(list));
@@ -7094,7 +7161,7 @@
     try {
       const db = await openEdsOfflineDb();
       if (!db) {
-        return JSON.parse(localStorage.getItem('EDS_OFFLINE_QUEUE_LOCAL') || '[]');
+        return safeJsonParse(localStorage.getItem('EDS_OFFLINE_QUEUE_LOCAL'), []);
       }
       return new Promise((resolve) => {
         const tx = db.transaction([EDS_OFFLINE_STORE], 'readonly');
@@ -7112,7 +7179,7 @@
     try {
       const db = await openEdsOfflineDb();
       if (!db) {
-        let list = JSON.parse(localStorage.getItem('EDS_OFFLINE_QUEUE_LOCAL') || '[]');
+        let list = safeJsonParse(localStorage.getItem('EDS_OFFLINE_QUEUE_LOCAL'), []);
         list = list.filter(i => i.id !== id);
         localStorage.setItem('EDS_OFFLINE_QUEUE_LOCAL', JSON.stringify(list));
         updateEdsOfflineQueueBadge();
@@ -7380,10 +7447,10 @@
         const cached = localStorage.getItem(EDS_MAIN_CACHE_KEY);
         const subCached = localStorage.getItem(EDS_SUBMITTED_CACHE_KEY);
         if (subCached) {
-          edsSubmittedSkuSet = new Set(JSON.parse(subCached));
+          edsSubmittedSkuSet = new Set(safeJsonParse(subCached, []));
         }
         if (cached) {
-          edsMainListData = JSON.parse(cached);
+          edsMainListData = safeJsonParse(cached, []);
           filterEdSweeperList();
           renderEdsReport();
         }
@@ -7771,12 +7838,13 @@
     filterEdSweeperList();
   };
 
-  // Search input listener
+  // Search input listener with debounce
+  const debouncedFilterEds = debounce(filterEdSweeperList, 160);
   document.getElementById('edsFilterInput')?.addEventListener('input', function (e) {
     const val = e.target.value.trim();
     const clearBtn = document.getElementById('edsFilterClearBtn');
     if (clearBtn) clearBtn.classList.toggle('hidden', val.length === 0);
-    filterEdSweeperList();
+    debouncedFilterEds();
   });
 
   function filterEdSweeperList() {
@@ -7841,11 +7909,19 @@
     renderEdSweeperCards(list);
   }
 
-  function renderEdSweeperCards(list) {
+  let currentEdsRenderLimit = 50;
+  let currentEdsListCache = [];
+
+  function renderEdSweeperCards(list, isLoadMore = false) {
     const container = document.getElementById('edsCardContainer');
     if (!container) return;
 
-    if (!list || list.length === 0) {
+    if (!isLoadMore) {
+      currentEdsListCache = list || [];
+      currentEdsRenderLimit = 50;
+    }
+
+    if (!currentEdsListCache || currentEdsListCache.length === 0) {
       container.innerHTML = `
         <div style="text-align:center; padding: 40px 20px; background: rgba(15,23,42,0.6); border-radius: 16px; border: 1px dashed rgba(255,255,255,0.15);">
           <div style="font-size: 2rem; margin-bottom: 8px;">🔍</div>
@@ -7856,7 +7932,8 @@
       return;
     }
 
-    const html = list.map(item => {
+    const itemsToRender = currentEdsListCache.slice(0, currentEdsRenderLimit);
+    const html = itemsToRender.map(item => {
       const isDone = item.isDone;
 
       // ── DETEKSI ALERT PERSIS DARI SPREADSHEET (🔴 CRITICAL, 🔴 HARD WARNING, 🟡 WARNING, 🟢 SAFE) ──
@@ -7938,8 +8015,26 @@
       `;
     }).join('');
 
-    container.innerHTML = html;
+    const remaining = currentEdsListCache.length - currentEdsRenderLimit;
+    let loadMoreBtn = '';
+    if (remaining > 0) {
+      const nextBatch = Math.min(remaining, 50);
+      loadMoreBtn = `
+        <div style="text-align:center; padding: 18px 0;" id="edsLoadMoreBox">
+          <button type="button" class="btn-load-more" onclick="loadMoreEdsCards()" style="background: rgba(56, 189, 248, 0.12); border: 1px solid rgba(56, 189, 248, 0.35); color: #38bdf8; padding: 12px 24px; border-radius: 12px; font-weight: 700; font-size: 0.9rem; cursor: pointer; width: 100%; max-width: 340px; box-shadow: 0 4px 12px rgba(0,0,0,0.2);">
+            ⚡ Tampilkan ${nextBatch} SKU Lagi (${remaining} tersisa)
+          </button>
+        </div>
+      `;
+    }
+
+    container.innerHTML = html + loadMoreBtn;
   }
+
+  window.loadMoreEdsCards = function () {
+    currentEdsRenderLimit += 50;
+    renderEdSweeperCards(currentEdsListCache, true);
+  };
 
   // ── Form Input SKU & Scan ──
   window.selectEdsItemForInput = function (sku) {
@@ -8020,8 +8115,9 @@
     }
   }
 
+  const debouncedLookupEds = debounce((val) => lookupEdsSku(val), 180);
   document.getElementById('edsSkuInput')?.addEventListener('input', function (e) {
-    lookupEdsSku(e.target.value.trim());
+    debouncedLookupEds(e.target.value.trim());
   });
 
   window.startEdsCameraScan = function () {
@@ -8777,10 +8873,21 @@
       hideLoading();
     }, 3500);
 
-    // Auto-refresh data every 5 minutes in the background
+    // Auto-refresh data every 5 minutes in the background (only when document is active and online to save battery)
     setInterval(() => {
-      fetchSheetData(true);
+      if (!document.hidden && navigator.onLine) {
+        fetchSheetData(true);
+      }
     }, 5 * 60 * 1000);
+
+    // Refresh automatically if returning to app after > 10 minutes in background
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden && navigator.onLine && dataTimestamp) {
+        if (Date.now() - dataTimestamp.getTime() > 10 * 60 * 1000) {
+          fetchSheetData(true);
+        }
+      }
+    });
   })();
 
 })();
