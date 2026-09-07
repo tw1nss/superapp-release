@@ -6,52 +6,57 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
 
 /* ── Design Tokens ── */
+/* ── Design Tokens — Astro Aerospace / Mission Control Palette ── */
 :root {
-  /* Colors — Dark Industrial Palette */
-  --bg-primary: #0a0e17;
-  --bg-secondary: #111827;
-  --bg-card: rgba(17, 24, 39, 0.7);
-  --bg-card-hover: rgba(22, 31, 48, 0.85);
-  --bg-input: rgba(15, 23, 42, 0.8);
-  --bg-overlay: rgba(0, 0, 0, 0.6);
+  /* Canvas & Obsidian Surfaces */
+  --bg-primary: #05070e;
+  --bg-secondary: #090e1a;
+  --bg-card: rgba(14, 22, 38, 0.78);
+  --bg-card-hover: rgba(22, 36, 62, 0.88);
+  --bg-input: rgba(10, 16, 28, 0.85);
+  --bg-overlay: rgba(3, 5, 10, 0.75);
 
-  /* Accent — Electric Cyan / Teal */
-  --accent-primary: #06d6a0;
-  --accent-secondary: #00b4d8;
-  --accent-glow: rgba(6, 214, 160, 0.3);
-  --accent-glow-strong: rgba(6, 214, 160, 0.5);
-  --accent-gradient: linear-gradient(135deg, #06d6a0 0%, #00b4d8 100%);
-  --accent-gradient-hover: linear-gradient(135deg, #00b4d8 0%, #06d6a0 100%);
+  /* Accent — Starlight Cyan & Orbital Emerald */
+  --accent-primary: #38bdf8;
+  --accent-secondary: #0ea5e9;
+  --accent-emerald: #10b981;
+  --accent-glow: rgba(56, 189, 248, 0.22);
+  --accent-glow-strong: rgba(56, 189, 248, 0.42);
+  --accent-gradient: linear-gradient(135deg, #38bdf8 0%, #0ea5e9 100%);
+  --accent-gradient-hover: linear-gradient(135deg, #0ea5e9 0%, #38bdf8 100%);
 
-  /* Warning / Error */
-  --color-error: #ef4444;
-  --color-error-bg: rgba(239, 68, 68, 0.1);
-  --color-error-border: rgba(239, 68, 68, 0.3);
+  /* Telemetry Status Signals */
+  --color-error: #f43f5e;
+  --color-error-bg: rgba(244, 63, 94, 0.12);
+  --color-error-border: rgba(244, 63, 94, 0.35);
   --color-warning: #f59e0b;
-  --color-success: #06d6a0;
-  --color-success-bg: rgba(6, 214, 160, 0.1);
+  --color-warning-bg: rgba(245, 158, 11, 0.12);
+  --color-warning-border: rgba(245, 158, 11, 0.35);
+  --color-success: #10b981;
+  --color-success-bg: rgba(16, 185, 129, 0.12);
+  --color-success-border: rgba(16, 185, 129, 0.35);
 
-  /* Text */
-  --text-primary: #f1f5f9;
+  /* High-Contrast Titanium Typography */
+  --text-primary: #f8fafc;
   --text-secondary: #94a3b8;
   --text-muted: #64748b;
-  --text-accent: #06d6a0;
+  --text-accent: #38bdf8;
 
-  /* Borders */
-  --border-color: rgba(148, 163, 184, 0.1);
-  --border-accent: rgba(6, 214, 160, 0.3);
-  --border-radius-sm: 8px;
-  --border-radius-md: 12px;
-  --border-radius-lg: 16px;
-  --border-radius-xl: 20px;
-  --border-radius-2xl: 24px;
+  /* Aerospace Precision Borders & Radii */
+  --border-color: rgba(255, 255, 255, 0.08);
+  --border-accent: rgba(56, 189, 248, 0.35);
+  --border-radius-sm: 6px;
+  --border-radius-md: 10px;
+  --border-radius-lg: 14px;
+  --border-radius-xl: 18px;
+  --border-radius-2xl: 22px;
 
   /* Shadows */
-  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.2);
-  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.3);
-  --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.4);
-  --shadow-glow: 0 0 30px rgba(6, 214, 160, 0.15);
-  --shadow-glow-strong: 0 0 60px rgba(6, 214, 160, 0.25);
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.5);
+  --shadow-glow: 0 0 24px rgba(56, 189, 248, 0.16);
+  --shadow-glow-strong: 0 0 48px rgba(56, 189, 248, 0.28);
 
   /* Spacing */
   --space-xs: 4px;
@@ -68,8 +73,8 @@
 
   /* Transitions */
   --transition-fast: 150ms ease;
-  --transition-base: 250ms ease;
-  --transition-slow: 400ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-base: 220ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-slow: 380ms cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 /* ── Reset & Base ── */
@@ -99,7 +104,7 @@ body {
   overscroll-behavior-y: none;
 }
 
-/* ── Animated Background ── */
+/* ── Deep Space Ambient Background ── */
 body::before {
   content: '';
   position: fixed;
@@ -108,14 +113,14 @@ body::before {
   width: 100%;
   height: 100%;
   background:
-    radial-gradient(ellipse 80% 50% at 50% -20%, rgba(6, 214, 160, 0.08) 0%, transparent 60%),
-    radial-gradient(ellipse 60% 40% at 80% 80%, rgba(0, 180, 216, 0.05) 0%, transparent 50%),
-    radial-gradient(ellipse 40% 60% at 10% 60%, rgba(6, 214, 160, 0.04) 0%, transparent 50%);
+    radial-gradient(circle 600px at 50% -10%, rgba(56, 189, 248, 0.08) 0%, transparent 70%),
+    radial-gradient(circle 500px at 85% 90%, rgba(16, 185, 129, 0.04) 0%, transparent 60%),
+    radial-gradient(circle 400px at 15% 55%, rgba(14, 165, 233, 0.03) 0%, transparent 60%);
   pointer-events: none;
   z-index: 0;
 }
 
-/* Grid pattern overlay */
+/* Starlight ambient texture overlay */
 body::after {
   content: '';
   position: fixed;
@@ -124,9 +129,12 @@ body::after {
   width: 100%;
   height: 100%;
   background-image:
-    linear-gradient(rgba(148, 163, 184, 0.03) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(148, 163, 184, 0.03) 1px, transparent 1px);
-  background-size: 60px 60px;
+    radial-gradient(1px 1px at 40px 60px, rgba(255, 255, 255, 0.35), transparent),
+    radial-gradient(1.2px 1.2px at 120px 180px, rgba(56, 189, 248, 0.4), transparent),
+    radial-gradient(1px 1px at 280px 90px, rgba(255, 255, 255, 0.3), transparent),
+    radial-gradient(1.5px 1.5px at 200px 320px, rgba(56, 189, 248, 0.35), transparent);
+  background-size: 320px 320px;
+  opacity: 0.65;
   pointer-events: none;
   z-index: 0;
 }
@@ -389,15 +397,15 @@ body::after {
 }
 
 .space-helmet-icon {
-  width: 50px;
-  height: 50px;
+  width: 52px;
+  height: 52px;
   border-radius: 50%;
-  background: radial-gradient(circle, rgba(56, 189, 248, 0.25) 0%, rgba(15, 23, 42, 0.8) 100%);
-  border: 1.5px solid rgba(56, 189, 248, 0.5);
+  background: radial-gradient(circle, rgba(56, 189, 248, 0.22) 0%, rgba(10, 16, 30, 0.85) 100%);
+  border: 1.5px solid rgba(56, 189, 248, 0.45);
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 0 20px rgba(56, 189, 248, 0.35);
+  box-shadow: 0 0 24px rgba(56, 189, 248, 0.25);
   flex-shrink: 0;
 }
 
@@ -406,22 +414,71 @@ body::after {
   flex-direction: column;
 }
 
+.space-mission-chip {
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.12em;
+  color: #38bdf8;
+  font-weight: 700;
+  text-transform: uppercase;
+  margin-bottom: 2px;
+}
+
 .space-app-title {
-  font-size: clamp(1.2rem, 4.5vw, 1.55rem);
+  font-size: clamp(1.25rem, 4.5vw, 1.6rem);
   font-weight: 800;
-  letter-spacing: -0.01em;
+  letter-spacing: -0.02em;
   color: #f8fafc;
-  line-height: 1.2;
+  line-height: 1.15;
 }
 
 .space-app-subtitle {
   font-size: clamp(0.78rem, 2.6vw, 0.85rem);
   color: #94a3b8;
   font-weight: 400;
-  max-width: 440px;
-  margin: 4px auto 0;
+  max-width: 460px;
+  margin: 6px auto 0;
   line-height: 1.45;
   padding: 0 8px;
+}
+
+.home-version-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 10px;
+  flex-wrap: wrap;
+}
+
+.home-telemetry-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  background: rgba(16, 185, 129, 0.1);
+  border: 1px solid rgba(16, 185, 129, 0.35);
+  border-radius: 9999px;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: #10b981;
+  letter-spacing: 0.05em;
+  user-select: none;
+}
+
+.telemetry-radar-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #10b981;
+  box-shadow: 0 0 6px #10b981;
+  animation: radarPulse 2s ease-in-out infinite;
+}
+
+@keyframes radarPulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.4); opacity: 0.5; }
 }
 
 /* ── PWA Android Install Banner ── */
@@ -436,23 +493,23 @@ body::after {
   width: 100%;
   gap: 10px;
   padding: 12px 18px;
-  background: linear-gradient(135deg, rgba(6, 214, 160, 0.12) 0%, rgba(0, 180, 216, 0.08) 100%);
-  border: 1px solid rgba(6, 214, 160, 0.35);
+  background: linear-gradient(135deg, rgba(56, 189, 248, 0.12) 0%, rgba(14, 165, 233, 0.06) 100%);
+  border: 1px solid rgba(56, 189, 248, 0.35);
   border-radius: var(--border-radius-md);
-  color: var(--accent-primary);
+  color: #38bdf8;
   font-family: var(--font-body);
   font-size: 0.88rem;
   font-weight: 700;
   cursor: pointer;
   transition: all var(--transition-base);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
 }
 
 .btn-install-pwa:hover {
   background: var(--accent-gradient);
-  color: #041014;
+  color: #05070e;
   transform: translateY(-2px);
-  box-shadow: 0 6px 24px rgba(6, 214, 160, 0.35);
+  box-shadow: 0 6px 24px rgba(56, 189, 248, 0.35);
 }
 
 /* ── 3x3 Space Glass Tiles Grid ── */
@@ -476,31 +533,53 @@ body::after {
   }
 }
 
-/* ── Space Glass Tile Card ── */
+/* ── Space Glass Tile Card (Aerospace Console) ── */
 .space-glass-card {
   position: relative;
-  background: linear-gradient(180deg, rgba(26, 42, 68, 0.75) 0%, rgba(10, 18, 34, 0.9) 100%);
-  border: 1.5px solid rgba(56, 189, 248, 0.35);
-  border-radius: 16px;
-  padding: 14px 8px 12px;
+  background: linear-gradient(180deg, rgba(16, 25, 44, 0.86) 0%, rgba(8, 13, 24, 0.96) 100%);
+  border: 1px solid rgba(56, 189, 248, 0.22);
+  border-radius: 14px;
+  padding: 12px 6px 12px;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   text-align: center;
   cursor: pointer;
-  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: transform 0.18s cubic-bezier(0.4, 0, 0.2, 1), border-color 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
   overflow: hidden;
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
   user-select: none;
-  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.35), inset 0 1px 1px rgba(255, 255, 255, 0.15);
-  min-height: 94px;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  min-height: 102px;
 }
 
 .space-glass-card:active {
-  transform: scale(0.95);
+  transform: scale(0.96);
   border-color: #38bdf8;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.6), inset 0 0 12px rgba(56, 189, 248, 0.25);
+}
+
+.space-glass-card:hover {
+  border-color: rgba(56, 189, 248, 0.55);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.25), 0 0 20px rgba(56, 189, 248, 0.25);
+  transform: translateY(-2px);
+  background: linear-gradient(180deg, rgba(22, 36, 64, 0.9) 0%, rgba(10, 18, 34, 0.98) 100%);
+}
+
+.space-card-module-badge {
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  font-weight: 700;
+  color: rgba(56, 189, 248, 0.75);
+  letter-spacing: 0.08em;
+  background: rgba(56, 189, 248, 0.08);
+  border: 1px solid rgba(56, 189, 248, 0.18);
+  padding: 1px 5px;
+  border-radius: 4px;
+  margin-bottom: 5px;
+  line-height: 1.2;
 }
 
 .space-glass-sheen {
@@ -508,9 +587,9 @@ body::after {
   top: 0;
   left: 0;
   right: 0;
-  height: 50%;
-  border-radius: 16px 16px 50% 50% / 16px 16px 25% 25%;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.22) 0%, rgba(255, 255, 255, 0.02) 80%, transparent 100%);
+  height: 45%;
+  border-radius: 14px 14px 50% 50% / 14px 14px 20% 20%;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.14) 0%, rgba(255, 255, 255, 0.01) 80%, transparent 100%);
   pointer-events: none;
 }
 
@@ -526,34 +605,28 @@ body::after {
 }
 
 .space-glass-card:hover .space-icon-wrap {
-  transform: scale(1.1);
+  transform: scale(1.08);
 }
 
 .space-glass-card .menu-card-title {
-  font-size: clamp(0.72rem, 2.5vw, 0.85rem);
+  font-size: clamp(0.72rem, 2.5vw, 0.84rem);
   font-weight: 700;
-  color: #f1f5f9;
+  color: #f8fafc;
   z-index: 1;
-  line-height: 1.2;
+  line-height: 1.25;
   margin: 0;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9);
 }
 
-.space-glass-card:hover {
-  border-color: #38bdf8;
-  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.5), inset 0 1px 2px rgba(255, 255, 255, 0.35), 0 0 20px rgba(56, 189, 248, 0.35);
-  transform: translateY(-2px);
-}
-
-/* ── Back Button ── */
+/* ── Back Button (Airlock Console HUD) ── */
 .btn-back {
   position: absolute;
   left: var(--space-md);
   top: var(--space-xl);
-  background: rgba(15, 23, 42, 0.6);
-  border: 1px solid var(--border-color);
+  background: rgba(14, 22, 38, 0.8);
+  border: 1px solid rgba(56, 189, 248, 0.3);
   border-radius: var(--border-radius-md);
-  color: var(--text-primary);
+  color: #38bdf8;
   width: 44px;
   height: 44px;
   display: flex;
@@ -562,12 +635,14 @@ body::after {
   cursor: pointer;
   transition: var(--transition-base);
   z-index: 10;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35);
 }
 
 .btn-back:hover {
-  background: var(--bg-card-hover);
-  border-color: var(--accent-primary);
-  color: var(--accent-primary);
+  background: rgba(22, 36, 62, 0.95);
+  border-color: #38bdf8;
+  color: #f8fafc;
+  box-shadow: 0 0 14px rgba(56, 189, 248, 0.3);
   transform: translateX(-2px);
 }
 
@@ -2806,8 +2881,9 @@ select.dcc-field-input option {
 }
 
 .dcc-nav-item.active {
-  color: var(--text-primary);
-  background: #3b82f6; /* Blue active tab */
+  color: #38bdf8;
+  background: rgba(56, 189, 248, 0.12);
+  border-top: 2px solid #38bdf8;
 }
 
 .dcc-nav-item:hover:not(.active) {
@@ -3025,14 +3101,15 @@ select.dcc-field-input option {
 }
 
 .dcc-photo-action-btn.secondary {
-  background: rgba(59, 130, 246, 0.15);
-  border-color: rgba(59, 130, 246, 0.35);
-  color: #60a5fa;
+  background: rgba(56, 189, 248, 0.12);
+  border-color: rgba(56, 189, 248, 0.3);
+  color: #38bdf8;
 }
 
 .dcc-photo-action-btn.secondary:hover {
-  background: #3b82f6;
-  color: #fff;
+  background: rgba(56, 189, 248, 0.25);
+  border-color: #38bdf8;
+  color: #f8fafc;
 }
 
 .dcc-image-preview-wrapper {
@@ -3103,22 +3180,22 @@ select.dcc-field-input option {
 .dcc-btn-save {
   flex: 1;
   padding: 15px;
-  background: #3b82f6;
-  border: none;
+  background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%);
+  border: 1px solid rgba(56, 189, 248, 0.35);
   border-radius: var(--border-radius-md);
-  color: #fff;
+  color: #f8fafc;
   font-size: 1rem;
   font-weight: 700;
   cursor: pointer;
   transition: var(--transition-fast);
   font-family: var(--font-body);
-  box-shadow: 0 4px 14px rgba(59, 130, 246, 0.4);
+  box-shadow: 0 4px 16px rgba(14, 165, 233, 0.35);
 }
 
 .dcc-btn-save:hover {
-  background: #2563eb;
+  background: linear-gradient(135deg, #38bdf8 0%, #0ea5e9 100%);
+  box-shadow: 0 6px 22px rgba(56, 189, 248, 0.45);
   transform: translateY(-1px);
-  box-shadow: 0 6px 20px rgba(59, 130, 246, 0.5);
 }
 
 .dcc-btn-save:disabled {
