@@ -1559,11 +1559,23 @@ body::after {
   overflow-x: auto;
 }
 
-.qr-wrapper canvas,
-.qr-wrapper img {
-  display: block;
+.qr-wrapper canvas {
+  display: none !important;
+}
+
+.qr-wrapper canvas:only-child {
+  display: block !important;
   width: 200px !important;
   height: 200px !important;
+  margin: 0 auto;
+}
+
+.qr-wrapper img {
+  display: block !important;
+  width: 200px !important;
+  height: 200px !important;
+  aspect-ratio: 1 / 1 !important;
+  object-fit: contain !important;
   margin: 0 auto;
 }
 
@@ -5610,16 +5622,35 @@ select.dcc-field-input option {
   padding: 16px;
   border-radius: 14px;
   box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   margin-bottom: 14px;
+  width: 292px;
+  height: 292px;
+  box-sizing: border-box;
 }
 
-.qr-zoom-wrapper canvas,
+.qr-zoom-wrapper canvas {
+  display: none !important;
+}
+
+.qr-zoom-wrapper canvas:only-child {
+  display: block !important;
+  width: 260px !important;
+  height: 260px !important;
+  aspect-ratio: 1 / 1 !important;
+  margin: 0 auto;
+}
+
 .qr-zoom-wrapper img {
   display: block !important;
   width: 260px !important;
   height: 260px !important;
-  margin: 0 auto;
+  max-width: 100% !important;
+  aspect-ratio: 1 / 1 !important;
+  object-fit: contain !important;
+  margin: 0 auto !important;
 }
 
 .qr-zoom-sub {

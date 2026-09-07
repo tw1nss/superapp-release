@@ -1837,6 +1837,18 @@
       correctLevel: QRCode.CorrectLevel.H,
     });
 
+    // Prevent duplicate canvas + img stacking by removing redundant canvas
+    requestAnimationFrame(() => {
+      const canvas = container.querySelector('canvas');
+      const img = container.querySelector('img');
+      if (img && canvas) {
+        canvas.remove();
+        img.style.display = 'block';
+        img.style.width = '260px';
+        img.style.height = '260px';
+      }
+    });
+
     modal.classList.remove('hidden');
   };
 
