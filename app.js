@@ -3156,7 +3156,7 @@
     const nameEl = document.getElementById('dccActivePicName');
     const tagEl = document.getElementById('dccActiveShiftTag');
     const isPagi = (selectedDccShift === 'pagi');
-    const p2 = getDccPetugas2Name() || 'Indra';
+    const p2 = getDccPetugas2Name();
 
     if (isPagi) {
       if (iconEl) iconEl.textContent = '☀️';
@@ -3164,7 +3164,7 @@
       if (tagEl) tagEl.textContent = 'Shift Pagi (Task 1)';
     } else {
       if (iconEl) iconEl.textContent = '🌤️';
-      if (nameEl) nameEl.textContent = p2;
+      if (nameEl) nameEl.textContent = p2 || 'Belum Diset (Klik Ganti PIC)';
       if (tagEl) tagEl.textContent = 'Shift Siang (Task 2)';
     }
   };
@@ -3177,8 +3177,10 @@
       if (isHidden) {
         group.classList.remove('hidden');
         if (input) {
-          input.value = (selectedDccShift === 'pagi') ? 'Bintang' : (getDccPetugas2Name() || 'Indra');
+          const currentP2 = getDccPetugas2Name();
+          input.value = (selectedDccShift === 'pagi') ? 'Bintang' : currentP2;
           input.focus();
+          input.select();
         }
       } else {
         group.classList.add('hidden');
@@ -3205,11 +3207,7 @@
         showDccToast('success', '☀️ Shift Pagi Aktif', `Menampilkan ${dccTask1List.length || 0} SKU Task 1`);
       }
     } else {
-      let p2 = getDccPetugas2Name();
-      if (!p2) {
-        setDccPetugas2Name('Indra');
-        p2 = 'Indra';
-      }
+      const p2 = getDccPetugas2Name();
       if (shiftBadge) {
         shiftBadge.innerHTML = '🌤️ Shift Siang';
         shiftBadge.className = 'dcc-shift-badge-btn malam';
@@ -3220,7 +3218,8 @@
       filterDccMainList();
       renderShiftSpecificReport();
       if (typeof showDccToast === 'function') {
-        showDccToast('success', '🌤️ Shift Siang Aktif', `Menampilkan ${dccTask2List.length || 0} SKU Task 2`);
+        const picMsg = p2 ? `PIC: ${p2}` : 'PIC belum diset';
+        showDccToast('success', '🌤️ Shift Siang Aktif', `Menampilkan ${dccTask2List.length || 0} SKU Task 2 (${picMsg})`);
       }
     }
   };
@@ -3251,10 +3250,10 @@
   }
 
   function updateDccPetugas2Options() {
-    const p2 = getDccPetugas2Name() || 'Indra';
+    const p2 = getDccPetugas2Name();
     const labelTask2Btn = document.getElementById('labelTask2Btn');
     if (labelTask2Btn) {
-      labelTask2Btn.textContent = `👤 Task 2 (${p2})`;
+      labelTask2Btn.textContent = p2 ? `👤 Task 2 (${p2})` : '👤 Task 2 (Siang)';
     }
   }
 
@@ -3644,7 +3643,7 @@
     const unmatchPct = totalSub > 0 ? ((slocUnmatchCount / totalSub) * 100).toFixed(1) + '%' : '0%';
     const progressPct = totalSku > 0 ? ((skuCounted / totalSku) * 100).toFixed(1) + '%' : '0%';
 
-    const activePic = isPagi ? 'Bintang' : (getDccPetugas2Name() || 'Indra');
+    const activePic = isPagi ? 'Bintang' : (getDccPetugas2Name() || 'Petugas Siang');
 
     const message = `📊 *RINGKASAN DAILY CYCLE COUNT (DCC)*\n` +
       `🏢 *Hub:* MTG - Menteng\n` +
@@ -3810,11 +3809,11 @@
         : `<span class="dcc-card-status-badge pending">⏳ Belum Diinput</span>`;
 
       const isBintang = isItemTask1(item);
-      const assignBadge = item.assign
-        ? `<span class="dcc-card-assign-badge ${isBintang ? 'bintang' : 'petugas2'}" title="Ditugaskan ke: ${escapeAttr(item.assign)}">
-            👤 ${escapeHtml(item.assign)}
-           </span>`
-        : '';
+      const activeP2 = getDccPetugas2Name() || 'Petugas Siang';
+      const displayAssign = isBintang ? 'Bintang' : (activeP2 || item.assign || 'Petugas Siang');
+      const assignBadge = `<span class="dcc-card-assign-badge ${isBintang ? 'bintang' : 'petugas2'}" title="Ditugaskan ke: ${escapeAttr(displayAssign)}">
+            👤 ${escapeHtml(displayAssign)}
+           </span>`;
 
       return `
         <div class="dcc-sku-card ${isSubmitted ? 'is-submitted' : ''}">
@@ -3833,7 +3832,7 @@
             <span class="dcc-card-sloc-pill" title="Lokasi Rack / SLOC">
               📍 ${escapeHtml(slocVal)}
             </span>
-            <button type="button" class="dcc-card-action-btn" onclick="quickFillDccSku('${escapeAttr(item.sku)}', '${escapeAttr(item.assign || '')}')">
+            <button type="button" class="dcc-card-action-btn" onclick="quickFillDccSku('${escapeAttr(item.sku)}', '${isBintang ? 'pagi' : 'siang'}')">
               <span>Input SKU</span> &rarr;
             </button>
           </div>
@@ -3862,7 +3861,7 @@
     renderDccMainListCards(currentDccListCache, undefined, true);
   };
 
-  window.quickFillDccSku = function (sku, assign) {
+  window.quickFillDccSku = function (sku, assignOrShift) {
     if (!sku) return;
     switchDccTab('scan');
     const input = document.getElementById('dccSkuInput');
@@ -3871,16 +3870,13 @@
       lookupDccSku(sku);
     }
 
-    // Auto-select shift & PIC based on assignment
-    if (assign) {
-      const assignLower = assign.toLowerCase();
-      if (assignLower.includes('bintang') || assignLower === 'task 1' || assignLower === 'task1') {
+    // Auto-select shift based on assignment / task (NEVER overwrite device's saved PIC name!)
+    if (assignOrShift) {
+      const str = String(assignOrShift).toLowerCase();
+      if (str.includes('bintang') || str.includes('pagi') || str === 'task 1' || str === 'task1') {
         selectedDccShift = 'pagi';
       } else {
         selectedDccShift = 'siang';
-        if (!assignLower.includes('task 2') && !assignLower.includes('petugas')) {
-          setDccPetugas2Name(assign);
-        }
       }
       updateDccPicDisplay();
     }
@@ -3927,7 +3923,7 @@
     isDccFetching = true;
 
     try {
-      const p2 = getDccPetugas2Name() || 'Petugas 2';
+      const p2 = getDccPetugas2Name() || 'Petugas Siang';
 
       // Fetch Task 1, Task 2, Hasil 1, Hasil 2, and MTG in parallel
       const [resTask1, resTask2, resHasil1, resHasil2, resMtg, resMain] = await Promise.all([
@@ -4161,6 +4157,30 @@
       input.addEventListener('input', debounce(filterDccMainList, 160));
     }
     updateDccPetugas2Options();
+  })();
+
+  // Setup live PIC input sync on typing/enter
+  (function initDccPicInputListener() {
+    const input = document.getElementById('dccCustomInputByName');
+    if (input) {
+      input.addEventListener('input', function () {
+        const val = input.value.trim();
+        if (selectedDccShift !== 'pagi' && val) {
+          try {
+            localStorage.setItem(DCC_PETUGAS2_KEY, val);
+          } catch (e) {}
+          const nameEl = document.getElementById('dccActivePicName');
+          if (nameEl) nameEl.textContent = val;
+          updateDccPetugas2Options();
+        }
+      });
+      input.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          saveDccPetugas2Name();
+        }
+      });
+    }
   })();
 
   // ── Auto-lookup SKU when typing/scanning in Submit tab ──
@@ -4760,7 +4780,22 @@
     if (selectedDccShift === 'pagi') {
       inputByVal = 'Bintang';
     } else {
-      inputByVal = getDccPetugas2Name() || 'Indra';
+      const customPicEl = document.getElementById('dccCustomInputByName');
+      const customPicTyped = customPicEl ? customPicEl.value.trim() : '';
+      if (customPicTyped) {
+        setDccPetugas2Name(customPicTyped);
+        inputByVal = customPicTyped;
+      } else {
+        inputByVal = getDccPetugas2Name();
+      }
+    }
+
+    // Strict PIC validation for Shift Siang: require PIC name
+    if (!inputByVal) {
+      playWarningBeep();
+      showDccToast('warning', 'PIC Wajib Diisi', 'Silakan masukkan nama PIC penginput untuk Shift Siang.');
+      toggleDccCustomPicInput();
+      return;
     }
 
     // Reason Bad validation with strict select dropdown
