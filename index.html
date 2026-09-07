@@ -44,72 +44,35 @@
     <div class="space-loading-stars"></div>
     <div class="space-loading-nebula"></div>
 
-    <div class="space-loading-content">
-      <!-- Orbital Reactor / Astro Helmet Loader -->
-      <div class="space-orbital-reactor">
-        <div class="orbital-ring ring-outer"></div>
-        <div class="orbital-ring ring-middle"></div>
-        <div class="orbital-ring ring-inner"></div>
-        <div class="reactor-core">
-          <svg width="46" height="46" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
-            stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="12" cy="12" r="9" stroke="#38bdf8" stroke-width="2" />
-            <path d="M7 12a5 5 0 0 1 10 0v1a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2v-1z" fill="rgba(56, 189, 248, 0.35)"
-              stroke="#38bdf8" />
-            <path d="M12 3v3M4 12H2M22 12h-2M8 12a4 4 0 0 1 8 0" stroke="#94a3b8" />
-          </svg>
-        </div>
-      </div>
-
-      <!-- Loading Title -->
-      <div class="space-loading-title">Loading...</div>
-
-      <!-- Animated Cyber Progress Bar -->
-      <div class="space-progress-bar-wrap">
-        <div class="space-progress-bar-fill"></div>
-      </div>
+    <div class="clean-loading-content">
+      <img src="app-logo.jpg" alt="Logo Superapp MTG" class="clean-loading-logo">
+      <div class="clean-loading-spinner"></div>
+      <div class="clean-loading-title">Superapp MTG</div>
+      <div class="clean-loading-subtitle">Memuat sistem operasional...</div>
     </div>
   </div>
 
   <!-- ═══ App Container ═══ -->
   <div class="app-container">
 
-    <!-- ── Header (Astro Mission Control Space Dashboard) ── -->
+    <!-- ── Header (Clean Industrial Warehouse Style) ── -->
     <header class="app-header">
       <button id="backToMenuBtn" class="btn-back hidden" onclick="goBackToMenu()" title="Kembali ke Menu Utama">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
           stroke-linecap="round" stroke-linejoin="round">
-          <line x1="19" y1="12" x2="5" y2="12"></line>
-          <polyline points="12 19 5 12 12 5"></polyline>
+          <polyline points="15 18 9 12 15 6"></polyline>
         </svg>
       </button>
 
       <div class="space-header-container">
-        <div class="space-helmet-icon">
-          <!-- Sleek Astronaut Visor Emblem -->
-          <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
-            stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="12" cy="12" r="9.5" stroke="#38bdf8" stroke-width="1.5" />
-            <path d="M7 11.5c0-2.5 2.2-4.5 5-4.5s5 2 5 4.5v1.5c0 1.5-1.5 2.5-3 2.5h-4c-1.5 0-3-1-3-2.5v-1.5z"
-              fill="rgba(56, 189, 248, 0.22)" stroke="#38bdf8" stroke-width="1.5" />
-            <ellipse cx="12" cy="11.5" rx="3.5" ry="1.8" fill="rgba(14, 165, 233, 0.65)" />
-            <path d="M12 2.5v1.8M3.5 12h2M18.5 12h2" stroke="#64748b" stroke-width="1.5" stroke-linecap="round" />
-            <circle cx="12" cy="12" r="11" stroke="rgba(56, 189, 248, 0.25)" stroke-dasharray="2 4" stroke-width="1" />
-          </svg>
-        </div>
+        <img src="app-logo.jpg" alt="Superapp MTG" class="space-app-logo">
         <div class="space-header-text">
-          <div class="space-mission-chip">ASTRO MISSION CONTROL • MTG</div>
           <h1 class="space-app-title">Superapp MTG</h1>
+          <p class="space-app-subtitle">Sistem Operasional Hub MTG</p>
         </div>
       </div>
-      <p class="space-app-subtitle">Sistem Operasional Logistik Hub MTG • Barcode, DCC, EDS, dan Jadwal Staf</p>
-      
-      <!-- Telemetry Live Status & Version -->
+
       <div class="home-version-wrap">
-        <div class="home-telemetry-pill" title="Status Sistem Telemetry Live">
-          <span class="telemetry-radar-dot"></span>
-          <span class="telemetry-radar-label">ORBITAL SYNC: ONLINE</span>
-        </div>
         <button type="button" class="home-version-chip" onclick="checkForAppUpdates(true)" title="Klik untuk memeriksa pembaruan aplikasi">
           <span class="home-version-dot"></span>
           <span id="homeAppVersionText">v1.2.2</span> • Cek Update
@@ -117,7 +80,7 @@
       </div>
     </header>
 
-    <!-- ── Home Menu Section (3x3 Space Glass Tiles) ── -->
+    <!-- ── Home Menu Section (Clean 3x3 Card Grid) ── -->
     <section id="homeMenuSection" class="home-menu-section">
       <!-- PWA Android Install Banner -->
       <div id="pwaInstallBanner" class="pwa-install-container hidden">
@@ -132,122 +95,92 @@
         </button>
       </div>
 
-      <!-- 3x3 Space Glass Tiles Grid -->
+      <!-- 3x3 Cards Grid (Uniform with DCC & EDS Cards) -->
       <div class="space-grid-3x3">
         <!-- 1. Barcode -->
-        <div class="menu-card space-glass-card" onclick="openAppMenu('barcode')">
-          <div class="space-glass-sheen"></div>
-          <div class="space-card-module-badge">MOD-01</div>
-          <div class="space-icon-wrap">
-            <svg width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
-              stroke-linecap="round" stroke-linejoin="round">
-              <path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2" stroke="#38bdf8" />
-              <path d="M7 8v8M10 8v8M14 8v8M17 8v8" stroke="#f8fafc" stroke-width="1.8" />
-              <line x1="2" y1="12" x2="22" y2="12" stroke="#ef4444" stroke-width="2" stroke-dasharray="3 2" />
+        <div class="menu-card" onclick="openAppMenu('barcode')">
+          <div class="menu-icon-box barcode">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M3 5v14M7 5v14M11 5v14M15 5v14M19 5v14M21 5v14" stroke="#94a3b8" />
+              <line x1="1" y1="12" x2="23" y2="12" stroke="#ef4444" stroke-width="2.5" />
+              <path d="M3 3h3v3M21 3h-3v3M3 21h3v-3M21 21h-3v-3" stroke="#38bdf8" />
             </svg>
           </div>
           <div class="menu-card-title">Barcode</div>
         </div>
 
         <!-- 2. Complain -->
-        <div class="menu-card space-glass-card" onclick="openAppMenu('complain')">
-          <div class="space-glass-sheen"></div>
-          <div class="space-card-module-badge">MOD-02</div>
-          <div class="space-icon-wrap">
-            <svg width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
-              stroke-linecap="round" stroke-linejoin="round">
-              <path d="M12 2a10 10 0 0 1 10 10" stroke="#f59e0b" />
-              <path d="M12 6a6 6 0 0 1 6 6" stroke="#fbbf24" />
-              <circle cx="12" cy="12" r="2.5" fill="#f59e0b" stroke="#f59e0b" />
-              <path d="M12 15v5M9 22h6" stroke="#94a3b8" />
-              <path d="M4 14l2-2 4 4-2 2z" fill="rgba(56,189,248,0.2)" stroke="#38bdf8" />
+        <div class="menu-card" onclick="openAppMenu('complain')">
+          <div class="menu-icon-box complain">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="1" y="3" width="15" height="13" rx="2" stroke="#f59e0b" fill="rgba(245, 158, 11, 0.15)" />
+              <polygon points="16 8 20 8 23 11 23 16 16 16 16 8" stroke="#f59e0b" fill="rgba(245, 158, 11, 0.2)" />
+              <circle cx="5.5" cy="18.5" r="2.5" stroke="#94a3b8" fill="#1e293b" />
+              <circle cx="18.5" cy="18.5" r="2.5" stroke="#94a3b8" fill="#1e293b" />
+              <line x1="5" y1="9" x2="9" y2="9" stroke="#f59e0b" stroke-width="2" />
             </svg>
           </div>
           <div class="menu-card-title">Complain</div>
         </div>
 
         <!-- 3. Retur Task -->
-        <div class="menu-card space-glass-card" onclick="openAppMenu('retur')">
-          <div class="space-glass-sheen"></div>
-          <div class="space-card-module-badge">MOD-03</div>
-          <div class="space-icon-wrap">
-            <svg width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
-              stroke-linecap="round" stroke-linejoin="round">
-              <path d="M12 2L6 8v6l6 6 6-6V8l-6-6z" fill="rgba(56,189,248,0.15)" stroke="#38bdf8" />
-              <circle cx="12" cy="11" r="2.5" fill="#38bdf8" />
-              <path d="M9 17l-3 4M15 17l3 4" stroke="#a855f7" stroke-width="2" />
-              <path d="M8 8l4-4 4 4" stroke="#38bdf8" />
+        <div class="menu-card" onclick="openAppMenu('retur')">
+          <div class="menu-icon-box retur">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="1 4 1 10 7 10"></polyline>
+              <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path>
+              <rect x="8" y="8" width="8" height="8" rx="1.5" stroke="#a855f7" fill="rgba(168, 85, 247, 0.2)" />
             </svg>
           </div>
           <div class="menu-card-title">Retur Task</div>
         </div>
 
         <!-- 4. DCC -->
-        <div class="menu-card space-glass-card" onclick="openAppMenu('dcc')">
-          <div class="space-glass-sheen"></div>
-          <div class="space-card-module-badge">MOD-04</div>
-          <div class="space-icon-wrap">
-            <svg width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
-              stroke-linecap="round" stroke-linejoin="round">
-              <circle cx="12" cy="12" r="5" fill="rgba(16,185,129,0.2)" stroke="#10b981" />
-              <ellipse cx="12" cy="12" rx="10" ry="4" stroke="#38bdf8" transform="rotate(-25 12 12)" />
-              <path d="M12 4v2M12 18v2M4 12h2M18 12h2" stroke="#94a3b8" />
-              <circle cx="17" cy="8" r="1.5" fill="#fbbf24" />
+        <div class="menu-card" onclick="openAppMenu('dcc')">
+          <div class="menu-icon-box dcc">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" stroke="#10b981" fill="rgba(16, 185, 129, 0.18)" />
+              <polyline points="3.27 6.96 12 12.01 20.73 6.96" stroke="#10b981" />
+              <line x1="12" y1="22.08" x2="12" y2="12" stroke="#10b981" />
             </svg>
           </div>
           <div class="menu-card-title">DCC</div>
         </div>
 
         <!-- 5. Gaji -->
-        <div class="menu-card space-glass-card" onclick="openAppMenu('slip_gaji')">
-          <div class="space-glass-sheen"></div>
-          <div class="space-card-module-badge">MOD-05</div>
-          <div class="space-icon-wrap">
-            <svg width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
-              stroke-linecap="round" stroke-linejoin="round">
-              <rect x="3" y="5" width="18" height="14" rx="3" fill="rgba(16,185,129,0.15)" stroke="#10b981" />
-              <circle cx="9" cy="12" r="2.5" stroke="#38bdf8" />
-              <path d="M14 9h4M14 12h3M14 15h2" stroke="#10b981" stroke-width="1.6" />
-              <circle cx="12" cy="3" r="1" fill="#38bdf8" />
+        <div class="menu-card" onclick="openAppMenu('slip_gaji')">
+          <div class="menu-icon-box gaji">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="2" y="4" width="20" height="16" rx="2" stroke="#34d399" fill="rgba(52, 211, 153, 0.15)" />
+              <line x1="2" y1="10" x2="22" y2="10" stroke="#34d399" />
+              <line x1="6" y1="15" x2="11" y2="15" stroke="#34d399" />
+              <circle cx="16.5" cy="15" r="1.5" fill="#34d399" />
             </svg>
           </div>
           <div class="menu-card-title">Gaji</div>
         </div>
 
         <!-- 6. Expired Date Sweeper -->
-        <div class="menu-card space-glass-card" onclick="openAppMenu('ed_sweeper')">
-          <div class="space-glass-sheen"></div>
-          <div class="space-card-module-badge">MOD-06</div>
-          <div class="space-icon-wrap">
-            <svg width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
-              stroke-linecap="round" stroke-linejoin="round">
-              <circle cx="12" cy="12" r="9" fill="rgba(245,158,11,0.12)" stroke="#f59e0b" />
-              <circle cx="12" cy="12" r="4" stroke="#f59e0b" stroke-dasharray="2 2" />
-              <line x1="12" y1="12" x2="19" y2="7" stroke="#38bdf8" stroke-width="2" />
-              <circle cx="19" cy="7" r="1.5" fill="#38bdf8" />
-              <path d="M12 3v3M21 12h-3M12 21v-3M3 12h3" stroke="#94a3b8" />
+        <div class="menu-card" onclick="openAppMenu('ed_sweeper')">
+          <div class="menu-icon-box eds">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="9" stroke="#fbbf24" fill="rgba(251, 191, 36, 0.15)" />
+              <polyline points="12 7 12 12 15 14" stroke="#fbbf24" />
+              <path d="M12 3v2M12 19v2M3 12h2M19 12h2" stroke="#fbbf24" stroke-width="1.5" />
             </svg>
           </div>
           <div class="menu-card-title">Expired Date Sweeper</div>
         </div>
 
         <!-- 7. MP Schedule -->
-        <div class="menu-card space-glass-card" onclick="openAppMenu('mp_schedule')">
-          <div class="space-glass-sheen"></div>
-          <div class="space-card-module-badge">MOD-07</div>
-          <div class="space-icon-wrap">
-            <svg width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
-              stroke-linecap="round" stroke-linejoin="round">
-              <rect x="3" y="4" width="18" height="17" rx="2" fill="rgba(56,189,248,0.12)" stroke="#38bdf8" />
-              <line x1="3" y1="9" x2="21" y2="9" stroke="#38bdf8" stroke-width="1.5" />
-              <line x1="8" y1="2" x2="8" y2="5" stroke="#38bdf8" stroke-width="2" />
-              <line x1="16" y1="2" x2="16" y2="5" stroke="#38bdf8" stroke-width="2" />
-              <circle cx="7.5" cy="13.5" r="1.5" fill="#10b981" />
-              <circle cx="12" cy="13.5" r="1.5" fill="#38bdf8" />
-              <circle cx="16.5" cy="13.5" r="1.5" fill="#f59e0b" />
-              <circle cx="7.5" cy="17.5" r="1.5" fill="#38bdf8" />
-              <circle cx="12" cy="17.5" r="1.5" fill="#10b981" />
-              <circle cx="16.5" cy="17.5" r="1.5" fill="#10b981" />
+        <div class="menu-card" onclick="openAppMenu('mp_schedule')">
+          <div class="menu-icon-box mps">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="4" width="18" height="18" rx="2" stroke="#38bdf8" fill="rgba(56, 189, 248, 0.15)" />
+              <line x1="16" y1="2" x2="16" y2="6" stroke="#38bdf8" />
+              <line x1="8" y1="2" x2="8" y2="6" stroke="#38bdf8" />
+              <line x1="3" y1="10" x2="21" y2="10" stroke="#38bdf8" />
+              <path d="M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01M16 18h.01" stroke="#38bdf8" stroke-width="2.5" />
             </svg>
           </div>
           <div class="menu-card-title">MP Schedule</div>
@@ -1790,7 +1723,7 @@
   </div>
 
   <!-- App Logic -->
-  <script src="app.js?v=51"></script>
+  <script src="app.js?v=52"></script>
 </body>
 
 </html>
