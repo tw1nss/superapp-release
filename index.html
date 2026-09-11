@@ -29,7 +29,7 @@
   <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/id.js"></script>
 
   <!-- Stylesheets -->
-  <link rel="stylesheet" href="style.css?v=27">
+  <link rel="stylesheet" href="style.css?v=28">
 
   <!-- QR Code & Barcode Libraries -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
@@ -147,17 +147,18 @@
           <div class="menu-card-title">DCC</div>
         </div>
 
-        <!-- 5. Gaji -->
+        <!-- 5. HK -->
         <div class="menu-card" onclick="openAppMenu('slip_gaji')">
           <div class="menu-icon-box gaji">
             <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <rect x="2" y="4" width="20" height="16" rx="2" stroke="#34d399" fill="rgba(52, 211, 153, 0.15)" />
-              <line x1="2" y1="10" x2="22" y2="10" stroke="#34d399" />
-              <line x1="6" y1="15" x2="11" y2="15" stroke="#34d399" />
-              <circle cx="16.5" cy="15" r="1.5" fill="#34d399" />
+              <rect x="3" y="4" width="18" height="18" rx="2" stroke="#34d399" fill="rgba(52, 211, 153, 0.15)" />
+              <line x1="16" y1="2" x2="16" y2="6" stroke="#34d399" />
+              <line x1="8" y1="2" x2="8" y2="6" stroke="#34d399" />
+              <line x1="3" y1="10" x2="21" y2="10" stroke="#34d399" />
+              <path d="M9 15l2 2 4-4" stroke="#34d399" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" />
             </svg>
           </div>
-          <div class="menu-card-title">Gaji</div>
+          <div class="menu-card-title">HK</div>
         </div>
 
         <!-- 6. Expired Date Sweeper -->
@@ -1174,9 +1175,9 @@
       </div>
     </div>
 
-    <!-- ── Slip Gaji Workspace (Hidden by Default) ── -->
+    <!-- ── Slip Gaji / Rekap HK Workspace (Hidden by Default) ── -->
     <div id="slipGajiWorkspace" class="hidden">
-      <!-- Slip Gaji Top Action Bar -->
+      <!-- Slip Gaji / HK Top Action Bar -->
       <div class="sg-top-bar">
         <button type="button" class="sg-top-back-btn" onclick="goBackToMenu()" title="Kembali ke Menu Utama">
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
@@ -1184,8 +1185,8 @@
             <polyline points="15 18 9 12 15 6"></polyline>
           </svg>
         </button>
-        <div class="sg-title">Slip Gaji Manpower MTG</div>
-        <button class="sg-refresh-btn" onclick="refreshSlipGajiData()" title="Muat Ulang Data Slip Gaji">
+        <div class="sg-title">Rekap HK Manpower MTG</div>
+        <button class="sg-refresh-btn" onclick="refreshSlipGajiData()" title="Muat Ulang Data HK">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
             stroke-linecap="round" stroke-linejoin="round">
             <polyline points="23 4 23 10 17 10"></polyline>
@@ -1222,11 +1223,11 @@
         <div class="sg-empty-state">
           <div style="font-size: 38px; margin-bottom: 10px;">🔍</div>
           <div style="font-weight: 700; font-size: 1.05rem; color: var(--text-primary); margin-bottom: 6px;">
-            Cari Slip Gaji Manpower
+            Cari Data HK Manpower
           </div>
           <div
             style="font-size: 0.85rem; color: var(--text-muted); line-height: 1.5; max-width: 340px; margin: 0 auto;">
-            Ketik nama Manpower atau ID pada kolom pencarian di atas untuk melihat rincian slip gaji.
+            Ketik nama Manpower atau ID pada kolom pencarian di atas untuk melihat rincian Hari Kerja (HK).
           </div>
         </div>
       </div>
@@ -1723,7 +1724,7 @@
   </div>
 
   <!-- App Logic -->
-  <script src="app.js?v=53"></script>
+  <script src="app.js?v=54"></script>
 </body>
 
 </html>

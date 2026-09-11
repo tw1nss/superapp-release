@@ -2566,7 +2566,7 @@
       if (typeof switchEdsTab === 'function') switchEdsTab('main');
       if (typeof initEdsFlatpickr === 'function') initEdsFlatpickr();
       if (typeof fetchEdSweeperData === 'function') fetchEdSweeperData(true);
-    } else if (menu === 'slip_gaji') {
+    } else if (menu === 'slip_gaji' || menu === 'hk') {
       document.getElementById('homeMenuSection').classList.add('hidden');
       document.getElementById('appWorkspace').classList.add('hidden');
       document.getElementById('dccWorkspace').classList.add('hidden');
@@ -2682,6 +2682,13 @@
     const mpsDetail = document.getElementById('mpsDetailSection');
     if (mpsDetail && !mpsDetail.classList.contains('hidden')) {
       closeMpScheduleDetail();
+      return true;
+    }
+
+    // 2.7 Close HK detail if open
+    const sgDetail = document.getElementById('sgDetailSection');
+    if (sgDetail && !sgDetail.classList.contains('hidden')) {
+      closeSlipGajiDetail();
       return true;
     }
 
@@ -5041,7 +5048,7 @@
       cardContainer.innerHTML = `
         <div class="sg-loading-placeholder">
           <div class="loading-spinner" style="width:32px;height:32px;margin:0 auto 12px auto;"></div>
-          <div>Mengambil data Slip Gaji dari Google Sheets...</div>
+          <div>Mengambil data HK Manpower dari Google Sheets...</div>
         </div>
       `;
     }
@@ -5102,7 +5109,7 @@
       updateSlipGajiMeta(slipGajiList.length, 'Live Sync');
 
       if (forceRefresh) {
-        showDccToast('success', 'Data Disinkronkan!', `Berhasil memuat ${slipGajiList.length} data Slip Gaji.`);
+        showDccToast('success', 'Data Disinkronkan!', `Berhasil memuat ${slipGajiList.length} data HK Manpower.`);
       }
 
       // If active MP was open, re-render it with fresh data
@@ -5111,12 +5118,12 @@
       }
 
     } catch (err) {
-      console.error('Error fetching Slip Gaji data:', err);
+      console.error('Error fetching HK data:', err);
       if (slipGajiList.length === 0 && cardContainer) {
         cardContainer.innerHTML = `
           <div class="sg-error-box">
             <div style="font-size: 24px; margin-bottom: 8px;">⚠️</div>
-            <div style="font-weight: 600; margin-bottom: 4px;">Gagal Memuat Data Slip Gaji</div>
+            <div style="font-weight: 600; margin-bottom: 4px;">Gagal Memuat Data HK Manpower</div>
             <div style="font-size: 13px; color: var(--text-muted); margin-bottom: 14px;">${err.message || 'Koneksi ke Google Sheets gagal'}</div>
             <button type="button" class="btn-submit" style="display:inline-flex; width:auto; padding: 8px 18px;" onclick="fetchSlipGajiData(true)">
               Coba Lagi
@@ -5207,10 +5214,10 @@
         <div class="sg-empty-state">
           <div style="font-size: 38px; margin-bottom: 10px;">🔍</div>
           <div style="font-weight: 700; font-size: 1.05rem; color: var(--text-primary); margin-bottom: 6px;">
-            Cari Slip Gaji Manpower
+            Cari Data HK Manpower
           </div>
           <div style="font-size: 0.85rem; color: var(--text-muted); line-height: 1.5; max-width: 340px; margin: 0 auto;">
-            Ketik nama Manpower atau ID pada kolom pencarian di atas untuk melihat rincian slip gaji.
+            Ketik nama Manpower atau ID pada kolom pencarian di atas untuk melihat rincian Hari Kerja (HK).
           </div>
         </div>
       `;
@@ -5268,27 +5275,27 @@
           </div>
 
           <div class="sg-card-stats-grid">
-            <div class="sg-stat-box">
-              <span class="sg-stat-lbl">Hari Kerja</span>
-              <span class="sg-stat-val">${escapeHtml(mp.hk)} Hari</span>
-            </div>
-            <div class="sg-stat-box">
-              <span class="sg-stat-lbl">Rate / Shift</span>
-              <span class="sg-stat-val">${escapeHtml(mp.amountHkShift)}</span>
+            <div class="sg-stat-box sg-stat-highlight">
+              <span class="sg-stat-lbl">Total Hari Kerja</span>
+              <span class="sg-stat-val font-accent">${escapeHtml(mp.hk)} Hari</span>
             </div>
             <div class="sg-stat-box">
               <span class="sg-stat-lbl">Jumlah Lembur</span>
               <span class="sg-stat-val ${totalOtCount > 0 ? 'font-accent' : ''}">${escapeHtml(otDisplayText)}</span>
             </div>
-            <div class="sg-stat-box sg-stat-highlight">
-              <span class="sg-stat-lbl">Total Gapok</span>
-              <span class="sg-stat-val font-accent">${escapeHtml(mp.totalGapok)}</span>
+            <div class="sg-stat-box">
+              <span class="sg-stat-lbl">Hari Libur (Off)</span>
+              <span class="sg-stat-val">${escapeHtml(mp.off)} Hari</span>
+            </div>
+            <div class="sg-stat-box">
+              <span class="sg-stat-lbl">Ketidakhadiran (Alfa)</span>
+              <span class="sg-stat-val" style="${mp.alfa !== '0' ? 'color: var(--color-error); font-weight: 700;' : ''}">${escapeHtml(mp.alfa)} Hari</span>
             </div>
           </div>
 
           <div class="sg-card-footer">
             <span class="sg-view-btn">
-              <span>Buka Slip Gaji</span>
+              <span>Lihat Rincian HK</span>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <polyline points="9 18 15 12 9 6"></polyline>
               </svg>
@@ -5311,6 +5318,7 @@
 
     const isLead = mp.role.toUpperCase().includes('LEAD');
     const roleBadgeClass = isLead ? 'sg-badge-lead' : 'sg-badge-fresh';
+    const totalOtCount = (Number(mp.ot24) || 0) + (Number(mp.otOver4) || 0);
 
     detailSection.innerHTML = `
       <div class="sg-slip-paper" id="sgPrintableArea">
@@ -5325,11 +5333,11 @@
             </div>
             <div>
               <div class="sg-company-title">ASTRO QA HUB</div>
-              <div class="sg-company-sub">Sistem Penggajian Manpower — Hub ${escapeHtml(mp.hub)}</div>
+              <div class="sg-company-sub">Rekap Kehadiran & HK Manpower — Hub ${escapeHtml(mp.hub)}</div>
             </div>
           </div>
           <div class="sg-slip-badge-wrapper">
-            <span class="sg-slip-type-badge">SLIP GAJI RESMI</span>
+            <span class="sg-slip-type-badge">REKAP HK RESMI</span>
             <button type="button" class="sg-close-detail-btn" onclick="closeSlipGajiDetail()" title="Tutup Rincian">✕</button>
           </div>
         </div>
@@ -5354,10 +5362,19 @@
               <span class="sg-emp-val">${escapeHtml(mp.joinDate)}</span>
             </div>
             <div class="sg-emp-item">
-              <span class="sg-emp-lbl">Rate per Shift</span>
-              <span class="sg-emp-val mono-font">${escapeHtml(mp.amountHkShift)}</span>
+              <span class="sg-emp-lbl">Status Kehadiran</span>
+              <span class="sg-emp-val font-accent" style="font-weight: 700;">${escapeHtml(mp.hk)} HK Aktif</span>
             </div>
           </div>
+        </div>
+
+        <!-- Grand Total HK Highlight Box -->
+        <div class="sg-grand-total-row" style="margin-top: 0; margin-bottom: 18px;">
+          <div>
+            <div class="sg-grand-lbl">TOTAL HARI KERJA (HK)</div>
+            <div class="sg-grand-sub">Total shift kerja yang tercatat periode ini</div>
+          </div>
+          <div class="sg-grand-val mono-font">${escapeHtml(mp.hk)} <span style="font-size: 1rem; font-weight: 700; opacity: 0.85;">HARI</span></div>
         </div>
 
         <!-- Attendance & Overtime Breakdown -->
@@ -5381,10 +5398,10 @@
                 </tr>
               </thead>
               <tbody>
-                <tr>
-                  <td>Total Hari Kerja (HK)</td>
-                  <td style="text-align:right;" class="font-bold">${escapeHtml(mp.hk)}</td>
-                  <td style="text-align:right; color: var(--text-muted);">Hari</td>
+                <tr style="background: rgba(6, 214, 160, 0.08);">
+                  <td style="font-weight: 700; color: var(--accent-primary);">Total Hari Kerja (HK)</td>
+                  <td style="text-align:right; font-weight: 800; color: var(--accent-primary); font-size: 1.05rem;">${escapeHtml(mp.hk)}</td>
+                  <td style="text-align:right; color: var(--accent-primary); font-weight: 600;">Hari</td>
                 </tr>
                 <tr>
                   <td>Lembur OT (2 - 4 Jam)</td>
@@ -5396,10 +5413,10 @@
                   <td style="text-align:right;">${escapeHtml(mp.otOver4)}</td>
                   <td style="text-align:right; color: var(--text-muted);">Kali</td>
                 </tr>
-                <tr style="background: rgba(6, 214, 160, 0.05);">
-                  <td style="font-weight: 600; color: var(--accent-primary);">Total Jumlah Lembur</td>
-                  <td style="text-align:right; font-weight: 700; color: var(--accent-primary);">${(Number(mp.ot24) || 0) + (Number(mp.otOver4) || 0)}</td>
-                  <td style="text-align:right; color: var(--accent-primary); font-weight: 600;">Kali</td>
+                <tr style="background: rgba(0, 180, 216, 0.05);">
+                  <td style="font-weight: 600; color: var(--accent-secondary);">Total Jumlah Lembur</td>
+                  <td style="text-align:right; font-weight: 700; color: var(--accent-secondary);">${totalOtCount}</td>
+                  <td style="text-align:right; color: var(--accent-secondary); font-weight: 600;">Kali</td>
                 </tr>
                 <tr>
                   <td>Hari Libur (Off)</td>
@@ -5408,7 +5425,7 @@
                 </tr>
                 <tr>
                   <td>Ketidakhadiran (Alfa)</td>
-                  <td style="text-align:right; color: ${mp.alfa !== '0' ? 'var(--color-error)' : 'inherit'};">${escapeHtml(mp.alfa)}</td>
+                  <td style="text-align:right; color: ${mp.alfa !== '0' ? 'var(--color-error)' : 'inherit'}; font-weight: ${mp.alfa !== '0' ? '700' : 'normal'};">${escapeHtml(mp.alfa)}</td>
                   <td style="text-align:right; color: var(--text-muted);">Hari</td>
                 </tr>
                 ${(mp.ho1 !== '0' || mp.ho2 !== '0') ? `
@@ -5422,37 +5439,6 @@
           </div>
         </div>
 
-        <!-- Financial & Earnings Breakdown -->
-        <div class="sg-section-card">
-          <div class="sg-section-title">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <line x1="12" y1="1" x2="12" y2="23"></line>
-              <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
-            </svg>
-            <span>Rincian Pendapatan</span>
-          </div>
-          <div class="sg-earnings-list">
-            <div class="sg-earning-row">
-              <span class="sg-earning-lbl">Gaji Pokok (GAPOK)</span>
-              <span class="sg-earning-val mono-font">${escapeHtml(mp.gapok)}</span>
-            </div>
-            ${mp.ipp && mp.ipp !== '-' && mp.ipp !== '0' ? `
-            <div class="sg-earning-row">
-              <span class="sg-earning-lbl">Insentif / Penyesuaian (IPP)</span>
-              <span class="sg-earning-val mono-font">${escapeHtml(mp.ipp)}</span>
-            </div>` : ''}
-
-            <!-- Grand Total Highlight -->
-            <div class="sg-grand-total-row">
-              <div>
-                <div class="sg-grand-lbl">TOTAL PENERIMAAN</div>
-                <div class="sg-grand-sub">Take Home Pay</div>
-              </div>
-              <div class="sg-grand-val mono-font">${escapeHtml(mp.totalGapok)}</div>
-            </div>
-          </div>
-        </div>
-
         <!-- Action Buttons (Print & WhatsApp Share) -->
         <div class="sg-actions-bar no-print">
           <button type="button" class="sg-btn-action sg-btn-whatsapp" onclick="copySlipGajiText('${escapeHtml(mp.id || mp.name)}')">
@@ -5460,7 +5446,7 @@
               <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
               <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
             </svg>
-            <span>Salin Rincian Slip</span>
+            <span>Salin Rincian HK</span>
           </button>
           <button type="button" class="sg-btn-action sg-btn-print" onclick="printSlipGaji()">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -5497,33 +5483,29 @@
 
     const lines = [
       `━━━━━━━━━━━━━━━━━━━━━━━`,
-      `📄 *SLIP GAJI MANPOWER ASTRO*`,
+      `📋 *REKAP HARI KERJA (HK) MANPOWER ASTRO*`,
       `🏢 Hub Lokasi: *${mp.hub}*`,
       `━━━━━━━━━━━━━━━━━━━━━━━`,
       `👤 *Nama*: ${mp.name}`,
       `🆔 *ID MP*: ${mp.id || '-'}`,
       `🏷️ *Jabatan/Role*: ${mp.role}`,
       `📅 *Join Date*: ${mp.joinDate}`,
-      `💵 *Rate HK/Shift*: ${mp.amountHkShift}`,
       `───────────────────────`,
-      `📊 *RINCIAN KEHADIRAN*:`,
-      `• Hari Kerja (HK) : *${mp.hk} Hari*`,
-      `• Total Lembur    : *${totalOtCount} Kali* (2-4j: ${mp.ot24}x, >4j: ${mp.otOver4}x)`,
-      `• Libur (Off)      : ${mp.off} Hari`,
-      `• Ketidakhadiran   : ${mp.alfa} Hari`,
-      `───────────────────────`,
-      `💰 *RINCIAN PENDAPATAN*:`,
-      `• Gaji Pokok : ${mp.gapok}`,
-      (mp.ipp && mp.ipp !== '-' && mp.ipp !== '0' ? `• Insentif/IPP : ${mp.ipp}` : null),
+      `📊 *RINCIAN KEHADIRAN & HK*:`,
+      `• Total Hari Kerja (HK) : *${mp.hk} Hari*`,
+      `• Total Lembur          : *${totalOtCount} Kali* (2-4j: ${mp.ot24}x, >4j: ${mp.otOver4}x)`,
+      `• Libur (Off)           : ${mp.off} Hari`,
+      `• Ketidakhadiran (Alfa) : ${mp.alfa} Hari`,
+      (mp.ho1 !== '0' || mp.ho2 !== '0' ? `• Holiday Overtime      : HO1=${mp.ho1}, HO2=${mp.ho2}` : null),
       `━━━━━━━━━━━━━━━━━━━━━━━`,
-      `💵 *TOTAL DITERIMA : ${mp.totalGapok}*`,
+      `⭐ *TOTAL HK : ${mp.hk} HARI*`,
       `━━━━━━━━━━━━━━━━━━━━━━━`,
       `_Generated via Super App MTG_`
     ].filter(Boolean).join('\n');
 
     if (navigator.clipboard && navigator.clipboard.writeText) {
       navigator.clipboard.writeText(lines).then(() => {
-        showDccToast('success', 'Rincian Slip Disalin!', `Data ${mp.name} berhasil disalin ke clipboard.`);
+        showDccToast('success', 'Rincian HK Disalin!', `Data ${mp.name} berhasil disalin ke clipboard.`);
       }).catch(() => {
         fallbackCopyText(lines, mp.name);
       });
@@ -5542,15 +5524,17 @@
     ta.select();
     try {
       document.execCommand('copy');
-      showDccToast('success', 'Rincian Slip Disalin!', `Data ${name} berhasil disalin.`);
+      showDccToast('success', 'Rincian HK Disalin!', `Data ${name} berhasil disalin.`);
     } catch (e) {
-      showDccToast('error', 'Gagal Menyalin', 'Salin manual teks slip gaji.');
+      showDccToast('error', 'Gagal Menyalin', 'Salin manual teks rincian HK.');
     }
     document.body.removeChild(ta);
   }
 
   window.printSlipGaji = function () {
-    triggerNativePrint('print-mode-slip', 'Slip_Gaji_MTG');
+    const activeMp = slipGajiList.find(item => item.id === currentActiveMpId || item.name === currentActiveMpId);
+    const safeName = activeMp ? activeMp.name.replace(/\s+/g, '_') : 'Manpower';
+    triggerNativePrint('print-mode-slip', `Rekap_HK_${safeName}`);
   };
 
   // ══════════════════════════════════════════════
