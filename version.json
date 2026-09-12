@@ -1,14 +1,13 @@
 {
-  "versionCode": 17,
-  "versionName": "1.2.2",
+  "versionCode": 18,
+  "versionName": "1.2.3",
   "apkUrl": "https://github.com/tw1nss/superapp-release/raw/main/app-debug.apk",
   "forceUpdate": false,
-  "title": "Pembaruan Superapp MTG v1.2.2",
+  "title": "Pembaruan Superapp MTG v1.2.3",
   "changelog": [
-    "Perbaikan Bug Real-Time Sisa Hari ED: Perubahan tanggal Expired Date langsung memperbarui sisa hari Expired & batas MSLTC secara instan",
-    "Sinkronisasi Otomatis Google Sheet: Tarik data Superset otomatis mengisi SKU & rumus di Main List SKU secara lengkap",
-    "Filter Kategori Alert Responsif: Menyesuaikan sheet aktif dan mendeteksi kolom secara dinamis",
-    "Fallback Data Update: Petugas tetap dapat memeriksa tugas meskipun Main List SKU di Spreadsheet belum disinkronkan supervisor"
+    "Notifikasi Push Realtime Complain Hub MTG via Firebase (Heads-Up Banner seperti chat WA)",
+    "Integrasi WhatsApp Webhook Bot GoWA dengan parser cerdas format Hub MTG & No Invoice",
+    "Pembersihan antarmuka Home Menu dan perbaikan tracking komplain terintegrasi Cloud Firestore"
   ],
-  "releasedAt": "2026-09-04"
+  "releasedAt": "2026-09-12"
 }

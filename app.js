@@ -1924,6 +1924,7 @@
   }
 
   function escapeHtml(str) {
+    if (!str) return '';
     const div = document.createElement('div');
     div.textContent = str;
     return div.innerHTML;
@@ -2591,6 +2592,37 @@
       window.closeMpScheduleDetail();
       switchMpsTab('manpower');
       fetchMpScheduleData();
+    } else if (menu === 'complain') {
+      document.getElementById('homeMenuSection').classList.add('hidden');
+      document.getElementById('appWorkspace').classList.add('hidden');
+      document.getElementById('dccWorkspace').classList.add('hidden');
+      const edsWs2 = document.getElementById('edSweeperWorkspace');
+      if (edsWs2) edsWs2.classList.add('hidden');
+      document.getElementById('slipGajiWorkspace').classList.add('hidden');
+      document.getElementById('mpScheduleWorkspace').classList.add('hidden');
+      document.getElementById('complainWorkspace').classList.remove('hidden');
+      const koliWs1 = document.getElementById('koliInboundWorkspace');
+      if (koliWs1) koliWs1.classList.add('hidden');
+      document.getElementById('backToMenuBtn').classList.remove('hidden');
+      fetchComplainData();
+    } else if (menu === 'koli_inbound') {
+      document.getElementById('homeMenuSection').classList.add('hidden');
+      document.getElementById('appWorkspace').classList.add('hidden');
+      document.getElementById('dccWorkspace').classList.add('hidden');
+      const edsWs = document.getElementById('edSweeperWorkspace');
+      if (edsWs) edsWs.classList.add('hidden');
+      document.getElementById('slipGajiWorkspace').classList.add('hidden');
+      document.getElementById('mpScheduleWorkspace').classList.add('hidden');
+      document.getElementById('complainWorkspace').classList.add('hidden');
+      const koliWs = document.getElementById('koliInboundWorkspace');
+      if (koliWs) {
+        koliWs.classList.remove('hidden');
+        koliWs.scrollTop = 0;
+      }
+      document.getElementById('backToMenuBtn').classList.remove('hidden');
+      if (typeof window.fetchKoliInboundData === 'function') {
+        window.fetchKoliInboundData();
+      }
     } else {
       alert('Fitur ini akan di-develop menyusul.');
     }
@@ -2610,7 +2642,14 @@
     if (edsWs) edsWs.classList.add('hidden');
     document.getElementById('slipGajiWorkspace').classList.add('hidden');
     document.getElementById('mpScheduleWorkspace').classList.add('hidden');
+    document.getElementById('complainWorkspace').classList.add('hidden');
+    const koliWs = document.getElementById('koliInboundWorkspace');
+    if (koliWs) koliWs.classList.add('hidden');
     document.getElementById('backToMenuBtn').classList.add('hidden');
+    closeComplainDetail();
+    if (typeof window.closeKoliDetailModal === 'function') {
+      window.closeKoliDetailModal();
+    }
 
     window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
     document.documentElement.scrollTop = 0;
@@ -2689,6 +2728,22 @@
     const sgDetail = document.getElementById('sgDetailSection');
     if (sgDetail && !sgDetail.classList.contains('hidden')) {
       closeSlipGajiDetail();
+      return true;
+    }
+
+    // 2.8 Close Complain detail if open
+    const cplDetail = document.getElementById('cplDetailSection');
+    if (cplDetail && !cplDetail.classList.contains('hidden')) {
+      closeComplainDetail();
+      return true;
+    }
+
+    // 2.9 Close Koli Inbound detail if open
+    const koliDetail = document.getElementById('koliDetailModal');
+    if (koliDetail && !koliDetail.classList.contains('hidden')) {
+      if (typeof window.closeKoliDetailModal === 'function') {
+        window.closeKoliDetailModal();
+      }
       return true;
     }
 
@@ -8921,4 +8976,1274 @@
     });
   })();
 
+  // ══════════════════════════════════════════════════════════════════════════
+  //  COMPLAIN TRACKER MODULE
+  //  Integrated with GoWA WhatsApp Gateway & Realtime Telemetry HUD Alerts
+  // ══════════════════════════════════════════════════════════════════════════
+
+  let complainList = [];
+  let complainActiveTab = 'semua';
+  let complainSearchQuery = '';
+  let complainEvidenceData = null;
+  let complainEvidenceFilename = null;
+  let complainSyncSource = 'Demo Data';
+  let COMPLAIN_API_BASE_URL = localStorage.getItem('superapp_complain_api_url') || '';
+
+  let lastKnownComplainIds = new Set();
+  let activeComplainToastItem = null;
+  let complainToastTimer = null;
+  let isComplainPolling = false;
+
+  // Resolves the best API URL for Complain Service
+  function getComplainApiUrl(endpoint = '/api/complaints') {
+    if (COMPLAIN_API_BASE_URL && COMPLAIN_API_BASE_URL.trim()) {
+      return COMPLAIN_API_BASE_URL.trim().replace(/\/+$/, '') + endpoint;
+    }
+    if (typeof window !== 'undefined' && window.location && window.location.origin && window.location.origin.startsWith('http')) {
+      return window.location.origin + endpoint;
+    }
+    return 'http://127.0.0.1:3100' + endpoint;
+  }
+
+  const FIRESTORE_REST_URL = 'https://firestore.googleapis.com/v1/projects/complain-m/databases/(default)/documents/complaints';
+
+  function mapFirestoreDocToComplain(d) {
+    const f = d.fields || {};
+    const id = f.id?.stringValue || d.name.split('/').pop();
+    return {
+      id: id,
+      hub: f.hub?.stringValue || 'Hub MTG Menteng',
+      invoice: f.invoice?.stringValue || '',
+      sender: f.sender?.stringValue || '',
+      description: f.description?.stringValue || '',
+      status: f.status?.stringValue || 'baru',
+      createdAt: f.createdAt?.stringValue || d.createTime,
+      claimedBy: f.claimedBy?.stringValue || null,
+      claimedAt: f.claimedAt?.stringValue || null,
+      resolvedAt: f.resolvedAt?.stringValue || null,
+      evidenceUrl: f.evidenceUrl?.stringValue || null,
+      rawText: f.rawText?.stringValue || ''
+    };
+  }
+
+  function formatComplainDate(isoStr) {
+    if (!isoStr) return '-';
+    try {
+      const d = new Date(isoStr);
+      const day = String(d.getDate()).padStart(2, '0');
+      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Ags', 'Sep', 'Okt', 'Nov', 'Des'];
+      const mon = months[d.getMonth()];
+      const yr = d.getFullYear();
+      const hr = String(d.getHours()).padStart(2, '0');
+      const mn = String(d.getMinutes()).padStart(2, '0');
+      return `${day} ${mon} ${yr}, ${hr}:${mn}`;
+    } catch (e) {
+      return isoStr;
+    }
+  }
+
+  function formatComplainDateShort(isoStr) {
+    if (!isoStr) return '-';
+    try {
+      const d = new Date(isoStr);
+      const day = String(d.getDate()).padStart(2, '0');
+      const mon = String(d.getMonth() + 1).padStart(2, '0');
+      const hr = String(d.getHours()).padStart(2, '0');
+      const mn = String(d.getMinutes()).padStart(2, '0');
+      return `${day}/${mon} ${hr}:${mn}`;
+    } catch (e) {
+      return isoStr;
+    }
+  }
+
+  function getStatusLabel(status) {
+    const map = { baru: 'Baru', dikerjakan: 'Dikerjakan', selesai: 'Selesai' };
+    return map[status] || status;
+  }
+
+  window.fetchComplainData = async function (forceRefresh = false) {
+    if (!forceRefresh && complainList.length > 0) {
+      filterComplainList();
+      return;
+    }
+
+    const cardContainer = document.getElementById('cplCardContainer');
+    if (complainList.length === 0 && cardContainer) {
+      cardContainer.innerHTML = `
+        <div class="cpl-loading-placeholder">
+          <div class="loading-spinner" style="width:32px;height:32px;margin:0 auto 12px auto;"></div>
+          <div>Memuat data complain...</div>
+        </div>
+      `;
+    }
+
+    // 1. Coba ambil dari GoWA Webhook API endpoint (via proxy lokal atau URL custom)
+    const apiUrl = getComplainApiUrl('/api/complaints');
+    try {
+      const res = await fetch(apiUrl, { signal: AbortSignal.timeout(3000) });
+      if (res.ok) {
+        const json = await res.json();
+        if (json && Array.isArray(json.data) && json.data.length > 0) {
+          complainList = json.data;
+          complainSyncSource = 'VPS GoWA';
+          complainList.forEach(c => lastKnownComplainIds.add(c.id));
+          localStorage.setItem('superapp_cached_complaints', JSON.stringify(complainList));
+          filterComplainList();
+          updateComplainMeta();
+          return;
+        }
+      }
+    } catch (apiErr) {
+      // lanjut ke Firestore REST
+    }
+
+    // 2. Ambil langsung dari Cloud Firestore REST API (aktif di seluruh dunia tanpa perlu port 3100)
+    try {
+      const fsRes = await fetch(FIRESTORE_REST_URL, { signal: AbortSignal.timeout(4500) });
+      if (fsRes.ok) {
+        const fsJson = await fsRes.json();
+        if (fsJson && Array.isArray(fsJson.documents)) {
+          complainList = fsJson.documents.map(mapFirestoreDocToComplain);
+          complainSyncSource = 'Cloud (Firestore)';
+          complainList.forEach(c => lastKnownComplainIds.add(c.id));
+          localStorage.setItem('superapp_cached_complaints', JSON.stringify(complainList));
+          filterComplainList();
+          updateComplainMeta();
+          return;
+        } else if (fsJson && !fsJson.documents) {
+          // Firestore aktif tapi koleksi masih kosong
+          complainList = [];
+          complainSyncSource = 'Cloud (Firestore)';
+          localStorage.setItem('superapp_cached_complaints', JSON.stringify([]));
+          filterComplainList();
+          updateComplainMeta();
+          return;
+        }
+      }
+    } catch (fsErr) {
+      console.warn('Firestore REST fetch notice:', fsErr);
+    }
+
+    // 3. Coba dari cache lokal jika pernah tersimpan
+    const cached = localStorage.getItem('superapp_cached_complaints');
+    if (cached) {
+      try {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed)) {
+          complainList = parsed;
+          complainSyncSource = 'Cache Lokal';
+          complainList.forEach(c => lastKnownComplainIds.add(c.id));
+          filterComplainList();
+          updateComplainMeta();
+          return;
+        }
+      } catch (e) {}
+    }
+
+    // 4. Default: list kosong (tidak ada dummy palsu)
+    complainList = [];
+    complainSyncSource = 'Cloud (Firestore)';
+    filterComplainList();
+    updateComplainMeta();
+  };
+
+  window.refreshComplainData = function () {
+    const refreshBtn = document.querySelector('.cpl-refresh-btn');
+    if (refreshBtn) refreshBtn.classList.add('spinning');
+    fetchComplainData(true);
+    setTimeout(() => {
+      if (refreshBtn) refreshBtn.classList.remove('spinning');
+    }, 800);
+  };
+
+  window.configureComplainApiUrl = function () {
+    const current = COMPLAIN_API_BASE_URL || '';
+    const input = prompt(
+      'Masukkan URL Server Webhook GoWA VPS (contoh: http://192.168.1.50:3100 atau https://bot.domain.com):\n(Kosongkan untuk otomatis menggunakan Cloud Firestore langsung)',
+      current
+    );
+    if (input !== null) {
+      COMPLAIN_API_BASE_URL = input.trim().replace(/\/+$/, '');
+      localStorage.setItem('superapp_complain_api_url', COMPLAIN_API_BASE_URL);
+      fetchComplainData(true);
+    }
+  };
+
+  window.pollNewComplaints = async function () {
+    if (isComplainPolling) return;
+    isComplainPolling = true;
+
+    try {
+      let fetchedItems = null;
+
+      // 1. Coba REST API
+      const apiUrl = getComplainApiUrl('/api/complaints');
+      try {
+        const res = await fetch(apiUrl, { signal: AbortSignal.timeout(3000) });
+        if (res.ok) {
+          const json = await res.json();
+          if (json && Array.isArray(json.data)) {
+            fetchedItems = json.data;
+            complainSyncSource = 'VPS GoWA';
+          }
+        }
+      } catch (err) {}
+
+      // 2. Fallback ke Firestore REST
+      if (!fetchedItems) {
+        try {
+          const fsRes = await fetch(FIRESTORE_REST_URL, { signal: AbortSignal.timeout(4000) });
+          if (fsRes.ok) {
+            const fsJson = await fsRes.json();
+            if (fsJson && Array.isArray(fsJson.documents)) {
+              fetchedItems = fsJson.documents.map(mapFirestoreDocToComplain);
+              complainSyncSource = 'Cloud (Firestore)';
+            } else if (fsJson && !fsJson.documents) {
+              fetchedItems = [];
+            }
+          }
+        } catch (fbErr) {}
+      }
+
+      if (fetchedItems && Array.isArray(fetchedItems)) {
+        complainList = fetchedItems;
+        complainList.forEach(c => lastKnownComplainIds.add(c.id));
+        try {
+          localStorage.setItem('superapp_cached_complaints', JSON.stringify(complainList));
+        } catch (e) {}
+
+        updateComplainMeta();
+        // Update list card jika sedang di workspace complain
+        const workspace = document.getElementById('complainWorkspace');
+        if (workspace && !workspace.classList.contains('hidden')) {
+          filterComplainList();
+        }
+      }
+    } catch (e) {
+      console.warn('Poll complain error:', e);
+    } finally {
+      isComplainPolling = false;
+    }
+  };
+
+  // Start background live polling setiap 10 detik (silent data sync)
+  setInterval(window.pollNewComplaints, 10000);
+  setTimeout(window.pollNewComplaints, 2000);
+
+  function updateComplainMeta() {
+    const countBaru = complainList.filter(c => c.status === 'baru').length;
+    const badge = document.getElementById('cplCounterBadge');
+    if (badge) {
+      badge.textContent = countBaru;
+      badge.classList.toggle('empty', countBaru === 0);
+    }
+
+    // Tab counts
+    const countAll = complainList.length;
+    const countDikerjakan = complainList.filter(c => c.status === 'dikerjakan').length;
+    const countSelesai = complainList.filter(c => c.status === 'selesai').length;
+
+    const el = (id, val) => { const e = document.getElementById(id); if (e) e.textContent = val; };
+    el('cplTabCountAll', countAll);
+    el('cplTabCountBaru', countBaru);
+    el('cplTabCountDikerjakan', countDikerjakan);
+    el('cplTabCountSelesai', countSelesai);
+
+    const syncBadge = document.getElementById('cplLastSyncBadge');
+    if (syncBadge) {
+      syncBadge.textContent = complainSyncSource;
+      syncBadge.style.cursor = 'pointer';
+      syncBadge.title = 'Klik untuk mengatur URL Server GoWA VPS';
+      syncBadge.onclick = window.configureComplainApiUrl;
+    }
+  }
+
+    // Tab counts
+    const countAll = complainList.length;
+    const countDikerjakan = complainList.filter(c => c.status === 'dikerjakan').length;
+    const countSelesai = complainList.filter(c => c.status === 'selesai').length;
+
+    const el = (id, val) => { const e = document.getElementById(id); if (e) e.textContent = val; };
+    el('cplTabCountAll', countAll);
+    el('cplTabCountBaru', countBaru);
+    el('cplTabCountDikerjakan', countDikerjakan);
+    el('cplTabCountSelesai', countSelesai);
+
+    const syncBadge = document.getElementById('cplLastSyncBadge');
+    if (syncBadge) {
+      syncBadge.textContent = complainSyncSource;
+      syncBadge.style.cursor = 'pointer';
+      syncBadge.title = 'Klik untuk mengatur URL Server GoWA VPS';
+      syncBadge.onclick = window.configureComplainApiUrl;
+    }
+  }
+
+  function filterComplainList() {
+    let filtered = [...complainList];
+
+    // Tab filter
+    if (complainActiveTab !== 'semua') {
+      filtered = filtered.filter(c => c.status === complainActiveTab);
+    }
+
+    // Search filter
+    if (complainSearchQuery) {
+      const q = complainSearchQuery.toLowerCase();
+      filtered = filtered.filter(c =>
+        (c.invoice || '').toLowerCase().includes(q) ||
+        (c.sender || '').toLowerCase().includes(q) ||
+        (c.description || '').toLowerCase().includes(q) ||
+        (c.hub || '').toLowerCase().includes(q)
+      );
+    }
+
+    // Sort: baru first, then dikerjakan, then selesai; within each, newest first
+    const statusOrder = { baru: 0, dikerjakan: 1, selesai: 2 };
+    filtered.sort((a, b) => {
+      const sa = statusOrder[a.status] ?? 3;
+      const sb = statusOrder[b.status] ?? 3;
+      if (sa !== sb) return sa - sb;
+      return new Date(b.createdAt) - new Date(a.createdAt);
+    });
+
+    renderComplainCards(filtered);
+    updateComplainMeta();
+
+    // Update list count badge
+    const countBadge = document.getElementById('cplListCountBadge');
+    if (countBadge) countBadge.textContent = `${filtered.length} Complain`;
+  }
+
+  function renderComplainCards(list) {
+    const container = document.getElementById('cplCardContainer');
+    if (!container) return;
+
+    if (list.length === 0) {
+      const tabLabel = complainActiveTab === 'semua' ? '' : ` berstatus "${getStatusLabel(complainActiveTab)}"`;
+      const searchNote = complainSearchQuery ? ` dengan kata kunci "${complainSearchQuery}"` : '';
+      container.innerHTML = `
+        <div class="cpl-empty-state">
+          <div class="cpl-empty-state-icon">📭</div>
+          <div class="cpl-empty-state-title">Tidak Ada Complain</div>
+          <div class="cpl-empty-state-desc">
+            Tidak ditemukan complain${tabLabel}${searchNote}. Coba ubah filter atau kata kunci pencarian.
+          </div>
+        </div>
+      `;
+      return;
+    }
+
+    container.innerHTML = list.map(item => `
+      <div class="cpl-card status-${item.status}" onclick="showComplainDetail('${item.id}')">
+        <div class="cpl-card-header">
+          <div class="cpl-card-hub">${escapeHtml(item.hub)}</div>
+          <span class="cpl-status-badge ${item.status}">${getStatusLabel(item.status)}</span>
+        </div>
+        <div class="cpl-card-invoice">${escapeHtml(item.invoice)}</div>
+        <div class="cpl-card-sender">${escapeHtml(item.sender)}</div>
+        <div class="cpl-card-desc">${escapeHtml(item.description)}</div>
+        <div class="cpl-card-footer">
+          <div class="cpl-card-date">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            ${formatComplainDateShort(item.createdAt)}
+          </div>
+          ${item.claimedBy ? `<div class="cpl-card-assignee">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+            ${escapeHtml(item.claimedBy)}
+          </div>` : ''}
+        </div>
+      </div>
+    `).join('');
+  }
+
+
+
+  window.showComplainDetail = function (id) {
+    const item = complainList.find(c => c.id === id);
+    if (!item) return;
+
+    const section = document.getElementById('cplDetailSection');
+    if (!section) return;
+
+    complainEvidenceData = null;
+    complainEvidenceFilename = null;
+
+    let statusHeroClass = item.status;
+    let statusHeroText = getStatusLabel(item.status).toUpperCase();
+    let statusHeroSub = '';
+    if (item.status === 'baru') statusHeroSub = 'Menunggu petugas mengambil alih';
+    if (item.status === 'dikerjakan') statusHeroSub = `Sedang dikerjakan oleh ${item.claimedBy || '-'}`;
+    if (item.status === 'selesai') statusHeroSub = `Diselesaikan pada ${formatComplainDate(item.resolvedAt)}`;
+
+    // Timeline
+    let timelineHtml = `
+      <div class="cpl-timeline-item">
+        <div class="cpl-timeline-dot baru active"></div>
+        <div class="cpl-timeline-label">Complain Masuk</div>
+        <div class="cpl-timeline-time">${formatComplainDate(item.createdAt)}</div>
+        <div class="cpl-timeline-user">Via WhatsApp Group</div>
+      </div>
+    `;
+
+    if (item.status === 'dikerjakan' || item.status === 'selesai') {
+      timelineHtml += `
+        <div class="cpl-timeline-item">
+          <div class="cpl-timeline-dot dikerjakan ${item.status === 'dikerjakan' ? 'active' : ''}"></div>
+          <div class="cpl-timeline-label">Dikerjakan</div>
+          <div class="cpl-timeline-time">${formatComplainDate(item.claimedAt)}</div>
+          <div class="cpl-timeline-user">${escapeHtml(item.claimedBy || '-')}</div>
+        </div>
+      `;
+    } else {
+      timelineHtml += `
+        <div class="cpl-timeline-item">
+          <div class="cpl-timeline-dot pending"></div>
+          <div class="cpl-timeline-label" style="color: #475569;">Menunggu dikerjakan</div>
+        </div>
+      `;
+    }
+
+    if (item.status === 'selesai') {
+      timelineHtml += `
+        <div class="cpl-timeline-item">
+          <div class="cpl-timeline-dot selesai active"></div>
+          <div class="cpl-timeline-label">Selesai</div>
+          <div class="cpl-timeline-time">${formatComplainDate(item.resolvedAt)}</div>
+          <div class="cpl-timeline-user">${escapeHtml(item.claimedBy || '-')}</div>
+        </div>
+      `;
+    } else {
+      timelineHtml += `
+        <div class="cpl-timeline-item">
+          <div class="cpl-timeline-dot pending"></div>
+          <div class="cpl-timeline-label" style="color: #475569;">Menunggu diselesaikan</div>
+        </div>
+      `;
+    }
+
+    // Evidence section
+    let evidenceHtml = '';
+    if (item.status === 'selesai' && item.evidenceUrl) {
+      evidenceHtml = `
+        <div class="cpl-evidence-card">
+          <div class="cpl-evidence-title">Bukti Reply Complain</div>
+          <img src="${item.evidenceUrl}" class="cpl-evidence-preview-existing" alt="Bukti reply complain" onerror="this.style.display='none'">
+        </div>
+        <div class="cpl-completed-banner">
+          <div class="cpl-completed-icon">✅</div>
+          <div class="cpl-completed-text">Complain Telah Diselesaikan</div>
+          <div class="cpl-completed-sub">Diselesaikan oleh ${escapeHtml(item.claimedBy)} pada ${formatComplainDate(item.resolvedAt)}</div>
+        </div>
+      `;
+    } else if (item.status === 'dikerjakan') {
+      evidenceHtml = `
+        <div class="cpl-evidence-card">
+          <div class="cpl-evidence-title">Upload Bukti Reply Complain</div>
+          <div class="cpl-upload-zone" id="cplUploadZone" onclick="triggerComplainEvidenceUpload()">
+            <div class="cpl-upload-icon">📸</div>
+            <div class="cpl-upload-text">Tap untuk ambil foto atau pilih dari galeri</div>
+            <div class="cpl-upload-hint">Screenshot bukti reply/penanganan complain</div>
+          </div>
+        </div>
+      `;
+    }
+
+    // Action buttons
+    let actionsHtml = '';
+    if (item.status === 'baru') {
+      actionsHtml = `
+        <div class="cpl-actions">
+          <button type="button" class="cpl-btn-primary" onclick="claimComplain('${item.id}')">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+            Kerjakan Complain Ini
+          </button>
+        </div>
+      `;
+    } else if (item.status === 'dikerjakan') {
+      actionsHtml = `
+        <div class="cpl-actions">
+          <button type="button" class="cpl-btn-resolve" id="cplResolveBtn" onclick="resolveComplain('${item.id}')" disabled>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+            Tandai Selesai
+          </button>
+          <div style="font-size: 0.72rem; color: #64748b; text-align: center;">Upload bukti terlebih dahulu untuk mengaktifkan tombol ini</div>
+        </div>
+      `;
+    }
+
+    section.innerHTML = `
+      <div class="cpl-detail-header">
+        <button type="button" class="cpl-detail-back-btn" onclick="closeComplainDetail()">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="15 18 9 12 15 6"></polyline>
+          </svg>
+        </button>
+        <div class="cpl-detail-title-text">Detail Complain</div>
+        <span class="cpl-status-badge ${item.status}">${getStatusLabel(item.status)}</span>
+      </div>
+
+      <div class="cpl-detail-body">
+        <!-- Status Hero -->
+        <div class="cpl-status-hero ${statusHeroClass}">
+          <div class="cpl-status-hero-label">Status Complain</div>
+          <div class="cpl-status-hero-text">${statusHeroText}</div>
+          <div class="cpl-status-hero-sub">${statusHeroSub}</div>
+        </div>
+
+        <!-- Info Card -->
+        <div class="cpl-info-card">
+          <div class="cpl-info-row">
+            <div class="cpl-info-label">Hub</div>
+            <div class="cpl-info-value">${escapeHtml(item.hub)}</div>
+          </div>
+          <div class="cpl-info-row">
+            <div class="cpl-info-label">Invoice</div>
+            <div class="cpl-info-value mono">${escapeHtml(item.invoice)}</div>
+          </div>
+          <div class="cpl-info-row">
+            <div class="cpl-info-label">Pengirim</div>
+            <div class="cpl-info-value">${escapeHtml(item.sender)}</div>
+          </div>
+          <div class="cpl-info-row">
+            <div class="cpl-info-label">Tanggal Masuk</div>
+            <div class="cpl-info-value mono">${formatComplainDate(item.createdAt)}</div>
+          </div>
+          ${item.claimedBy ? `
+          <div class="cpl-info-row">
+            <div class="cpl-info-label">Dikerjakan Oleh</div>
+            <div class="cpl-info-value">${escapeHtml(item.claimedBy)}</div>
+          </div>` : ''}
+        </div>
+
+        <!-- Description -->
+        <div class="cpl-desc-card">
+          <div class="cpl-desc-label">Detail Complain</div>
+          <div class="cpl-desc-text">${escapeHtml(item.description)}</div>
+        </div>
+
+        <!-- Timeline -->
+        <div class="cpl-timeline-card">
+          <div class="cpl-timeline-title">Timeline Penanganan</div>
+          <div class="cpl-timeline">
+            ${timelineHtml}
+          </div>
+        </div>
+
+        <!-- Evidence -->
+        ${evidenceHtml}
+
+        <!-- Actions -->
+        ${actionsHtml}
+      </div>
+    `;
+
+    section.classList.remove('hidden');
+    section.scrollTop = 0;
+  };
+
+  window.closeComplainDetail = function () {
+    const section = document.getElementById('cplDetailSection');
+    if (section) {
+      section.classList.add('hidden');
+      section.innerHTML = '';
+    }
+    complainEvidenceData = null;
+    complainEvidenceFilename = null;
+  };
+
+  window.switchComplainTab = function (tab) {
+    complainActiveTab = tab;
+
+    // Update tab button styles
+    ['All', 'Baru', 'Dikerjakan', 'Selesai'].forEach(t => {
+      const btn = document.getElementById('cplTab' + t);
+      if (btn) btn.classList.remove('active');
+    });
+
+    const tabMap = { semua: 'All', baru: 'Baru', dikerjakan: 'Dikerjakan', selesai: 'Selesai' };
+    const activeBtn = document.getElementById('cplTab' + tabMap[tab]);
+    if (activeBtn) activeBtn.classList.add('active');
+
+    filterComplainList();
+  };
+
+  window.clearComplainFilter = function () {
+    const input = document.getElementById('cplFilterInput');
+    if (input) input.value = '';
+    complainSearchQuery = '';
+    document.getElementById('cplFilterClearBtn').classList.add('hidden');
+    filterComplainList();
+  };
+
+  // Search input handler (attach on DOMContentLoaded)
+  function initComplainSearch() {
+    const input = document.getElementById('cplFilterInput');
+    if (!input) return;
+
+    let debounceTimer;
+    input.addEventListener('input', function () {
+      clearTimeout(debounceTimer);
+      const clearBtn = document.getElementById('cplFilterClearBtn');
+      if (clearBtn) clearBtn.classList.toggle('hidden', !this.value);
+
+      debounceTimer = setTimeout(() => {
+        complainSearchQuery = this.value.trim();
+        filterComplainList();
+      }, 250);
+    });
+  }
+
+  window.claimComplain = async function (id) {
+    const item = complainList.find(c => c.id === id);
+    if (!item || item.status !== 'baru') return;
+
+    item.status = 'dikerjakan';
+    item.claimedBy = 'User Aktif';
+    item.claimedAt = new Date().toISOString();
+
+    filterComplainList();
+    showComplainDetail(id);
+
+    // Save to local cache
+    try {
+      localStorage.setItem('superapp_cached_complaints', JSON.stringify(complainList));
+    } catch (e) {}
+
+    // Update to Firestore if active
+    if (typeof firebase !== 'undefined' && firebase.apps && firebase.apps.length > 0) {
+      try {
+        firebase.firestore().collection('complaints').doc(id).update({
+          status: 'dikerjakan',
+          claimedBy: item.claimedBy,
+          claimedAt: item.claimedAt
+        });
+      } catch (e) {
+        console.warn('Firestore claim update error:', e);
+      }
+    }
+
+    // Update to Firestore REST API (Cloud direct)
+    try {
+      fetch(`${FIRESTORE_REST_URL}/${id}?updateMask.fieldPaths=status&updateMask.fieldPaths=claimedBy&updateMask.fieldPaths=claimedAt`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fields: {
+            status: { stringValue: 'dikerjakan' },
+            claimedBy: { stringValue: item.claimedBy },
+            claimedAt: { stringValue: item.claimedAt }
+          }
+        })
+      }).catch(() => {});
+    } catch (e) {}
+
+    // Update to VPS REST API (via local proxy atau VPS langsung)
+    try {
+      const claimUrl = getComplainApiUrl(`/api/complaints/${id}/claim`);
+      fetch(claimUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userName: item.claimedBy })
+      }).catch(() => {});
+    } catch (e) {}
+  };
+
+  window.triggerComplainEvidenceUpload = function () {
+    const fileInput = document.getElementById('cplEvidenceInput');
+    if (fileInput) fileInput.click();
+  };
+
+  function initComplainEvidenceUpload() {
+    const fileInput = document.getElementById('cplEvidenceInput');
+    if (!fileInput) return;
+
+    fileInput.addEventListener('change', function (e) {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      complainEvidenceFilename = file.name;
+
+      const reader = new FileReader();
+      reader.onload = function (ev) {
+        complainEvidenceData = ev.target.result;
+
+        // Update preview in upload zone
+        const uploadZone = document.getElementById('cplUploadZone');
+        if (uploadZone) {
+          uploadZone.classList.add('has-preview');
+          uploadZone.innerHTML = `
+            <img src="${complainEvidenceData}" class="cpl-evidence-preview" alt="Preview bukti">
+            <div class="cpl-evidence-filename">${escapeHtml(complainEvidenceFilename)}</div>
+          `;
+        }
+
+        // Enable resolve button
+        const resolveBtn = document.getElementById('cplResolveBtn');
+        if (resolveBtn) resolveBtn.disabled = false;
+      };
+      reader.readAsDataURL(file);
+
+      // Reset input for re-upload
+      fileInput.value = '';
+    });
+  }
+
+  window.resolveComplain = async function (id) {
+    const item = complainList.find(c => c.id === id);
+    if (!item || item.status !== 'dikerjakan') return;
+
+    if (!complainEvidenceData) {
+      alert('Upload bukti screenshot reply complain terlebih dahulu.');
+      return;
+    }
+
+    item.status = 'selesai';
+    item.resolvedAt = new Date().toISOString();
+    item.evidenceUrl = complainEvidenceData;
+
+    const uploadedEvidence = complainEvidenceData;
+    complainEvidenceData = null;
+    complainEvidenceFilename = null;
+
+    filterComplainList();
+    showComplainDetail(id);
+
+    // Save to local cache
+    try {
+      localStorage.setItem('superapp_cached_complaints', JSON.stringify(complainList));
+    } catch (e) {}
+
+    // Update to Firestore if active
+    if (typeof firebase !== 'undefined' && firebase.apps && firebase.apps.length > 0) {
+      try {
+        firebase.firestore().collection('complaints').doc(id).update({
+          status: 'selesai',
+          resolvedAt: item.resolvedAt,
+          evidenceUrl: uploadedEvidence
+        });
+      } catch (e) {
+        console.warn('Firestore resolve update error:', e);
+      }
+    }
+
+    // Update to Firestore REST API (Cloud direct)
+    try {
+      fetch(`${FIRESTORE_REST_URL}/${id}?updateMask.fieldPaths=status&updateMask.fieldPaths=resolvedAt&updateMask.fieldPaths=evidenceUrl`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fields: {
+            status: { stringValue: 'selesai' },
+            resolvedAt: { stringValue: item.resolvedAt },
+            evidenceUrl: { stringValue: uploadedEvidence }
+          }
+        })
+      }).catch(() => {});
+    } catch (e) {}
+
+    // Update to VPS REST API (via local proxy atau VPS langsung)
+    try {
+      const resolveUrl = getComplainApiUrl(`/api/complaints/${id}/resolve`);
+      fetch(resolveUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ evidenceUrl: uploadedEvidence })
+      }).catch(() => {});
+    } catch (e) {}
+  };
+
+  // Initialize complain search and upload handlers on DOMContentLoaded
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => {
+      initComplainSearch();
+      initComplainEvidenceUpload();
+    });
+  } else {
+    initComplainSearch();
+    initComplainEvidenceUpload();
+  }
+
+  // ──────────────────────────────────────────────
+  // NEW KOLI INBOUND MTG - Simplified Table & Detail
+  // ──────────────────────────────────────────────
+
+  const KOLI_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1sULhhG0_Oe2hr2B34Lum08ibDuxWJtM9buz9kitAnKg/gviz/tq?tqx=out:csv&gid=0';
+  const KOLI_PROXY_URL = '/api/koli-inbound-csv';
+  const KOLI_CACHE_KEY = 'koli_inbound_cache_data_v3';
+
+  let koliAllRows = [];
+  let koliFilteredRows = [];
+  let koliSelectedOrigin = 'all';
+  let koliSearchQuery = '';
+  let koliDisplayLimit = 100;
+  let isKoliFetching = false;
+
+  function parseKoliCsvRows(csvText) {
+    const rows = parseCSV(csvText);
+    if (!rows || rows.length <= 1) {
+      throw new Error('Format CSV kosong atau tidak valid.');
+    }
+
+    const headers = rows[0].map(h => String(h || '').trim().toLowerCase().replace(/[^a-z0-9]/g, '_'));
+
+    // 0. so_date (Col A, index 0)
+    let dateIdx = headers.findIndex(h => h === 'so_date' || (h.includes('date') && !h.includes('update')));
+    if (dateIdx === -1) dateIdx = 0;
+
+    // 1. no_koli (Col C, index 2)
+    let koliIdx = headers.findIndex(h => h === 'no_koli' || h === 'koli' || (h.includes('koli') && !h.includes('id')));
+    if (koliIdx === -1) koliIdx = 2;
+
+    // 2. so_number (Col D, index 3) - Avoid matching 'fsoid_koli_id'
+    let soIdx = headers.findIndex(h => h === 'so_number' || h === 'no_so' || (h.includes('so') && h.includes('number') && !h.includes('date')));
+    if (soIdx === -1) {
+      soIdx = headers.findIndex(h => (h === 'so' || h.endsWith('_so') || h.startsWith('so_')) && !h.includes('date') && !h.includes('id'));
+    }
+    if (soIdx === -1) soIdx = 3;
+
+    // 3. origin_location_name (Col E, index 4)
+    let originIdx = headers.findIndex(h => h.includes('origin'));
+    if (originIdx === -1) originIdx = 4;
+
+    // 4. destination_location_name (Col F, index 5)
+    let destIdx = headers.findIndex(h => h.includes('destination') || h.includes('dest'));
+    if (destIdx === -1) destIdx = 5;
+
+    // 5. product_sku_number (Col G, index 6)
+    let skuIdx = headers.findIndex(h => h === 'product_sku_number' || h === 'sku' || h.includes('sku'));
+    if (skuIdx === -1) skuIdx = 6;
+
+    // 6. product_name (Col H, index 7) - Avoid matching 'origin_location_name'
+    let nameIdx = headers.findIndex(h => h === 'product_name' || (h.includes('product') && h.includes('name')) || (h.includes('name') && !h.includes('location') && !h.includes('origin') && !h.includes('dest')));
+    if (nameIdx === -1) nameIdx = 7;
+
+    // 7. quantity (Col I, index 8)
+    let qtyIdx = headers.findIndex(h => h === 'quantity' || h === 'qty' || h.includes('qty') || h.includes('quantity'));
+    if (qtyIdx === -1) qtyIdx = 8;
+
+    const colDate = dateIdx;
+    const colKoli = koliIdx;
+    const colSo = soIdx;
+    const colOrigin = originIdx;
+    const colDest = destIdx;
+    const colSku = skuIdx;
+    const colName = nameIdx;
+    const colQty = qtyIdx;
+
+    const items = [];
+    for (let r = 1; r < rows.length; r++) {
+      const row = rows[r];
+      if (!row || row.length === 0) continue;
+
+      const noKoli = String(row[colKoli] || '').trim();
+      const sku = String(row[colSku] || '').trim();
+      if (!noKoli && !sku) continue;
+
+      const soNumber = String(row[colSo] || '').trim();
+      const origin = String(row[colOrigin] || '').trim() || 'Origin Tidak Diketahui';
+      const dest = String(row[colDest] || '').trim();
+      const name = String(row[colName] || '').trim() || '-';
+      const rawQty = parseInt(row[colQty], 10);
+      const qty = isNaN(rawQty) || rawQty <= 0 ? 1 : rawQty;
+      const soDate = String(row[colDate] || '').trim();
+
+      items.push({
+        noKoli,
+        soNumber,
+        origin,
+        dest,
+        sku,
+        name,
+        qty,
+        soDate
+      });
+    }
+
+    return items;
+  }
+
+  function populateKoliOriginDropdown() {
+    const originSelect = document.getElementById('koliOriginSelect');
+    if (!originSelect) return;
+
+    const originCounts = new Map();
+    koliAllRows.forEach(item => {
+      const orig = item.origin || 'Lainnya';
+      originCounts.set(orig, (originCounts.get(orig) || 0) + 1);
+    });
+
+    const sortedOrigins = Array.from(originCounts.keys()).sort();
+
+    let html = '<option value="all">Semua Origin (' + koliAllRows.length + ')</option>';
+    sortedOrigins.forEach(orig => {
+      const count = originCounts.get(orig);
+      const isSelected = koliSelectedOrigin === orig ? 'selected' : '';
+      html += '<option value="' + escapeHtml(orig) + '" ' + isSelected + '>' + escapeHtml(orig) + ' (' + count + ')</option>';
+    });
+
+    originSelect.innerHTML = html;
+  }
+
+  function filterKoliData() {
+    const q = (koliSearchQuery || '').toLowerCase();
+    koliFilteredRows = koliAllRows.filter(item => {
+      // Origin filter
+      if (koliSelectedOrigin !== 'all' && item.origin !== koliSelectedOrigin) {
+        return false;
+      }
+      // Text query filter
+      if (q) {
+        const mOrigin = item.origin.toLowerCase().includes(q);
+        const mName = item.name.toLowerCase().includes(q);
+        const mKoli = item.noKoli.toLowerCase().includes(q);
+        const mSo = item.soNumber.toLowerCase().includes(q);
+        const mSku = item.sku.toLowerCase().includes(q);
+        if (!mOrigin && !mName && !mKoli && !mSo && !mSku) return false;
+      }
+      return true;
+    });
+  }
+
+  function renderKoliTable(appendOnly = false) {
+    const tbody = document.getElementById('koliTableBody');
+    const emptyState = document.getElementById('koliEmptyState');
+    const rowCounter = document.getElementById('koliRowCountBadge');
+    if (!tbody) return;
+
+    if (!appendOnly) {
+      filterKoliData();
+    }
+
+    if (rowCounter) {
+      rowCounter.textContent = koliFilteredRows.length.toLocaleString('id-ID') + ' Baris';
+    }
+
+    if (koliFilteredRows.length === 0) {
+      tbody.innerHTML = '';
+      if (emptyState) emptyState.classList.remove('hidden');
+      return;
+    }
+
+    if (emptyState) emptyState.classList.add('hidden');
+
+    const slice = koliFilteredRows.slice(0, koliDisplayLimit);
+
+    let html = '';
+    slice.forEach((row, idx) => {
+      html += `
+        <tr onclick="openKoliDetail(${idx})">
+          <td class="td-origin">${escapeHtml(row.origin)}</td>
+          <td class="td-name">${escapeHtml(row.name)}</td>
+          <td class="td-koli">${escapeHtml(row.noKoli)}</td>
+          <td class="td-so" title="${escapeHtml(row.soNumber)}">${escapeHtml(row.soNumber)}</td>
+          <td class="td-sku">${escapeHtml(row.sku)}</td>
+          <td class="td-qty">${row.qty}</td>
+          <td class="td-arrow">&rsaquo;</td>
+        </tr>
+      `;
+    });
+
+    if (koliFilteredRows.length > koliDisplayLimit) {
+      html += `
+        <tr style="background: rgba(255,255,255,0.02);">
+          <td colspan="7" style="text-align: center; padding: 14px;">
+            <button type="button" class="btn-clean secondary" style="display:inline-flex; width:auto; padding:6px 18px; font-size:0.8rem;" onclick="loadMoreKoliRows(event)">
+              Tampilkan Lebih Banyak (${slice.length} dari ${koliFilteredRows.length})
+            </button>
+          </td>
+        </tr>
+      `;
+    }
+
+    tbody.innerHTML = html;
+  }
+
+  window.loadMoreKoliRows = function (event) {
+    if (event) event.stopPropagation();
+    koliDisplayLimit += 150;
+    renderKoliTable(true);
+  };
+
+  window.onKoliOriginSelectChange = function (val) {
+    koliSelectedOrigin = val || 'all';
+    koliDisplayLimit = 100;
+    renderKoliTable();
+  };
+
+  window.clearKoliSearch = function () {
+    const input = document.getElementById('koliSearchInput');
+    const clearBtn = document.getElementById('koliSearchClearBtn');
+    if (input) input.value = '';
+    if (clearBtn) clearBtn.classList.add('hidden');
+    koliSearchQuery = '';
+    koliDisplayLimit = 100;
+    renderKoliTable();
+  };
+
+  window.openKoliDetail = function (index) {
+    const item = koliFilteredRows[index];
+    if (!item) return;
+
+    const elTitle = document.getElementById('koliDetailTitleOrigin');
+    const elKoli = document.getElementById('koliValNoKoli');
+    const elSo = document.getElementById('koliValSoNumber');
+    const elOrigin = document.getElementById('koliValOrigin');
+    const elSku = document.getElementById('koliValSku');
+    const elName = document.getElementById('koliValName');
+    const elQty = document.getElementById('koliValQty');
+
+    if (elTitle) elTitle.textContent = item.origin || 'Detail Koli';
+    if (elKoli) elKoli.textContent = item.noKoli || '-';
+    if (elSo) elSo.textContent = item.soNumber || '-';
+    if (elOrigin) elOrigin.textContent = item.origin || '-';
+    if (elSku) elSku.textContent = item.sku || '-';
+    if (elName) elName.textContent = item.name || '-';
+    if (elQty) elQty.textContent = String(item.qty || 1);
+
+    // 1. Generate QR Code for NO KOLI
+    const qrKoliBox = document.getElementById('koliQrKoliBox');
+    if (qrKoliBox) {
+      qrKoliBox.innerHTML = '';
+      if (item.noKoli && typeof QRCode !== 'undefined') {
+        try {
+          new QRCode(qrKoliBox, {
+            text: item.noKoli,
+            width: 160,
+            height: 160,
+            colorDark: '#000000',
+            colorLight: '#ffffff',
+            correctLevel: QRCode.CorrectLevel.M
+          });
+        } catch (qrErr) {
+          console.warn('QR Koli generation error:', qrErr);
+          qrKoliBox.innerHTML = '<span style="color:#000;font-size:0.75rem;padding:10px;">' + escapeHtml(item.noKoli) + '</span>';
+        }
+      }
+    }
+
+    // 2. Generate 1D Barcode for NO KOLI
+    const barcodeKoliSvg = document.getElementById('koliBarcodeKoli');
+    if (barcodeKoliSvg) {
+      if (item.noKoli && typeof JsBarcode !== 'undefined') {
+        try {
+          JsBarcode(barcodeKoliSvg, item.noKoli, {
+            format: 'CODE128',
+            width: 1.8,
+            height: 46,
+            displayValue: true,
+            font: 'monospace',
+            fontSize: 13,
+            textMargin: 3,
+            background: '#ffffff',
+            lineColor: '#000000',
+            margin: 4
+          });
+          if (barcodeKoliSvg.parentElement) barcodeKoliSvg.parentElement.style.display = 'flex';
+        } catch (bcErr) {
+          console.warn('Barcode Koli generation error:', bcErr);
+          if (barcodeKoliSvg.parentElement) barcodeKoliSvg.parentElement.style.display = 'none';
+        }
+      } else {
+        if (barcodeKoliSvg.parentElement) barcodeKoliSvg.parentElement.style.display = 'none';
+      }
+    }
+
+    // 3. Generate QR Code for SKU
+    const qrSkuBox = document.getElementById('koliQrSkuBox');
+    if (qrSkuBox) {
+      qrSkuBox.innerHTML = '';
+      if (item.sku && typeof QRCode !== 'undefined') {
+        try {
+          new QRCode(qrSkuBox, {
+            text: item.sku,
+            width: 160,
+            height: 160,
+            colorDark: '#000000',
+            colorLight: '#ffffff',
+            correctLevel: QRCode.CorrectLevel.M
+          });
+        } catch (qrErr) {
+          console.warn('QR SKU generation error:', qrErr);
+          qrSkuBox.innerHTML = '<span style="color:#000;font-size:0.75rem;padding:10px;">' + escapeHtml(item.sku) + '</span>';
+        }
+      }
+    }
+
+    // 4. Generate 1D Barcode for SKU
+    const barcodeSkuSvg = document.getElementById('koliBarcodeSku');
+    if (barcodeSkuSvg) {
+      if (item.sku && typeof JsBarcode !== 'undefined') {
+        try {
+          JsBarcode(barcodeSkuSvg, item.sku, {
+            format: 'CODE128',
+            width: 1.8,
+            height: 46,
+            displayValue: true,
+            font: 'monospace',
+            fontSize: 13,
+            textMargin: 3,
+            background: '#ffffff',
+            lineColor: '#000000',
+            margin: 4
+          });
+          if (barcodeSkuSvg.parentElement) barcodeSkuSvg.parentElement.style.display = 'flex';
+        } catch (bcErr) {
+          console.warn('Barcode SKU generation error:', bcErr);
+          if (barcodeSkuSvg.parentElement) barcodeSkuSvg.parentElement.style.display = 'none';
+        }
+      } else {
+        if (barcodeSkuSvg.parentElement) barcodeSkuSvg.parentElement.style.display = 'none';
+      }
+    }
+
+    const modal = document.getElementById('koliDetailModal');
+    if (modal) modal.classList.remove('hidden');
+  };
+
+  window.closeKoliDetailModal = function () {
+    const modal = document.getElementById('koliDetailModal');
+    if (modal) modal.classList.add('hidden');
+  };
+
+  window.refreshKoliInboundData = function () {
+    window.fetchKoliInboundData(true);
+  };
+
+  window.fetchKoliInboundData = async function (forceRefresh = false) {
+    if (!forceRefresh && koliAllRows.length > 0) {
+      renderKoliTable();
+      return;
+    }
+
+    const refreshBtn = document.querySelector('.koli-refresh-icon-btn');
+    const loadingState = document.getElementById('koliLoadingState');
+
+    // Warm cache instant render
+    if (!forceRefresh && koliAllRows.length === 0) {
+      try {
+        const cached = localStorage.getItem(KOLI_CACHE_KEY);
+        if (cached) {
+          const parsed = parseKoliCsvRows(cached);
+          if (parsed.length > 0) {
+            koliAllRows = parsed;
+            populateKoliOriginDropdown();
+            renderKoliTable();
+          }
+        }
+      } catch (cacheErr) {
+        console.warn('Failed to load Koli cache:', cacheErr);
+      }
+    }
+
+    if (isKoliFetching) return;
+    isKoliFetching = true;
+
+    if (refreshBtn) refreshBtn.classList.add('spinning');
+    if (koliAllRows.length === 0 && loadingState) loadingState.classList.remove('hidden');
+
+    try {
+      let csvText = '';
+      let fetchSuccess = false;
+
+      // Attempt 1: Direct Google Sheet fetch
+      try {
+        const directRes = await fetch(KOLI_SHEET_URL + '&_t=' + Date.now());
+        if (directRes.ok) {
+          csvText = await directRes.text();
+          if (csvText && csvText.length > 50) {
+            fetchSuccess = true;
+          }
+        }
+      } catch (directErr) {
+        console.warn('Direct sheet fetch failed, trying proxy:', directErr);
+      }
+
+      // Attempt 2: Local server proxy fallback
+      if (!fetchSuccess) {
+        const proxyRes = await fetch(KOLI_PROXY_URL + '?_t=' + Date.now());
+        if (!proxyRes.ok) throw new Error('HTTP Error ' + proxyRes.status);
+        csvText = await proxyRes.text();
+      }
+
+      const parsed = parseKoliCsvRows(csvText);
+      if (!parsed || parsed.length === 0) {
+        throw new Error('Data Koli kosong atau format tidak sesuai.');
+      }
+
+      koliAllRows = parsed;
+
+      try {
+        localStorage.setItem(KOLI_CACHE_KEY, csvText);
+      } catch (saveErr) {
+        console.warn('Failed to save koli cache:', saveErr);
+      }
+
+      populateKoliOriginDropdown();
+      renderKoliTable();
+
+    } catch (err) {
+      console.error('Fetch Koli Inbound Error:', err);
+      if (koliAllRows.length === 0) {
+        const emptyState = document.getElementById('koliEmptyState');
+        if (emptyState) {
+          emptyState.classList.remove('hidden');
+          emptyState.innerHTML = `
+            <div style="color:#ef4444; font-weight:600; margin-bottom:6px;">Gagal Memuat Data</div>
+            <div>${escapeHtml(err.message || 'Periksa koneksi internet Anda.')}</div>
+            <button type="button" class="btn-clean secondary" style="display:inline-flex; width:auto; margin-top:12px; padding:6px 16px;" onclick="fetchKoliInboundData(true)">
+              Coba Lagi
+            </button>
+          `;
+        }
+      }
+    } finally {
+      isKoliFetching = false;
+      if (refreshBtn) refreshBtn.classList.remove('spinning');
+      if (loadingState) loadingState.classList.add('hidden');
+    }
+  };
+
+  function initKoliSearchInput() {
+    const searchInput = document.getElementById('koliSearchInput');
+    const clearBtn = document.getElementById('koliSearchClearBtn');
+    if (!searchInput) return;
+
+    let searchTimer = null;
+    searchInput.addEventListener('input', (e) => {
+      const val = e.target.value;
+      if (clearBtn) clearBtn.classList.toggle('hidden', !val);
+
+      clearTimeout(searchTimer);
+      searchTimer = setTimeout(() => {
+        koliSearchQuery = val.trim();
+        koliDisplayLimit = 100;
+        renderKoliTable();
+      }, 120);
+    });
+  }
+
+  function initKoliScrollLoader() {
+    const wrapper = document.querySelector('.koli-table-wrapper');
+    if (!wrapper) return;
+    wrapper.addEventListener('scroll', () => {
+      if (wrapper.scrollTop + wrapper.clientHeight >= wrapper.scrollHeight - 160) {
+        if (koliDisplayLimit < koliFilteredRows.length) {
+          koliDisplayLimit += 100;
+          renderKoliTable(true);
+        }
+      }
+    }, { passive: true });
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => {
+      initKoliSearchInput();
+      initKoliScrollLoader();
+    });
+  } else {
+    initKoliSearchInput();
+    initKoliScrollLoader();
+  }
+
 })();
+
