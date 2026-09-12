@@ -6737,8 +6737,8 @@
   //  IN-APP UPDATE & VERSION CHECKING ENGINE
   // ══════════════════════════════════════════════
 
-  const APP_VERSION_CODE = 17; // Local current version code (v1.2.2 Master OTA)
-  const APP_VERSION_NAME = '1.2.2';
+  const APP_VERSION_CODE = 19; // Local current version code (v1.2.4 Master OTA)
+  const APP_VERSION_NAME = '1.2.4';
   const UPDATE_MANIFEST_URL = 'https://raw.githubusercontent.com/tw1nss/superapp-release/main/version.json';
 
   let currentUpdateData = null;
@@ -9016,6 +9016,7 @@
       invoice: f.invoice?.stringValue || '',
       sender: f.sender?.stringValue || '',
       description: f.description?.stringValue || '',
+      productImageUrl: f.productImageUrl?.stringValue || null,
       status: f.status?.stringValue || 'baru',
       createdAt: f.createdAt?.stringValue || d.createTime,
       claimedBy: f.claimedBy?.stringValue || null,
@@ -9339,7 +9340,10 @@
           <div class="cpl-card-hub">${escapeHtml(item.hub)}</div>
           <span class="cpl-status-badge ${item.status}">${getStatusLabel(item.status)}</span>
         </div>
-        <div class="cpl-card-invoice">${escapeHtml(item.invoice)}</div>
+        <div class="cpl-card-invoice">
+          ${escapeHtml(item.invoice)}
+          ${item.productImageUrl ? `<span class="cpl-media-badge" title="Ada Foto Produk Terlampir">📷 Foto</span>` : ''}
+        </div>
         <div class="cpl-card-sender">${escapeHtml(item.sender)}</div>
         <div class="cpl-card-desc">${escapeHtml(item.description)}</div>
         <div class="cpl-card-footer">
@@ -9520,6 +9524,25 @@
           <div class="cpl-desc-label">Detail Complain</div>
           <div class="cpl-desc-text">${escapeHtml(item.description)}</div>
         </div>
+
+        <!-- Product Photo Card (Foto Produk Yang Dikomplain) -->
+        ${item.productImageUrl ? `
+        <div class="cpl-product-photo-card">
+          <div class="cpl-product-photo-header">
+            <div class="cpl-product-photo-title">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+              Foto Produk Yang Dikomplain
+            </div>
+            <div class="cpl-product-photo-hint">Tap foto untuk perbesar</div>
+          </div>
+          <div class="cpl-product-photo-wrapper" onclick="openPhotoViewerModal('${item.productImageUrl}')">
+            <img src="${item.productImageUrl}" class="cpl-product-photo-img" alt="Foto Produk Complain" loading="lazy" onerror="this.parentElement.style.display='none'">
+            <div class="cpl-product-photo-zoom-icon">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
+            </div>
+          </div>
+        </div>
+        ` : ''}
 
         <!-- Timeline -->
         <div class="cpl-timeline-card">

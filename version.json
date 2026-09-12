@@ -1,13 +1,13 @@
 {
-  "versionCode": 18,
-  "versionName": "1.2.3",
+  "versionCode": 19,
+  "versionName": "1.2.4",
   "apkUrl": "https://github.com/tw1nss/superapp-release/raw/main/app-debug.apk",
   "forceUpdate": false,
-  "title": "Pembaruan Superapp MTG v1.2.3",
+  "title": "Pembaruan Superapp MTG v1.2.4",
   "changelog": [
-    "Notifikasi Push Realtime Complain Hub MTG via Firebase (Heads-Up Banner seperti chat WA)",
-    "Integrasi WhatsApp Webhook Bot GoWA dengan parser cerdas format Hub MTG & No Invoice",
-    "Pembersihan antarmuka Home Menu dan perbaikan tracking komplain terintegrasi Cloud Firestore"
+    "Aktivasi menu Complain & Koli Inbound di Android & Web",
+    "Dukungan foto produk complain dan deteksi gambar WhatsApp",
+    "Bypass cache otomatis (OTA Auto-Refresh v70)"
   ],
   "releasedAt": "2026-09-12"
 }
