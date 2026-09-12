@@ -9259,26 +9259,6 @@
     }
   }
 
-    // Tab counts
-    const countAll = complainList.length;
-    const countDikerjakan = complainList.filter(c => c.status === 'dikerjakan').length;
-    const countSelesai = complainList.filter(c => c.status === 'selesai').length;
-
-    const el = (id, val) => { const e = document.getElementById(id); if (e) e.textContent = val; };
-    el('cplTabCountAll', countAll);
-    el('cplTabCountBaru', countBaru);
-    el('cplTabCountDikerjakan', countDikerjakan);
-    el('cplTabCountSelesai', countSelesai);
-
-    const syncBadge = document.getElementById('cplLastSyncBadge');
-    if (syncBadge) {
-      syncBadge.textContent = complainSyncSource;
-      syncBadge.style.cursor = 'pointer';
-      syncBadge.title = 'Klik untuk mengatur URL Server GoWA VPS';
-      syncBadge.onclick = window.configureComplainApiUrl;
-    }
-  }
-
   function filterComplainList() {
     let filtered = [...complainList];
 

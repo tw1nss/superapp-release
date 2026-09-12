@@ -51,6 +51,15 @@
       <div class="clean-loading-subtitle">Memuat sistem operasional...</div>
     </div>
   </div>
+  <script>
+    setTimeout(function () {
+      var lo = document.getElementById('loadingOverlay');
+      if (lo && !lo.classList.contains('hidden')) {
+        lo.classList.add('fade-out');
+        setTimeout(function () { lo.classList.add('hidden'); }, 350);
+      }
+    }, 2800);
+  </script>
 
   <!-- ═══ App Container ═══ -->
   <div class="app-container">
