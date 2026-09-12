@@ -9423,10 +9423,18 @@
       evidenceHtml = `
         <div class="cpl-evidence-card">
           <div class="cpl-evidence-title">Upload Bukti Reply Complain</div>
-          <div class="cpl-upload-zone" id="cplUploadZone" onclick="triggerComplainEvidenceUpload()">
+          <div class="cpl-upload-choice-row" style="display:flex; gap:8px; margin-bottom:10px;">
+            <button type="button" class="cpl-btn-subtle" onclick="triggerComplainEvidenceUpload('gallery')" style="flex:1; padding:9px 12px; background:rgba(56,189,248,0.12); border:1px solid rgba(56,189,248,0.35); border-radius:8px; color:#38bdf8; font-weight:600; cursor:pointer; font-size:0.82rem; display:flex; align-items:center; justify-content:center; gap:6px;">
+              <span>🖼️ Dari Galeri</span>
+            </button>
+            <button type="button" class="cpl-btn-subtle" onclick="triggerComplainEvidenceUpload('camera')" style="flex:1; padding:9px 12px; background:rgba(16,185,129,0.12); border:1px solid rgba(16,185,129,0.35); border-radius:8px; color:#10b981; font-weight:600; cursor:pointer; font-size:0.82rem; display:flex; align-items:center; justify-content:center; gap:6px;">
+              <span>📷 Buka Kamera</span>
+            </button>
+          </div>
+          <div class="cpl-upload-zone" id="cplUploadZone" onclick="triggerComplainEvidenceUpload('gallery')">
             <div class="cpl-upload-icon">📸</div>
-            <div class="cpl-upload-text">Tap untuk ambil foto atau pilih dari galeri</div>
-            <div class="cpl-upload-hint">Screenshot bukti reply/penanganan complain</div>
+            <div class="cpl-upload-text">Pilih foto screenshot dari galeri atau kamera</div>
+            <div class="cpl-upload-hint">Format gambar PNG, JPG, JPEG didukung</div>
           </div>
         </div>
       `;
@@ -9506,23 +9514,43 @@
         </div>
 
         <!-- Product Photo Card (Foto Produk Yang Dikomplain) -->
-        ${item.productImageUrl ? `
         <div class="cpl-product-photo-card">
-          <div class="cpl-product-photo-header">
+          <div class="cpl-product-photo-header" style="display:flex; justify-content:space-between; align-items:center;">
             <div class="cpl-product-photo-title">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
               Foto Produk Yang Dikomplain
             </div>
-            <div class="cpl-product-photo-hint">Tap foto untuk perbesar</div>
+            <div style="display:flex; gap:6px;">
+              <button type="button" onclick="triggerProductPhotoUpload('${item.id}', 'gallery')" style="background:rgba(56,189,248,0.12); border:1px solid rgba(56,189,248,0.35); color:#38bdf8; font-size:0.75rem; padding:4px 9px; border-radius:6px; cursor:pointer; font-weight:600;">
+                ${item.productImageUrl ? '🖼️ Ganti Foto' : '🖼️ Upload Galeri'}
+              </button>
+              <button type="button" onclick="triggerProductPhotoUpload('${item.id}', 'camera')" style="background:rgba(16,185,129,0.12); border:1px solid rgba(16,185,129,0.35); color:#10b981; font-size:0.75rem; padding:4px 9px; border-radius:6px; cursor:pointer; font-weight:600;">
+                📷 Kamera
+              </button>
+            </div>
           </div>
+          ${item.productImageUrl ? `
+          <div class="cpl-product-photo-hint">Tap foto untuk perbesar</div>
           <div class="cpl-product-photo-wrapper" onclick="openPhotoViewerModal('${item.productImageUrl}')">
             <img src="${item.productImageUrl}" class="cpl-product-photo-img" alt="Foto Produk Complain" loading="lazy" onerror="this.parentElement.style.display='none'">
             <div class="cpl-product-photo-zoom-icon">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
             </div>
           </div>
+          ` : `
+          <div style="padding:14px; text-align:center; background:rgba(15,23,42,0.35); border:1px dashed rgba(255,255,255,0.12); border-radius:8px; margin-top:8px;">
+            <div style="font-size:0.8rem; color:#94a3b8; margin-bottom:8px;">Belum ada foto produk pada tiket ini</div>
+            <div style="display:flex; gap:8px; justify-content:center;">
+              <button type="button" onclick="triggerProductPhotoUpload('${item.id}', 'gallery')" style="padding:6px 12px; background:rgba(56,189,248,0.15); border:1px solid #38bdf8; border-radius:6px; color:#38bdf8; font-size:0.78rem; font-weight:600; cursor:pointer;">
+                🖼️ Upload dari Galeri
+              </button>
+              <button type="button" onclick="triggerProductPhotoUpload('${item.id}', 'camera')" style="padding:6px 12px; background:rgba(16,185,129,0.15); border:1px solid #10b981; border-radius:6px; color:#10b981; font-size:0.78rem; font-weight:600; cursor:pointer;">
+                📷 Ambil Kamera
+              </button>
+            </div>
+          </div>
+          `}
         </div>
-        ` : ''}
 
         <!-- Timeline -->
         <div class="cpl-timeline-card">
@@ -9651,19 +9679,32 @@
     } catch (e) {}
   };
 
-  window.triggerComplainEvidenceUpload = function () {
-    const fileInput = document.getElementById('cplEvidenceInput');
-    if (fileInput) fileInput.click();
+  let activeProductPhotoComplainId = null;
+
+  window.triggerComplainEvidenceUpload = function (source = 'gallery') {
+    if (source === 'camera') {
+      const cameraInput = document.getElementById('cplEvidenceCameraInput');
+      if (cameraInput) cameraInput.click();
+    } else {
+      const fileInput = document.getElementById('cplEvidenceInput');
+      if (fileInput) fileInput.click();
+    }
+  };
+
+  window.triggerProductPhotoUpload = function (complainId, source = 'gallery') {
+    activeProductPhotoComplainId = complainId;
+    if (source === 'camera') {
+      const cameraInput = document.getElementById('cplProductPhotoCameraInput');
+      if (cameraInput) cameraInput.click();
+    } else {
+      const fileInput = document.getElementById('cplProductPhotoInput');
+      if (fileInput) fileInput.click();
+    }
   };
 
   function initComplainEvidenceUpload() {
-    const fileInput = document.getElementById('cplEvidenceInput');
-    if (!fileInput) return;
-
-    fileInput.addEventListener('change', function (e) {
-      const file = e.target.files[0];
+    const handleEvidenceFile = function (file) {
       if (!file) return;
-
       complainEvidenceFilename = file.name;
 
       const reader = new FileReader();
@@ -9685,10 +9726,84 @@
         if (resolveBtn) resolveBtn.disabled = false;
       };
       reader.readAsDataURL(file);
+    };
 
-      // Reset input for re-upload
-      fileInput.value = '';
-    });
+    const galleryInput = document.getElementById('cplEvidenceInput');
+    if (galleryInput) {
+      galleryInput.addEventListener('change', function (e) {
+        handleEvidenceFile(e.target.files[0]);
+        galleryInput.value = '';
+      });
+    }
+
+    const cameraInput = document.getElementById('cplEvidenceCameraInput');
+    if (cameraInput) {
+      cameraInput.addEventListener('change', function (e) {
+        handleEvidenceFile(e.target.files[0]);
+        cameraInput.value = '';
+      });
+    }
+  }
+
+  function initProductPhotoUpload() {
+    const handleProductPhoto = function (file) {
+      if (!file || !activeProductPhotoComplainId) return;
+      const targetId = activeProductPhotoComplainId;
+      const item = complainList.find(c => c.id === targetId);
+      if (!item) return;
+
+      const reader = new FileReader();
+      reader.onload = function (ev) {
+        const base64Data = ev.target.result;
+        item.productImageUrl = base64Data;
+
+        // Update local cache
+        try {
+          localStorage.setItem('superapp_cached_complaints', JSON.stringify(complainList));
+        } catch (e) {}
+
+        // Save to Firestore direct REST
+        try {
+          fetch(`${FIRESTORE_REST_URL}/${targetId}?updateMask.fieldPaths=productImageUrl`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              fields: {
+                productImageUrl: { stringValue: base64Data }
+              }
+            })
+          }).catch(err => console.warn('Product photo save to Firestore REST error:', err));
+        } catch (e) {}
+
+        // Refresh UI
+        showComplainDetail(targetId);
+        filterComplainList();
+        updateComplainMeta();
+
+        if (typeof showHudToast === 'function') {
+          showHudToast('Foto produk berhasil diunggah dari galeri!', 'success');
+        } else {
+          alert('Foto produk berhasil disimpan!');
+        }
+      };
+      reader.readAsDataURL(file);
+    };
+
+    const prodGalleryInput = document.getElementById('cplProductPhotoInput');
+    if (prodGalleryInput) {
+      prodGalleryInput.addEventListener('change', function (e) {
+        handleProductPhoto(e.target.files[0]);
+        prodGalleryInput.value = '';
+      });
+    }
+
+    const prodCameraInput = document.getElementById('cplProductPhotoCameraInput');
+    if (prodCameraInput) {
+      prodCameraInput.addEventListener('change', function (e) {
+        handleProductPhoto(e.target.files[0]);
+        prodCameraInput.value = '';
+      });
+    }
   }
 
   window.resolveComplain = async function (id) {
@@ -9760,10 +9875,12 @@
     document.addEventListener('DOMContentLoaded', () => {
       initComplainSearch();
       initComplainEvidenceUpload();
+      initProductPhotoUpload();
     });
   } else {
     initComplainSearch();
     initComplainEvidenceUpload();
+    initProductPhotoUpload();
   }
 
   // ──────────────────────────────────────────────

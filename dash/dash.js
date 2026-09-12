@@ -1108,8 +1108,14 @@ function startAutoRefresh() {
 }
 
 // ─── Initialization ───
-document.addEventListener('DOMContentLoaded', () => {
+function initDash() {
   setupEventListeners();
   fetchComplaints();
   startAutoRefresh();
-});
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initDash);
+} else {
+  initDash();
+}
