@@ -1548,8 +1548,8 @@
       </div>
 
       <!-- Hidden file inputs for resolution evidence upload -->
-      <input type="file" id="cplEvidenceInput" class="cpl-file-input" accept="image/*" style="display: none;">
-      <input type="file" id="cplEvidenceCameraInput" class="cpl-file-input" accept="image/*" capture="environment" style="display: none;">
+      <input type="file" id="cplEvidenceInput" class="cpl-file-input" accept="image/*" style="display: none;" onchange="handleEvidenceFileSelect(event)">
+      <input type="file" id="cplEvidenceCameraInput" class="cpl-file-input" accept="image/*" capture="environment" style="display: none;" onchange="handleEvidenceFileSelect(event)">
     </div> <!-- End Complain Workspace -->
 
     <!-- ── Koli Inbound Workspace (Hidden by Default) ── -->
@@ -2024,7 +2024,7 @@
   </div>
 
   <!-- App Logic -->
-  <script src="app.js?v=77"></script>
+  <script src="app.js?v=79"></script>
 </body>
 
 </html>

@@ -9732,33 +9732,115 @@
 
   let activeProductPhotoComplainId = null;
 
+  function handleEvidenceFileSelect(e) {
+    const inputEl = e.target;
+    const file = inputEl && inputEl.files && inputEl.files[0];
+    if (!file) return;
+
+    showGlobalToast('info', 'Memproses Foto', 'Sedang mengompresi dan menyiapkan foto bukti...');
+
+    const reader = new FileReader();
+    reader.onload = function (evt) {
+      if (inputEl) inputEl.value = '';
+      const rawDataUrl = evt.target.result;
+      
+      compressEvidenceImage(rawDataUrl, 1280, 0.82, function (compressedDataUrl) {
+        complainEvidenceData = compressedDataUrl;
+        complainEvidenceFilename = file.name || 'bukti_complain.jpg';
+
+        // Update preview UI in detail section
+        const zone = document.getElementById('cplUploadZone');
+        if (zone) {
+          zone.className = 'cpl-upload-zone has-preview';
+          zone.innerHTML = `
+            <img src="${complainEvidenceData}" class="cpl-evidence-preview" alt="Pratinjau Bukti Selesai">
+            <div class="cpl-evidence-filename">✅ Bukti Foto Siap (${escapeHtml(complainEvidenceFilename)})</div>
+            <div style="margin-top: 8px; font-size: 0.76rem; color: #38bdf8; font-weight: 600; cursor: pointer;">Ganti Foto</div>
+          `;
+        }
+
+        // Enable Tandai Selesai button
+        const resolveBtn = document.getElementById('cplResolveBtn');
+        if (resolveBtn) {
+          resolveBtn.disabled = false;
+          resolveBtn.style.opacity = '1';
+          resolveBtn.style.cursor = 'pointer';
+        }
+
+        showGlobalToast('success', 'Bukti Terpasang', 'Foto bukti penyelesaian berhasil dipilih. Tekan "Tandai Selesai" untuk menyimpan.');
+      });
+    };
+    reader.onerror = function () {
+      showGlobalToast('error', 'Gagal Membaca File', 'Foto tidak dapat dimuat. Silakan pilih kembali.');
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function compressEvidenceImage(dataUrl, maxDim, quality, callback) {
+    try {
+      const img = new Image();
+      img.onload = function () {
+        let w = img.width;
+        let h = img.height;
+        if (w > maxDim || h > maxDim) {
+          if (w > h) {
+            h = Math.round((h * maxDim) / w);
+            w = maxDim;
+          } else {
+            w = Math.round((w * maxDim) / h);
+            h = maxDim;
+          }
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, w, h);
+        const compressed = canvas.toDataURL('image/jpeg', quality);
+        callback(compressed);
+      };
+      img.onerror = function () {
+        callback(dataUrl);
+      };
+      img.src = dataUrl;
+    } catch (e) {
+      callback(dataUrl);
+    }
+  }
+
+  function initComplainEvidenceUpload() {
+    const galleryInput = document.getElementById('cplEvidenceInput');
+    const cameraInput = document.getElementById('cplEvidenceCameraInput');
+
+    if (galleryInput && !galleryInput._hasListener) {
+      galleryInput.addEventListener('change', handleEvidenceFileSelect);
+      galleryInput._hasListener = true;
+    }
+    if (cameraInput && !cameraInput._hasListener) {
+      cameraInput.addEventListener('change', handleEvidenceFileSelect);
+      cameraInput._hasListener = true;
+    }
+  }
+  window.handleEvidenceFileSelect = handleEvidenceFileSelect;
+
   window.triggerComplainEvidenceUpload = function (source = 'gallery') {
-    if (source === 'camera') {
-      const cameraInput = document.getElementById('cplEvidenceCameraInput');
-      if (cameraInput) cameraInput.click();
-    } else {
-      const fileInput = document.getElementById('cplEvidenceInput');
-      if (fileInput) fileInput.click();
+    initComplainEvidenceUpload();
+    const targetInput = source === 'camera'
+      ? document.getElementById('cplEvidenceCameraInput')
+      : document.getElementById('cplEvidenceInput');
+
+    if (targetInput) {
+      targetInput.value = '';
+      targetInput.click();
     }
   };
-
-  // Initialize complain search and upload handlers on DOMContentLoaded
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => {
-      initComplainSearch();
-      initComplainEvidenceUpload();
-    });
-  } else {
-    initComplainSearch();
-    initComplainEvidenceUpload();
-  }
 
   window.resolveComplain = async function (id) {
     const item = complainList.find(c => c.id === id);
     if (!item || item.status !== 'dikerjakan') return;
 
     if (!complainEvidenceData) {
-      alert('Upload bukti screenshot reply complain terlebih dahulu.');
+      showGlobalToast('warning', 'Bukti Diperlukan', 'Upload bukti screenshot reply complain terlebih dahulu.');
       return;
     }
 
@@ -9772,6 +9854,7 @@
 
     filterComplainList();
     showComplainDetail(id);
+    showGlobalToast('success', 'Complain Selesai', 'Tiket telah berhasil diselesaikan dengan bukti terlampir!');
 
     // Save to local cache
     try {
@@ -9822,12 +9905,10 @@
     document.addEventListener('DOMContentLoaded', () => {
       initComplainSearch();
       initComplainEvidenceUpload();
-      initProductPhotoUpload();
     });
   } else {
     initComplainSearch();
     initComplainEvidenceUpload();
-    initProductPhotoUpload();
   }
 
   // ──────────────────────────────────────────────
