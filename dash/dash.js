@@ -156,17 +156,46 @@ function decodeFirestoreDoc(doc) {
     return null;
   }
 
-  const obj = {};
+  const rawObj = {};
   for (const k in fields) {
-    obj[k] = unwrap(fields[k]);
+    rawObj[k] = unwrap(fields[k]);
   }
 
-  // Extract ID from doc.name: "projects/.../documents/complaints/{id}"
-  if (!obj.id && doc.name) {
-    obj.id = doc.name.split('/').pop();
-  }
+  const id = rawObj.id || (doc.name ? doc.name.split('/').pop() : `cpl-${Date.now().toString(36)}`);
+  return {
+    id: id,
+    hub: rawObj.hub || 'Hub MTG Menteng',
+    invoice: rawObj.invoice || '',
+    sender: rawObj.sender || 'Customer',
+    description: rawObj.description || '-',
+    productImageUrl: rawObj.productImageUrl || null,
+    status: (rawObj.status || 'baru').toLowerCase(),
+    createdAt: rawObj.createdAt || doc.createTime || new Date().toISOString(),
+    claimedBy: rawObj.claimedBy || null,
+    claimedAt: rawObj.claimedAt || null,
+    resolvedAt: rawObj.resolvedAt || null,
+    evidenceUrl: rawObj.evidenceUrl || null,
+    rawText: rawObj.rawText || '',
+    source: rawObj.source || null
+  };
+}
 
-  return obj;
+// ─── Local Storage Cache Loader ───
+function loadCachedComplaints() {
+  try {
+    const raw = localStorage.getItem('superapp_dash_cached') || localStorage.getItem('superapp_cached_complaints');
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        complaintsData = parsed;
+        updateSyncTelemetry(true, 'Cache Lokal');
+        applyFiltersAndRender();
+        updateKPIs();
+      }
+    }
+  } catch (e) {
+    console.warn('Gagal membaca cache lokal:', e);
+  }
 }
 
 // ─── Encode Object to Firestore Fields ───
@@ -205,10 +234,12 @@ async function fetchComplaints() {
     });
     if (fsRes.ok) {
       const fsData = await fsRes.json();
-      if (fsData && fsData.documents) {
+      if (fsData && Array.isArray(fsData.documents)) {
         list = fsData.documents.map(decodeFirestoreDoc).filter(Boolean);
         source = 'Firestore Cloud';
       }
+    } else {
+      console.warn(`Firestore REST HTTP status: ${fsRes.status}`);
     }
   } catch (err) {
     console.warn('Firestore direct REST error, falling back to local/backend API:', err);
@@ -220,12 +251,23 @@ async function fetchComplaints() {
       const apiRes = await fetch('/api/complaints?_t=' + Date.now());
       if (apiRes.ok) {
         const apiData = await apiRes.json();
-        list = apiData.data || apiData || [];
-        source = 'GoWA Webhook API';
+        const rawList = apiData.data || apiData || [];
+        if (Array.isArray(rawList) && rawList.length > 0) {
+          list = rawList;
+          source = 'GoWA Webhook API';
+        }
       }
     } catch (err2) {
       console.warn('Local API error:', err2);
     }
+  }
+
+  // 3. Fallback to cached complaints if both network sources returned 0
+  if (list.length === 0 && complaintsData.length > 0) {
+    updateSyncTelemetry(false, 'Offline / Cache');
+    applyFiltersAndRender();
+    updateKPIs();
+    return;
   }
 
   // Sort descending by createdAt
@@ -236,6 +278,11 @@ async function fetchComplaints() {
   });
 
   complaintsData = list;
+  try {
+    localStorage.setItem('superapp_dash_cached', JSON.stringify(list));
+    localStorage.setItem('superapp_cached_complaints', JSON.stringify(list));
+  } catch (_) {}
+
   updateSyncTelemetry(true, source || 'Tersinkron');
   applyFiltersAndRender();
   updateKPIs();
@@ -1109,6 +1156,7 @@ function startAutoRefresh() {
 
 // ─── Initialization ───
 function initDash() {
+  loadCachedComplaints();
   setupEventListeners();
   fetchComplaints();
   startAutoRefresh();
