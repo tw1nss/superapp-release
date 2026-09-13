@@ -9615,9 +9615,61 @@
 
   let activeClaimComplainId = null;
 
+  function syncClaimComplain(id, item) {
+    // Save to local cache
+    try {
+      localStorage.setItem('superapp_cached_complaints', JSON.stringify(complainList));
+    } catch (e) {}
+
+    // Update to Firestore if active
+    if (typeof firebase !== 'undefined' && firebase.apps && firebase.apps.length > 0) {
+      try {
+        firebase.firestore().collection('complaints').doc(id).update({
+          status: 'dikerjakan',
+          claimedBy: item.claimedBy,
+          claimedAt: item.claimedAt
+        });
+      } catch (e) {
+        console.warn('Firestore claim update error:', e);
+      }
+    }
+
+    // Update to Firestore REST API (Cloud direct)
+    try {
+      fetch(`${FIRESTORE_REST_URL}/${id}?updateMask.fieldPaths=status&updateMask.fieldPaths=claimedBy&updateMask.fieldPaths=claimedAt`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fields: {
+            status: { stringValue: 'dikerjakan' },
+            claimedBy: { stringValue: item.claimedBy },
+            claimedAt: { stringValue: item.claimedAt }
+          }
+        })
+      }).catch(() => {});
+    } catch (e) {}
+
+    // Update to VPS REST API (via local proxy atau VPS langsung)
+    try {
+      const claimUrl = getComplainApiUrl(`/api/complaints/${id}/claim`);
+      fetch(claimUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ claimedBy: item.claimedBy })
+      }).catch(() => {});
+    } catch (e) {}
+  }
+
   window.claimComplain = function (id) {
     const item = complainList.find(c => c.id === id);
-    if (!item || item.status !== 'baru') return;
+    if (!item) {
+      showGlobalToast('error', 'Tiket Tidak Ditemukan', 'Data tiket komplain tidak ditemukan.');
+      return;
+    }
+    if (item.status !== 'baru') {
+      showGlobalToast('info', 'Status Tiket', `Tiket ini sudah dalam status "${item.status}"`);
+      return;
+    }
 
     activeClaimComplainId = id;
     const modal = document.getElementById('cplPicClaimModal');
@@ -9630,6 +9682,19 @@
         input.focus();
         input.select();
       }, 100);
+    } else {
+      const promptPic = prompt('Masukkan Nama PIC yang mengerjakan complain ini:', localStorage.getItem('superapp_pic_name') || '');
+      if (promptPic && promptPic.trim()) {
+        const pic = promptPic.trim();
+        localStorage.setItem('superapp_pic_name', pic);
+        item.status = 'dikerjakan';
+        item.claimedBy = pic;
+        item.claimedAt = new Date().toISOString();
+        filterComplainList();
+        showComplainDetail(id);
+        showGlobalToast('success', 'Tiket Diklaim', `Komplain sedang dikerjakan oleh ${pic}`);
+        syncClaimComplain(id, item);
+      }
     }
   };
 
@@ -9670,48 +9735,7 @@
     showComplainDetail(id);
     showGlobalToast('success', 'Tiket Diklaim', `Komplain sedang dikerjakan oleh ${picName}`);
 
-    // Save to local cache
-    try {
-      localStorage.setItem('superapp_cached_complaints', JSON.stringify(complainList));
-    } catch (e) {}
-
-    // Update to Firestore if active
-    if (typeof firebase !== 'undefined' && firebase.apps && firebase.apps.length > 0) {
-      try {
-        firebase.firestore().collection('complaints').doc(id).update({
-          status: 'dikerjakan',
-          claimedBy: item.claimedBy,
-          claimedAt: item.claimedAt
-        });
-      } catch (e) {
-        console.warn('Firestore claim update error:', e);
-      }
-    }
-
-    // Update to Firestore REST API (Cloud direct)
-    try {
-      fetch(`${FIRESTORE_REST_URL}/${id}?updateMask.fieldPaths=status&updateMask.fieldPaths=claimedBy&updateMask.fieldPaths=claimedAt`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          fields: {
-            status: { stringValue: 'dikerjakan' },
-            claimedBy: { stringValue: item.claimedBy },
-            claimedAt: { stringValue: item.claimedAt }
-          }
-        })
-      }).catch(() => {});
-    } catch (e) {}
-
-    // Update to VPS REST API (via local proxy atau VPS langsung)
-    try {
-      const claimUrl = getComplainApiUrl(`/api/complaints/${id}/claim`);
-      fetch(claimUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ claimedBy: picName })
-      }).catch(() => {});
-    } catch (e) {}
+    syncClaimComplain(id, item);
   };
 
   // Keyboard handler Enter/Escape di modal PIC
