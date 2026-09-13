@@ -10272,6 +10272,9 @@
     const item = koliFilteredRows[index];
     if (!item) return;
 
+    const modal = document.getElementById('koliDetailModal');
+    if (modal) modal.classList.remove('hidden');
+
     const elTitle = document.getElementById('koliDetailTitleOrigin');
     const elKoli = document.getElementById('koliValNoKoli');
     const elSo = document.getElementById('koliValSoNumber');
@@ -10284,7 +10287,6 @@
     if (elKoli) elKoli.textContent = item.noKoli || '-';
     if (elSo) elSo.textContent = item.soNumber || '-';
     if (elOrigin) elOrigin.textContent = item.origin || '-';
-    if (elSku) elSku.textContent = item.sku || '-';
     if (elName) elName.textContent = item.name || '-';
     if (elQty) elQty.textContent = String(item.qty || 1);
 
@@ -10307,8 +10309,14 @@
             colorLight: '#ffffff',
             correctLevel: QRCode.CorrectLevel.M
           });
+          const img = container.querySelector('img');
           const canvas = container.querySelector('canvas');
-          if (canvas) {
+          if (img) {
+            img.style.display = 'block';
+            img.style.width = '160px';
+            img.style.height = '160px';
+          }
+          if (canvas && (!img || !img.src)) {
             canvas.style.display = 'block';
             canvas.style.width = '160px';
             canvas.style.height = '160px';
@@ -10333,17 +10341,19 @@
       renderKoliQr(qrSkuBox, elSku.value);
 
       if (!elSku._hasLiveQrListener) {
+        let debounceTimer = null;
         elSku.addEventListener('input', function () {
-          renderKoliQr(qrSkuBox, this.value);
+          clearTimeout(debounceTimer);
+          debounceTimer = setTimeout(() => {
+            const targetBox = document.getElementById('koliQrSkuBox');
+            renderKoliQr(targetBox, elSku.value);
+          }, 50);
         });
         elSku._hasLiveQrListener = true;
       }
     } else {
       renderKoliQr(qrSkuBox, item.sku);
     }
-
-    const modal = document.getElementById('koliDetailModal');
-    if (modal) modal.classList.remove('hidden');
   };
 
   window.closeKoliDetailModal = function () {

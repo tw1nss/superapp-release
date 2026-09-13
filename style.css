@@ -10204,23 +10204,35 @@ select.dcc-field-input option {
 }
 
 .koli-field-input {
-  background: #0b0f19;
-  border: 1.5px solid rgba(56, 189, 248, 0.45);
+  background: #0d1017;
+  border: 1px solid rgba(255, 255, 255, 0.14);
   border-radius: 8px;
   padding: 10px 14px;
-  font-size: 0.92rem;
-  color: #38bdf8;
+  font-size: 0.88rem;
+  color: #f8fafc;
+  line-height: 1.35;
   width: 100%;
-  outline: none;
-  transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
+  outline: none !important;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  font-family: 'JetBrains Mono', monospace;
   box-sizing: border-box;
+  box-shadow: none !important;
+  transition: border-color 0.15s ease, background 0.15s ease;
 }
 
 .koli-field-input:focus {
-  border-color: #38bdf8;
-  background: #0f172a;
-  box-shadow: 0 0 12px rgba(56, 189, 248, 0.35);
-  color: #ffffff;
+  background: #0d1017;
+  border-color: rgba(56, 189, 248, 0.5);
+  outline: none !important;
+  box-shadow: 0 0 0 1px rgba(56, 189, 248, 0.25) !important;
+  color: #f8fafc;
+}
+
+.koli-field-input::placeholder {
+  color: #64748b;
+  font-weight: 400;
 }
 
 .koli-field-input.font-mono {
@@ -10259,8 +10271,12 @@ select.dcc-field-input option {
   box-sizing: border-box;
 }
 
-/* Fix: qrcodejs renders on canvas. Ensure canvas is always visible and crisp */
+/* Fix: qrcodejs renders canvas and img. Support both cleanly so barcode kotak is never blank */
 .koli-qr-white-frame canvas {
+  display: none !important;
+}
+
+.koli-qr-white-frame canvas:only-child {
   display: block !important;
   width: 160px !important;
   height: 160px !important;
@@ -10270,14 +10286,13 @@ select.dcc-field-input option {
 }
 
 .koli-qr-white-frame img {
-  display: none !important;
-}
-
-.koli-qr-white-frame:not(:has(canvas)) img {
   display: block !important;
   width: 160px !important;
   height: 160px !important;
-  object-fit: contain;
+  aspect-ratio: 1 / 1 !important;
+  object-fit: contain !important;
+  image-rendering: -webkit-optimize-contrast;
+  image-rendering: pixelated;
   margin: 0 auto;
 }
 

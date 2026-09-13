@@ -29,10 +29,11 @@
   <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/id.js"></script>
 
   <!-- Stylesheets -->
-  <link rel="stylesheet" href="style.css?v=38">
+  <link rel="stylesheet" href="style.css?v=83">
 
   <!-- QR Code & Barcode Libraries -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <script src="qrcode.min.js"></script>
+  <script>if (typeof QRCode === 'undefined') { document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"><\/script>'); }</script>
   <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
   <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 </head>
@@ -1666,9 +1667,11 @@
 
             <!-- product_sku_number -->
             <div class="koli-input-block">
-              <label class="koli-input-label">product_sku_number</label>
-              <input type="text" id="koliValSku" class="koli-field-input font-mono font-bold" placeholder="Masukkan SKU atau tambahkan ED..." autocomplete="off" spellcheck="false">
-              <span class="koli-field-hint" style="font-size: 0.72rem; color: #38bdf8; margin-top: 3px; display: block; font-weight: 500;">💡 Anda dapat mengedit / menambahkan ED pada SKU ini, barcode kotak langsung menyesuaikan.</span>
+              <div style="display: flex; justify-content: space-between; align-items: baseline;">
+                <label class="koli-input-label" for="koliValSku">product_sku_number</label>
+                <span style="font-size: 0.68rem; color: #64748b; font-weight: 500;">(bisa diedit)</span>
+              </div>
+              <input type="text" id="koliValSku" class="koli-field-input font-mono" placeholder="Masukkan SKU atau tambahkan ED..." autocomplete="off" spellcheck="false">
             </div>
 
             <!-- product_name -->
@@ -2021,7 +2024,7 @@
   </div>
 
   <!-- App Logic -->
-  <script src="app.js?v=82"></script>
+  <script src="app.js?v=83"></script>
 </body>
 
 </html>
