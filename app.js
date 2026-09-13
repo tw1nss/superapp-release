@@ -10172,100 +10172,58 @@
     if (elName) elName.textContent = item.name || '-';
     if (elQty) elQty.textContent = String(item.qty || 1);
 
-    // 1. Generate QR Code for NO KOLI
+    // Helper untuk generate QR Code (Barcode Kotak)
+    function renderKoliQr(container, text) {
+      if (!container) return;
+      container.innerHTML = '';
+      const cleanText = String(text || '').trim();
+      if (!cleanText) {
+        container.innerHTML = '<span style="color:#64748b;font-size:0.75rem;padding:10px;text-align:center;">Masukkan teks untuk barcode</span>';
+        return;
+      }
+      if (typeof QRCode !== 'undefined') {
+        try {
+          new QRCode(container, {
+            text: cleanText,
+            width: 160,
+            height: 160,
+            colorDark: '#000000',
+            colorLight: '#ffffff',
+            correctLevel: QRCode.CorrectLevel.M
+          });
+          const canvas = container.querySelector('canvas');
+          if (canvas) {
+            canvas.style.display = 'block';
+            canvas.style.width = '160px';
+            canvas.style.height = '160px';
+          }
+        } catch (qrErr) {
+          console.warn('QR generation error:', qrErr);
+          container.innerHTML = '<span style="color:#000;font-size:0.75rem;padding:10px;word-break:break-all;">' + escapeHtml(cleanText) + '</span>';
+        }
+      } else {
+        container.innerHTML = '<span style="color:#000;font-size:0.75rem;padding:10px;word-break:break-all;">' + escapeHtml(cleanText) + '</span>';
+      }
+    }
+
+    // 1. Generate QR Code untuk NO KOLI
     const qrKoliBox = document.getElementById('koliQrKoliBox');
-    if (qrKoliBox) {
-      qrKoliBox.innerHTML = '';
-      if (item.noKoli && typeof QRCode !== 'undefined') {
-        try {
-          new QRCode(qrKoliBox, {
-            text: item.noKoli,
-            width: 160,
-            height: 160,
-            colorDark: '#000000',
-            colorLight: '#ffffff',
-            correctLevel: QRCode.CorrectLevel.M
-          });
-        } catch (qrErr) {
-          console.warn('QR Koli generation error:', qrErr);
-          qrKoliBox.innerHTML = '<span style="color:#000;font-size:0.75rem;padding:10px;">' + escapeHtml(item.noKoli) + '</span>';
-        }
-      }
-    }
+    renderKoliQr(qrKoliBox, item.noKoli);
 
-    // 2. Generate 1D Barcode for NO KOLI
-    const barcodeKoliSvg = document.getElementById('koliBarcodeKoli');
-    if (barcodeKoliSvg) {
-      if (item.noKoli && typeof JsBarcode !== 'undefined') {
-        try {
-          JsBarcode(barcodeKoliSvg, item.noKoli, {
-            format: 'CODE128',
-            width: 1.8,
-            height: 46,
-            displayValue: true,
-            font: 'monospace',
-            fontSize: 13,
-            textMargin: 3,
-            background: '#ffffff',
-            lineColor: '#000000',
-            margin: 4
-          });
-          if (barcodeKoliSvg.parentElement) barcodeKoliSvg.parentElement.style.display = 'flex';
-        } catch (bcErr) {
-          console.warn('Barcode Koli generation error:', bcErr);
-          if (barcodeKoliSvg.parentElement) barcodeKoliSvg.parentElement.style.display = 'none';
-        }
-      } else {
-        if (barcodeKoliSvg.parentElement) barcodeKoliSvg.parentElement.style.display = 'none';
-      }
-    }
-
-    // 3. Generate QR Code for SKU
+    // 2. Generate QR Code untuk SKU dan pasang live listener
     const qrSkuBox = document.getElementById('koliQrSkuBox');
-    if (qrSkuBox) {
-      qrSkuBox.innerHTML = '';
-      if (item.sku && typeof QRCode !== 'undefined') {
-        try {
-          new QRCode(qrSkuBox, {
-            text: item.sku,
-            width: 160,
-            height: 160,
-            colorDark: '#000000',
-            colorLight: '#ffffff',
-            correctLevel: QRCode.CorrectLevel.M
-          });
-        } catch (qrErr) {
-          console.warn('QR SKU generation error:', qrErr);
-          qrSkuBox.innerHTML = '<span style="color:#000;font-size:0.75rem;padding:10px;">' + escapeHtml(item.sku) + '</span>';
-        }
-      }
-    }
+    if (elSku) {
+      elSku.value = item.sku || '';
+      renderKoliQr(qrSkuBox, elSku.value);
 
-    // 4. Generate 1D Barcode for SKU
-    const barcodeSkuSvg = document.getElementById('koliBarcodeSku');
-    if (barcodeSkuSvg) {
-      if (item.sku && typeof JsBarcode !== 'undefined') {
-        try {
-          JsBarcode(barcodeSkuSvg, item.sku, {
-            format: 'CODE128',
-            width: 1.8,
-            height: 46,
-            displayValue: true,
-            font: 'monospace',
-            fontSize: 13,
-            textMargin: 3,
-            background: '#ffffff',
-            lineColor: '#000000',
-            margin: 4
-          });
-          if (barcodeSkuSvg.parentElement) barcodeSkuSvg.parentElement.style.display = 'flex';
-        } catch (bcErr) {
-          console.warn('Barcode SKU generation error:', bcErr);
-          if (barcodeSkuSvg.parentElement) barcodeSkuSvg.parentElement.style.display = 'none';
-        }
-      } else {
-        if (barcodeSkuSvg.parentElement) barcodeSkuSvg.parentElement.style.display = 'none';
+      if (!elSku._hasLiveQrListener) {
+        elSku.addEventListener('input', function () {
+          renderKoliQr(qrSkuBox, this.value);
+        });
+        elSku._hasLiveQrListener = true;
       }
+    } else {
+      renderKoliQr(qrSkuBox, item.sku);
     }
 
     const modal = document.getElementById('koliDetailModal');

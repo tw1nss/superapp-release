@@ -1667,7 +1667,8 @@
             <!-- product_sku_number -->
             <div class="koli-input-block">
               <label class="koli-input-label">product_sku_number</label>
-              <div class="koli-input-readonly font-mono font-bold" id="koliValSku">-</div>
+              <input type="text" id="koliValSku" class="koli-field-input font-mono font-bold" placeholder="Masukkan SKU atau tambahkan ED..." autocomplete="off" spellcheck="false">
+              <span class="koli-field-hint" style="font-size: 0.72rem; color: #38bdf8; margin-top: 3px; display: block; font-weight: 500;">💡 Anda dapat mengedit / menambahkan ED pada SKU ini, barcode kotak langsung menyesuaikan.</span>
             </div>
 
             <!-- product_name -->
@@ -1682,25 +1683,19 @@
               <div class="koli-input-readonly font-mono" id="koliValQty">-</div>
             </div>
 
-            <!-- QR KOLI (with 1D Barcode) -->
+            <!-- QR KOLI (Barcode Kotak) -->
             <div class="koli-input-block">
               <label class="koli-input-label">QR KOLI</label>
               <div class="koli-qr-container-card">
                 <div class="koli-qr-white-frame" id="koliQrKoliBox"></div>
-                <div class="koli-barcode-white-frame">
-                  <svg id="koliBarcodeKoli"></svg>
-                </div>
               </div>
             </div>
 
-            <!-- QR SKU (with 1D Barcode) -->
+            <!-- QR SKU (Barcode Kotak) -->
             <div class="koli-input-block">
               <label class="koli-input-label">QR SKU</label>
               <div class="koli-qr-container-card">
                 <div class="koli-qr-white-frame" id="koliQrSkuBox"></div>
-                <div class="koli-barcode-white-frame">
-                  <svg id="koliBarcodeSku"></svg>
-                </div>
               </div>
             </div>
           </div>
@@ -2026,7 +2021,7 @@
   </div>
 
   <!-- App Logic -->
-  <script src="app.js?v=80"></script>
+  <script src="app.js?v=81"></script>
 </body>
 
 </html>
