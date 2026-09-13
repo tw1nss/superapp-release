@@ -388,7 +388,7 @@ function renderViews() {
         <td><strong>${escapeHtml(item.sender || 'Customer')}</strong></td>
         <td><span title="${escapeHtml(item.description || '')}">${shortDesc}</span></td>
         <td>${photoThumb}</td>
-        <td>${item.claimedBy ? `<strong>${escapeHtml(item.claimedBy)}</strong>` : '<span class="text-muted">Menunggu</span>'}</td>
+        <td>${item.claimedBy ? `<span style="color:#38bdf8; font-weight:600;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-1px; margin-right:3px;"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>${escapeHtml(item.claimedBy)}</span>` : '<span class="text-muted">Menunggu</span>'}</td>
         <td>${evidenceThumb}</td>
         <td class="cell-mono" style="font-size: 0.76rem; color: var(--text-subtext);">${dateFormatted}</td>
         <td>
@@ -443,7 +443,7 @@ function renderViews() {
 
         <div class="card-footer">
           <span class="text-muted" style="font-size: 0.78rem;">
-            ${item.claimedBy ? `Staf: <strong>${escapeHtml(item.claimedBy)}</strong>` : 'Belum ditugaskan'}
+            ${item.claimedBy ? `PIC: <strong style="color:#38bdf8;">${escapeHtml(item.claimedBy)}</strong>` : 'Menunggu PIC'}
           </span>
           <div style="display: flex; gap: 6px;">
             <button class="btn btn-sm btn-secondary" onclick="viewComplainDetail('${escapeHtml(item.id)}')">Detail</button>
@@ -521,36 +521,36 @@ async function updateDetailStatus(newStatus) {
     const updatePayload = {
       status: newStatus
     };
-    if (newStatus === 'dikerjakan' && !currentDetailComplain.claimedAt) {
+    if (newStatus === 'dikerjakan') {
+      const defaultPic = currentDetailComplain.claimedBy || 'Admin MTG';
+      const picInput = prompt('Masukkan Nama PIC yang menangani complain ini:', defaultPic);
+      if (picInput === null) return;
+      const picName = picInput.trim() || 'Admin MTG';
       updatePayload.claimedAt = updateTime;
-      updatePayload.claimedBy = 'Admin Console';
+      updatePayload.claimedBy = picName;
     } else if (newStatus === 'selesai') {
       updatePayload.resolvedAt = updateTime;
     }
 
-    // Try backend proxy first
-    let success = false;
+    // Direct Firestore REST update to guarantee instant sync with SuperApp mobile
+    const patchFields = encodeToFirestoreFields(updatePayload);
+    const maskParams = Object.keys(updatePayload).map(k => `updateMask.fieldPaths=${k}`).join('&');
+    await fetch(`${docUrl}?${maskParams}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fields: patchFields })
+    });
+
+    // Optional backend proxy sync
     try {
       if (newStatus === 'dikerjakan') {
-        const res = await fetch(`/api/complaints/${id}/claim`, {
+        await fetch(`/api/complaints/${id}/claim`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ userName: 'Admin Console' })
+          body: JSON.stringify({ userName: updatePayload.claimedBy })
         });
-        if (res.ok) success = true;
       }
     } catch (_) {}
-
-    // Direct Firestore update if needed
-    if (!success) {
-      const patchFields = encodeToFirestoreFields(updatePayload);
-      const maskParams = Object.keys(updatePayload).map(k => `updateMask.fieldPaths=${k}`).join('&');
-      await fetch(`${docUrl}?${maskParams}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ fields: patchFields })
-      });
-    }
 
     showToast(`Status berhasil diubah menjadi ${newStatus}!`, 'success');
     await fetchComplaints();

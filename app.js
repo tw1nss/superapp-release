@@ -6737,7 +6737,7 @@
   //  IN-APP UPDATE & VERSION CHECKING ENGINE
   // ══════════════════════════════════════════════
 
-  const APP_VERSION_CODE = 19; // Local current version code (v1.2.4 Master OTA)
+  const APP_VERSION_CODE = 20; // Local current version code (v1.2.4 Master OTA)
   const APP_VERSION_NAME = '1.2.4';
   const UPDATE_MANIFEST_URL = 'https://raw.githubusercontent.com/tw1nss/superapp-release/main/version.json';
 
@@ -9100,11 +9100,15 @@
 
     // 2. Ambil langsung dari Cloud Firestore REST API (aktif di seluruh dunia tanpa perlu port 3100)
     try {
-      const fsRes = await fetch(FIRESTORE_REST_URL, { signal: AbortSignal.timeout(4500) });
+      const fsRes = await fetch(`${FIRESTORE_REST_URL}?pageSize=200&_t=${Date.now()}`, {
+        cache: 'no-store',
+        signal: AbortSignal.timeout(5000)
+      });
       if (fsRes.ok) {
         const fsJson = await fsRes.json();
         if (fsJson && Array.isArray(fsJson.documents)) {
           complainList = fsJson.documents.map(mapFirestoreDocToComplain);
+          complainList.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
           complainSyncSource = 'Cloud (Firestore)';
           complainList.forEach(c => lastKnownComplainIds.add(c.id));
           localStorage.setItem('superapp_cached_complaints', JSON.stringify(complainList));
@@ -9193,11 +9197,15 @@
       // 2. Fallback ke Firestore REST
       if (!fetchedItems) {
         try {
-          const fsRes = await fetch(FIRESTORE_REST_URL, { signal: AbortSignal.timeout(4000) });
+          const fsRes = await fetch(`${FIRESTORE_REST_URL}?pageSize=200&_t=${Date.now()}`, {
+            cache: 'no-store',
+            signal: AbortSignal.timeout(4500)
+          });
           if (fsRes.ok) {
             const fsJson = await fsRes.json();
             if (fsJson && Array.isArray(fsJson.documents)) {
               fetchedItems = fsJson.documents.map(mapFirestoreDocToComplain);
+              fetchedItems.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
               complainSyncSource = 'Cloud (Firestore)';
             } else if (fsJson && !fsJson.documents) {
               fetchedItems = [];
@@ -9333,7 +9341,7 @@
           </div>
           ${item.claimedBy ? `<div class="cpl-card-assignee">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-            ${escapeHtml(item.claimedBy)}
+            PIC: <strong>${escapeHtml(item.claimedBy)}</strong>
           </div>` : ''}
         </div>
       </div>
@@ -9500,11 +9508,12 @@
             <div class="cpl-info-label">Tanggal Masuk</div>
             <div class="cpl-info-value mono">${formatComplainDate(item.createdAt)}</div>
           </div>
-          ${item.claimedBy ? `
           <div class="cpl-info-row">
-            <div class="cpl-info-label">Dikerjakan Oleh</div>
-            <div class="cpl-info-value">${escapeHtml(item.claimedBy)}</div>
-          </div>` : ''}
+            <div class="cpl-info-label">Nama PIC</div>
+            <div class="cpl-info-value" style="font-weight:600; color:${item.claimedBy ? '#38bdf8' : '#94a3b8'};">
+              ${item.claimedBy ? escapeHtml(item.claimedBy) : '<span style="color:#94a3b8; font-style:italic;">Menunggu Klaim</span>'}
+            </div>
+          </div>
         </div>
 
         <!-- Description -->
@@ -9513,23 +9522,15 @@
           <div class="cpl-desc-text">${escapeHtml(item.description)}</div>
         </div>
 
-        <!-- Product Photo Card (Foto Produk Yang Dikomplain) -->
+        ${item.productImageUrl ? `
+        <!-- Product Photo Card (Foto dari WhatsApp) -->
         <div class="cpl-product-photo-card">
-          <div class="cpl-product-photo-header" style="display:flex; justify-content:space-between; align-items:center;">
+          <div class="cpl-product-photo-header">
             <div class="cpl-product-photo-title">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
-              Foto Produk Yang Dikomplain
-            </div>
-            <div style="display:flex; gap:6px;">
-              <button type="button" onclick="triggerProductPhotoUpload('${item.id}', 'gallery')" style="background:rgba(56,189,248,0.12); border:1px solid rgba(56,189,248,0.35); color:#38bdf8; font-size:0.75rem; padding:4px 9px; border-radius:6px; cursor:pointer; font-weight:600;">
-                ${item.productImageUrl ? '🖼️ Ganti Foto' : '🖼️ Upload Galeri'}
-              </button>
-              <button type="button" onclick="triggerProductPhotoUpload('${item.id}', 'camera')" style="background:rgba(16,185,129,0.12); border:1px solid rgba(16,185,129,0.35); color:#10b981; font-size:0.75rem; padding:4px 9px; border-radius:6px; cursor:pointer; font-weight:600;">
-                📷 Kamera
-              </button>
+              Foto dari WhatsApp
             </div>
           </div>
-          ${item.productImageUrl ? `
           <div class="cpl-product-photo-hint">Tap foto untuk perbesar</div>
           <div class="cpl-product-photo-wrapper" onclick="openPhotoViewerModal('${item.productImageUrl}')">
             <img src="${item.productImageUrl}" class="cpl-product-photo-img" alt="Foto Produk Complain" loading="lazy" onerror="this.parentElement.style.display='none'">
@@ -9537,20 +9538,8 @@
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
             </div>
           </div>
-          ` : `
-          <div style="padding:14px; text-align:center; background:rgba(15,23,42,0.35); border:1px dashed rgba(255,255,255,0.12); border-radius:8px; margin-top:8px;">
-            <div style="font-size:0.8rem; color:#94a3b8; margin-bottom:8px;">Belum ada foto produk pada tiket ini</div>
-            <div style="display:flex; gap:8px; justify-content:center;">
-              <button type="button" onclick="triggerProductPhotoUpload('${item.id}', 'gallery')" style="padding:6px 12px; background:rgba(56,189,248,0.15); border:1px solid #38bdf8; border-radius:6px; color:#38bdf8; font-size:0.78rem; font-weight:600; cursor:pointer;">
-                🖼️ Upload dari Galeri
-              </button>
-              <button type="button" onclick="triggerProductPhotoUpload('${item.id}', 'camera')" style="padding:6px 12px; background:rgba(16,185,129,0.15); border:1px solid #10b981; border-radius:6px; color:#10b981; font-size:0.78rem; font-weight:600; cursor:pointer;">
-                📷 Ambil Kamera
-              </button>
-            </div>
-          </div>
-          `}
         </div>
+        ` : ''}
 
         <!-- Timeline -->
         <div class="cpl-timeline-card">
@@ -9628,8 +9617,14 @@
     const item = complainList.find(c => c.id === id);
     if (!item || item.status !== 'baru') return;
 
+    let savedPic = localStorage.getItem('superapp_pic_name') || '';
+    const picInput = prompt('Masukkan Nama PIC yang menangani complain ini:', savedPic);
+    if (picInput === null) return; // User membatalkan klaim
+    const picName = picInput.trim() || 'Tim MTG';
+    localStorage.setItem('superapp_pic_name', picName);
+
     item.status = 'dikerjakan';
-    item.claimedBy = 'User Aktif';
+    item.claimedBy = picName;
     item.claimedAt = new Date().toISOString();
 
     filterComplainList();
@@ -9691,119 +9686,15 @@
     }
   };
 
-  window.triggerProductPhotoUpload = function (complainId, source = 'gallery') {
-    activeProductPhotoComplainId = complainId;
-    if (source === 'camera') {
-      const cameraInput = document.getElementById('cplProductPhotoCameraInput');
-      if (cameraInput) cameraInput.click();
-    } else {
-      const fileInput = document.getElementById('cplProductPhotoInput');
-      if (fileInput) fileInput.click();
-    }
-  };
-
-  function initComplainEvidenceUpload() {
-    const handleEvidenceFile = function (file) {
-      if (!file) return;
-      complainEvidenceFilename = file.name;
-
-      const reader = new FileReader();
-      reader.onload = function (ev) {
-        complainEvidenceData = ev.target.result;
-
-        // Update preview in upload zone
-        const uploadZone = document.getElementById('cplUploadZone');
-        if (uploadZone) {
-          uploadZone.classList.add('has-preview');
-          uploadZone.innerHTML = `
-            <img src="${complainEvidenceData}" class="cpl-evidence-preview" alt="Preview bukti">
-            <div class="cpl-evidence-filename">${escapeHtml(complainEvidenceFilename)}</div>
-          `;
-        }
-
-        // Enable resolve button
-        const resolveBtn = document.getElementById('cplResolveBtn');
-        if (resolveBtn) resolveBtn.disabled = false;
-      };
-      reader.readAsDataURL(file);
-    };
-
-    const galleryInput = document.getElementById('cplEvidenceInput');
-    if (galleryInput) {
-      galleryInput.addEventListener('change', function (e) {
-        handleEvidenceFile(e.target.files[0]);
-        galleryInput.value = '';
-      });
-    }
-
-    const cameraInput = document.getElementById('cplEvidenceCameraInput');
-    if (cameraInput) {
-      cameraInput.addEventListener('change', function (e) {
-        handleEvidenceFile(e.target.files[0]);
-        cameraInput.value = '';
-      });
-    }
-  }
-
-  function initProductPhotoUpload() {
-    const handleProductPhoto = function (file) {
-      if (!file || !activeProductPhotoComplainId) return;
-      const targetId = activeProductPhotoComplainId;
-      const item = complainList.find(c => c.id === targetId);
-      if (!item) return;
-
-      const reader = new FileReader();
-      reader.onload = function (ev) {
-        const base64Data = ev.target.result;
-        item.productImageUrl = base64Data;
-
-        // Update local cache
-        try {
-          localStorage.setItem('superapp_cached_complaints', JSON.stringify(complainList));
-        } catch (e) {}
-
-        // Save to Firestore direct REST
-        try {
-          fetch(`${FIRESTORE_REST_URL}/${targetId}?updateMask.fieldPaths=productImageUrl`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              fields: {
-                productImageUrl: { stringValue: base64Data }
-              }
-            })
-          }).catch(err => console.warn('Product photo save to Firestore REST error:', err));
-        } catch (e) {}
-
-        // Refresh UI
-        showComplainDetail(targetId);
-        filterComplainList();
-        updateComplainMeta();
-
-        if (typeof showHudToast === 'function') {
-          showHudToast('Foto produk berhasil diunggah dari galeri!', 'success');
-        } else {
-          alert('Foto produk berhasil disimpan!');
-        }
-      };
-      reader.readAsDataURL(file);
-    };
-
-    const prodGalleryInput = document.getElementById('cplProductPhotoInput');
-    if (prodGalleryInput) {
-      prodGalleryInput.addEventListener('change', function (e) {
-        handleProductPhoto(e.target.files[0]);
-        prodGalleryInput.value = '';
-      });
-    }
-
-    const prodCameraInput = document.getElementById('cplProductPhotoCameraInput');
-    if (prodCameraInput) {
-      prodCameraInput.addEventListener('change', function (e) {
-        handleProductPhoto(e.target.files[0]);
-        prodCameraInput.value = '';
-      });
-    }
+  // Initialize complain search and upload handlers on DOMContentLoaded
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => {
+      initComplainSearch();
+      initComplainEvidenceUpload();
+    });
+  } else {
+    initComplainSearch();
+    initComplainEvidenceUpload();
   }
 
   window.resolveComplain = async function (id) {
