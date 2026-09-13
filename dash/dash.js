@@ -220,22 +220,22 @@ function encodeToFirestoreFields(obj) {
 async function fetchComplaints() {
   let list = [];
   let source = '';
+  let syncSuccess = false;
 
-  // 1. Try Firestore REST directly
+  // 1. Try Firestore REST directly (Simple CORS request without custom headers)
   try {
     const fsRes = await fetch(FIRESTORE_URL + '?pageSize=200', {
-      cache: 'no-store',
-      headers: {
-        'Cache-Control': 'no-cache, no-store, must-revalidate',
-        'Pragma': 'no-cache'
-      }
+      cache: 'no-cache'
     });
     if (fsRes.ok) {
       const fsData = await fsRes.json();
       if (fsData && Array.isArray(fsData.documents)) {
         list = fsData.documents.map(decodeFirestoreDoc).filter(Boolean);
-        source = 'Firestore Cloud';
+      } else {
+        list = [];
       }
+      source = 'Firestore Cloud';
+      syncSuccess = true;
     } else {
       console.warn(`Firestore REST HTTP status: ${fsRes.status}`);
     }
@@ -243,16 +243,17 @@ async function fetchComplaints() {
     console.warn('Firestore direct REST error, falling back to local/backend API:', err);
   }
 
-  // 2. Fallback to /api/complaints if Firestore returned empty or failed
-  if (list.length === 0) {
+  // 2. Fallback to /api/complaints if Firestore direct connection failed
+  if (!syncSuccess) {
     try {
-      const apiRes = await fetch('/api/complaints?_t=' + Date.now());
+      const apiRes = await fetch('/api/complaints', { cache: 'no-cache' });
       if (apiRes.ok) {
         const apiData = await apiRes.json();
         const rawList = apiData.data || apiData || [];
-        if (Array.isArray(rawList) && rawList.length > 0) {
+        if (Array.isArray(rawList)) {
           list = rawList;
           source = 'GoWA Webhook API';
+          syncSuccess = true;
         }
       }
     } catch (err2) {
@@ -260,8 +261,8 @@ async function fetchComplaints() {
     }
   }
 
-  // 3. Fallback to cached complaints if both network sources returned 0
-  if (list.length === 0 && complaintsData.length > 0) {
+  // 3. If network sync failed, fall back to cached data
+  if (!syncSuccess) {
     updateSyncTelemetry(false, 'Offline / Cache');
     applyFiltersAndRender();
     updateKPIs();
@@ -281,7 +282,7 @@ async function fetchComplaints() {
     localStorage.setItem('superapp_cached_complaints', JSON.stringify(list));
   } catch (_) {}
 
-  updateSyncTelemetry(true, source || 'Tersinkron');
+  updateSyncTelemetry(true, source || 'Firestore Cloud');
   applyFiltersAndRender();
   updateKPIs();
 }
