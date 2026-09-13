@@ -223,8 +223,12 @@ async function fetchComplaints() {
 
   // 1. Try Firestore REST directly
   try {
-    const fsRes = await fetch(FIRESTORE_URL + '?pageSize=200&_t=' + Date.now(), {
-      cache: 'no-store'
+    const fsRes = await fetch(FIRESTORE_URL + '?pageSize=200', {
+      cache: 'no-store',
+      headers: {
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache'
+      }
     });
     if (fsRes.ok) {
       const fsData = await fsRes.json();
