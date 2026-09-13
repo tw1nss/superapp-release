@@ -412,13 +412,9 @@
             <label for="inputDesc">Detail Keluhan / Masalah *</label>
             <textarea id="inputDesc" rows="3" placeholder="Contoh: Produk pecah, salah varian, atau kurang item" required></textarea>
           </div>
-          <div class="form-group">
-            <label for="inputPhoto">Foto Produk (File Gambar)</label>
-            <input type="file" id="inputPhoto" accept="image/*">
-            <div id="manualPhotoPreview" class="preview-mini" style="display: none;">
-              <img id="manualPreviewImg" src="" alt="Preview">
-              <button type="button" class="btn-remove-preview" id="btnRemoveManualPhoto">Hapus</button>
-            </div>
+          <div class="form-group info-box-auto" style="background: rgba(56, 189, 248, 0.08); border: 1px dashed var(--border-hud); border-radius: var(--radius-md); padding: 12px; font-size: 0.82rem; color: var(--text-subtext); display: flex; align-items: center; gap: 8px;">
+            <span style="font-size: 1.2rem;">🤖</span>
+            <span>Foto bukti produk complain otomatis terbaca langsung dari pesan WhatsApp (grup atau chat pribadi) yang dikirim ke nomor bot.</span>
           </div>
         </div>
         <div class="modal-footer">

@@ -106,10 +106,6 @@ const dom = {
   inputHub: document.getElementById('inputHub'),
   inputSender: document.getElementById('inputSender'),
   inputDesc: document.getElementById('inputDesc'),
-  inputPhoto: document.getElementById('inputPhoto'),
-  manualPhotoPreview: document.getElementById('manualPhotoPreview'),
-  manualPreviewImg: document.getElementById('manualPreviewImg'),
-  btnRemoveManualPhoto: document.getElementById('btnRemoveManualPhoto'),
 
   // PIN Modal
   pinModal: document.getElementById('pinModal'),
@@ -127,8 +123,6 @@ const dom = {
   // Toast
   toastContainer: document.getElementById('toastContainer')
 };
-
-let uploadedManualPhotoBase64 = null;
 
 // ─── Firestore Document Decoder ───
 function decodeFirestoreDoc(doc) {
@@ -737,7 +731,7 @@ async function handleManualSubmit(e) {
   const hub = dom.inputHub.value.trim() || 'Hub MTG Menteng';
   const sender = dom.inputSender.value.trim();
   const description = dom.inputDesc.value.trim();
-  const productImageUrl = uploadedManualPhotoBase64 || null;
+  const productImageUrl = null;
 
   if (!invoice || !sender || !description) {
     showToast('Lengkapi nomor invoice, pelapor, dan keluhan!', 'warning');
@@ -1090,8 +1084,6 @@ function setupEventListeners() {
   // Manual Complain Modal
   dom.btnManualInput.addEventListener('click', () => {
     dom.manualComplainForm.reset();
-    uploadedManualPhotoBase64 = null;
-    dom.manualPhotoPreview.style.display = 'none';
     dom.manualInputModal.classList.add('active');
     dom.inputInvoice.focus();
   });
@@ -1099,26 +1091,6 @@ function setupEventListeners() {
   dom.btnCloseManualModal.addEventListener('click', () => dom.manualInputModal.classList.remove('active'));
   dom.btnCancelManual.addEventListener('click', () => dom.manualInputModal.classList.remove('active'));
   dom.manualComplainForm.addEventListener('submit', handleManualSubmit);
-
-  // Manual Photo File Input
-  dom.inputPhoto.addEventListener('change', (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = (loadEvt) => {
-      uploadedManualPhotoBase64 = loadEvt.target.result;
-      dom.manualPreviewImg.src = uploadedManualPhotoBase64;
-      dom.manualPhotoPreview.style.display = 'flex';
-    };
-    reader.readAsDataURL(file);
-  });
-
-  dom.btnRemoveManualPhoto.addEventListener('click', () => {
-    dom.inputPhoto.value = '';
-    uploadedManualPhotoBase64 = null;
-    dom.manualPhotoPreview.style.display = 'none';
-  });
 
   // PIN Modal
   dom.btnClosePinModal.addEventListener('click', () => dom.pinModal.classList.remove('active'));
