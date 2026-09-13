@@ -9495,6 +9495,253 @@ select.dcc-field-input option {
   background: rgba(255, 255, 255, 0.08);
 }
 
+/* ── Modern PIC Claim Modal (Replaces Browser Prompt) ── */
+.cpl-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 18px;
+  opacity: 1;
+  visibility: visible;
+  transition: opacity 0.2s ease, visibility 0.2s ease;
+}
+
+.cpl-modal-overlay.hidden {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.cpl-modal-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(3, 7, 18, 0.75);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+.cpl-modal-card {
+  position: relative;
+  width: 100%;
+  max-width: 440px;
+  background: linear-gradient(180deg, rgba(15, 23, 42, 0.96) 0%, rgba(10, 15, 30, 0.98) 100%);
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  border-radius: 20px;
+  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.75), 0 0 35px rgba(245, 158, 11, 0.15);
+  padding: 22px 20px 20px;
+  z-index: 2;
+  animation: cplModalSlideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  overflow: hidden;
+}
+
+@keyframes cplModalSlideUp {
+  0% {
+    opacity: 0;
+    transform: translateY(24px) scale(0.96);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.cpl-modal-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, #f59e0b 0%, #38bdf8 50%, #10b981 100%);
+}
+
+.cpl-modal-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.cpl-modal-icon-badge {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: rgba(245, 158, 11, 0.15);
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  color: #f59e0b;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.cpl-modal-title-wrap {
+  flex: 1;
+}
+
+.cpl-modal-tag {
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.8px;
+  color: #fbbf24;
+  text-transform: uppercase;
+  display: block;
+  margin-bottom: 2px;
+}
+
+.cpl-modal-title {
+  font-size: 1.12rem;
+  font-weight: 700;
+  color: #f8fafc;
+  margin: 0;
+  line-height: 1.25;
+}
+
+.cpl-modal-close {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: 1px solid rgba(148, 163, 184, 0.15);
+  background: rgba(148, 163, 184, 0.08);
+  color: #94a3b8;
+  font-size: 0.95rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.cpl-modal-close:hover,
+.cpl-modal-close:active {
+  color: #f8fafc;
+  background: rgba(239, 68, 68, 0.2);
+  border-color: rgba(239, 68, 68, 0.4);
+}
+
+.cpl-modal-body {
+  margin-bottom: 20px;
+}
+
+.cpl-modal-desc {
+  font-size: 0.84rem;
+  color: #94a3b8;
+  line-height: 1.5;
+  margin: 0 0 16px 0;
+}
+
+.cpl-input-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.cpl-input-label {
+  font-size: 0.76rem;
+  font-weight: 600;
+  color: #cbd5e1;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.cpl-input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.cpl-input-icon {
+  position: absolute;
+  left: 14px;
+  font-size: 1.1rem;
+  pointer-events: none;
+  opacity: 0.85;
+}
+
+.cpl-modal-input {
+  width: 100%;
+  background: rgba(5, 7, 15, 0.85);
+  border: 1.5px solid rgba(148, 163, 184, 0.25);
+  border-radius: 12px;
+  padding: 12px 14px 12px 42px;
+  font-size: 0.95rem;
+  color: #ffffff;
+  font-weight: 600;
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  box-sizing: border-box;
+}
+
+.cpl-modal-input:focus {
+  border-color: #f59e0b;
+  box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.25);
+  background: rgba(5, 7, 15, 0.98);
+}
+
+.cpl-modal-input::placeholder {
+  color: #475569;
+  font-weight: 400;
+}
+
+.cpl-input-hint {
+  font-size: 0.72rem;
+  color: #64748b;
+  line-height: 1.35;
+  margin-top: 4px;
+}
+
+.cpl-modal-footer {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.cpl-modal-btn-cancel {
+  flex: 1;
+  padding: 12px 16px;
+  border-radius: 12px;
+  background: rgba(148, 163, 184, 0.08);
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  color: #94a3b8;
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  min-height: 46px;
+}
+
+.cpl-modal-btn-cancel:active {
+  background: rgba(148, 163, 184, 0.16);
+  transform: scale(0.97);
+}
+
+.cpl-modal-btn-confirm {
+  flex: 2;
+  padding: 12px 18px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+  border: none;
+  color: #05070e;
+  font-size: 0.88rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  cursor: pointer;
+  box-shadow: 0 6px 18px rgba(245, 158, 11, 0.35);
+  transition: all 0.15s ease;
+  min-height: 46px;
+}
+
+.cpl-modal-btn-confirm:active {
+  transform: scale(0.97);
+  box-shadow: 0 2px 8px rgba(245, 158, 11, 0.25);
+}
+
 /* ══════════════════════════════════════════════
    NEW KOLI INBOUND MTG WORKSPACE STYLES
    Minimalist Data Table & QR/Barcode Telemetry

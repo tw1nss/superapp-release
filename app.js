@@ -9613,15 +9613,54 @@
     });
   }
 
-  window.claimComplain = async function (id) {
+  let activeClaimComplainId = null;
+
+  window.claimComplain = function (id) {
     const item = complainList.find(c => c.id === id);
     if (!item || item.status !== 'baru') return;
 
-    let savedPic = localStorage.getItem('superapp_pic_name') || '';
-    const picInput = prompt('Masukkan Nama PIC yang menangani complain ini:', savedPic);
-    if (picInput === null) return; // User membatalkan klaim
-    const picName = picInput.trim() || 'Tim MTG';
+    activeClaimComplainId = id;
+    const modal = document.getElementById('cplPicClaimModal');
+    const input = document.getElementById('cplPicNameInput');
+    if (modal && input) {
+      const savedPic = localStorage.getItem('superapp_pic_name') || '';
+      input.value = savedPic;
+      modal.classList.remove('hidden');
+      setTimeout(() => {
+        input.focus();
+        input.select();
+      }, 100);
+    }
+  };
+
+  window.closePicClaimModal = function () {
+    const modal = document.getElementById('cplPicClaimModal');
+    if (modal) modal.classList.add('hidden');
+    activeClaimComplainId = null;
+  };
+
+  window.confirmClaimComplain = async function () {
+    const id = activeClaimComplainId;
+    if (!id) return;
+
+    const input = document.getElementById('cplPicNameInput');
+    const rawVal = input ? input.value.trim() : '';
+    if (!rawVal) {
+      if (input) {
+        input.focus();
+        input.style.borderColor = '#ef4444';
+        setTimeout(() => { input.style.borderColor = ''; }, 1200);
+      }
+      showGlobalToast('warning', 'Nama PIC Wajib Diisi', 'Silakan ketikkan nama PIC yang menangani komplain ini.');
+      return;
+    }
+
+    const picName = rawVal;
     localStorage.setItem('superapp_pic_name', picName);
+    closePicClaimModal();
+
+    const item = complainList.find(c => c.id === id);
+    if (!item) return;
 
     item.status = 'dikerjakan';
     item.claimedBy = picName;
@@ -9629,6 +9668,7 @@
 
     filterComplainList();
     showComplainDetail(id);
+    showGlobalToast('success', 'Tiket Diklaim', `Komplain sedang dikerjakan oleh ${picName}`);
 
     // Save to local cache
     try {
@@ -9669,10 +9709,26 @@
       fetch(claimUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userName: item.claimedBy })
+        body: JSON.stringify({ claimedBy: picName })
       }).catch(() => {});
     } catch (e) {}
   };
+
+  // Keyboard handler Enter/Escape di modal PIC
+  document.addEventListener('DOMContentLoaded', () => {
+    const input = document.getElementById('cplPicNameInput');
+    if (input) {
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          window.confirmClaimComplain();
+        } else if (e.key === 'Escape') {
+          e.preventDefault();
+          window.closePicClaimModal();
+        }
+      });
+    }
+  });
 
   let activeProductPhotoComplainId = null;
 

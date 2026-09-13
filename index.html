@@ -1981,10 +1981,50 @@
         <button type="button" class="btn-primary" style="width: 100%;" onclick="closeMsltcInfoModal()">Mengerti</button>
       </div>
     </div>
+  <!-- Modal Input Nama PIC (Klaim Complain Modern) -->
+  <div id="cplPicClaimModal" class="cpl-modal-overlay hidden">
+    <div class="cpl-modal-backdrop" onclick="closePicClaimModal()"></div>
+    <div class="cpl-modal-card">
+      <div class="cpl-modal-header">
+        <div class="cpl-modal-icon-badge">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+            <circle cx="12" cy="7" r="4"></circle>
+          </svg>
+        </div>
+        <div class="cpl-modal-title-wrap">
+          <span class="cpl-modal-tag">KLAIM PENANGANAN</span>
+          <h3 class="cpl-modal-title">Kerjakan Complain Ini</h3>
+        </div>
+        <button type="button" class="cpl-modal-close" onclick="closePicClaimModal()" title="Batal">✕</button>
+      </div>
+
+      <div class="cpl-modal-body">
+        <p class="cpl-modal-desc">
+          Masukkan nama PIC / staf yang bertanggung jawab menangani dan menyelesaikan kendala tiket ini:
+        </p>
+        <div class="cpl-input-group">
+          <label for="cplPicNameInput" class="cpl-input-label">Nama Lengkap PIC / Petugas *</label>
+          <div class="cpl-input-wrapper">
+            <span class="cpl-input-icon">👤</span>
+            <input type="text" id="cplPicNameInput" class="cpl-modal-input" placeholder="Contoh: Budi (Team Leader) / Star" autocomplete="name" maxlength="40">
+          </div>
+          <span class="cpl-input-hint">💡 Nama ini otomatis disimpan agar Anda tidak perlu mengetik ulang pada komplain berikutnya.</span>
+        </div>
+      </div>
+
+      <div class="cpl-modal-footer">
+        <button type="button" class="cpl-modal-btn-cancel" onclick="closePicClaimModal()">Batal</button>
+        <button type="button" class="cpl-modal-btn-confirm" id="btnConfirmClaimComplain" onclick="confirmClaimComplain()">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
+          <span>Konfirmasi & Kerjakan</span>
+        </button>
+      </div>
+    </div>
   </div>
 
   <!-- App Logic -->
-  <script src="app.js?v=76"></script>
+  <script src="app.js?v=77"></script>
 </body>
 
 </html>
