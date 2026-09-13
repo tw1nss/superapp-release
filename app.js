@@ -9101,12 +9101,8 @@
     // 2. Ambil langsung dari Cloud Firestore REST API (aktif di seluruh dunia tanpa perlu port 3100)
     try {
       const fsRes = await fetch(`${FIRESTORE_REST_URL}?pageSize=200`, {
-        cache: 'no-store',
-        headers: {
-          'Cache-Control': 'no-cache, no-store, must-revalidate',
-          'Pragma': 'no-cache'
-        },
-        signal: AbortSignal.timeout(5000)
+        cache: 'no-cache',
+        signal: AbortSignal.timeout(6000)
       });
       if (fsRes.ok) {
         const fsJson = await fsRes.json();
@@ -9202,12 +9198,8 @@
       if (!fetchedItems) {
         try {
           const fsRes = await fetch(`${FIRESTORE_REST_URL}?pageSize=200`, {
-            cache: 'no-store',
-            headers: {
-              'Cache-Control': 'no-cache, no-store, must-revalidate',
-              'Pragma': 'no-cache'
-            },
-            signal: AbortSignal.timeout(4500)
+            cache: 'no-cache',
+            signal: AbortSignal.timeout(6000)
           });
           if (fsRes.ok) {
             const fsJson = await fsRes.json();
