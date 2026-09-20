@@ -124,6 +124,13 @@ const dom = {
   toastContainer: document.getElementById('toastContainer')
 };
 
+function checkIsCancel(item) {
+  if (!item) return false;
+  return item.type === 'cancel' ||
+    /cancel|batal|dibatalkan/i.test(item.description || '') ||
+    /cancel|batal|dibatalkan/i.test(item.rawText || '');
+}
+
 // ─── Firestore Document Decoder ───
 function decodeFirestoreDoc(doc) {
   if (!doc || !doc.fields) return null;
@@ -156,8 +163,11 @@ function decodeFirestoreDoc(doc) {
   }
 
   const id = rawObj.id || (doc.name ? doc.name.split('/').pop() : `cpl-${Date.now().toString(36)}`);
+  const isCancel = rawObj.type === 'cancel' || checkIsCancel(rawObj);
+
   return {
     id: id,
+    type: isCancel ? 'cancel' : 'complain',
     hub: rawObj.hub || 'Hub MTG Menteng',
     invoice: rawObj.invoice || '',
     sender: rawObj.sender || 'Customer',
@@ -419,10 +429,17 @@ function renderViews() {
          </div>`
       : `<span class="thumb-empty">-</span>`;
 
+    const isCancel = checkIsCancel(item);
+
     return `
-      <tr data-id="${escapeHtml(item.id)}">
+      <tr data-id="${escapeHtml(item.id)}" class="${isCancel ? 'row-cancel' : ''}">
         <td class="cell-mono text-muted">${idx + 1}</td>
-        <td><span class="status-badge ${statusClass}">${statusLabel}</span></td>
+        <td>
+          <div style="display:flex; align-items:center; gap:4px;">
+            <span class="status-badge ${statusClass}">${statusLabel}</span>
+            ${isCancel ? `<span style="background:rgba(239,68,68,0.2); color:#ef4444; border:1px solid rgba(239,68,68,0.5); font-size:10px; font-weight:800; padding:2px 6px; border-radius:4px; white-space:nowrap;">🚫 CANCEL</span>` : ''}
+          </div>
+        </td>
         <td>
           <div class="invoice-badge">
             <span class="cell-mono">${escapeHtml(item.invoice || '-')}</span>
@@ -451,18 +468,22 @@ function renderViews() {
 
   // 2. Render Cards (Mobile)
   dom.cardsContainer.innerHTML = filteredData.map(item => {
+    const isCancel = checkIsCancel(item);
     const statusClass = `status-${(item.status || 'baru').toLowerCase()}`;
     const statusLabel = formatStatusLabel(item.status);
     const dateFormatted = formatDateTime(item.createdAt);
 
     return `
-      <div class="complaint-card" data-id="${escapeHtml(item.id)}">
+      <div class="complaint-card ${isCancel ? 'is-cancel' : ''}" data-id="${escapeHtml(item.id)}" style="${isCancel ? 'border-left: 4px solid #ef4444;' : ''}">
         <div class="card-top">
           <div>
-            <div class="card-invoice">${escapeHtml(item.invoice || '-')}</div>
+            <div class="card-invoice" style="${isCancel ? 'color:#fca5a5;' : ''}">${escapeHtml(item.invoice || '-')}</div>
             <div class="card-time">${dateFormatted}</div>
           </div>
-          <span class="status-badge ${statusClass}">${statusLabel}</span>
+          <div style="display:flex; align-items:center; gap:4px;">
+            ${isCancel ? `<span style="background:rgba(239,68,68,0.2); color:#ef4444; border:1px solid rgba(239,68,68,0.5); font-size:10px; font-weight:800; padding:2px 6px; border-radius:4px;">🚫 CANCEL</span>` : ''}
+            <span class="status-badge ${statusClass}">${statusLabel}</span>
+          </div>
         </div>
 
         <div class="card-customer">Pelapor: ${escapeHtml(item.sender || 'Customer')}</div>
@@ -507,8 +528,9 @@ window.viewComplainDetail = function(id) {
   if (!item) return;
 
   currentDetailComplain = item;
+  const isCancel = checkIsCancel(item);
 
-  dom.modalHubTag.textContent = (item.hub || 'HUB MTG MENTENG').toUpperCase();
+  dom.modalHubTag.textContent = (item.hub || 'HUB MTG MENTENG').toUpperCase() + (isCancel ? ' • 🚫 CANCEL ORDER' : '');
   dom.modalInvoice.textContent = item.invoice || 'INV/...';
   dom.modalSender.textContent = item.sender || '-';
   dom.modalDescription.textContent = item.description || '-';

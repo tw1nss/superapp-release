@@ -1,13 +1,13 @@
 {
-  "versionCode": 20,
-  "versionName": "1.2.4",
+  "versionCode": 21,
+  "versionName": "1.2.5",
   "apkUrl": "https://github.com/tw1nss/superapp-release/raw/main/app-debug.apk",
   "forceUpdate": false,
-  "title": "Pembaruan Superapp MTG v1.2.4",
+  "title": "Pembaruan Superapp MTG v1.2.5",
   "changelog": [
-    "Aktivasi menu Complain & Koli Inbound di Android & Web",
-    "Sinkronisasi real-time Cloud Firestore & WhatsApp Complain",
-    "Penambahan kolom Nama PIC dan perbaikan stabilitas APK"
+    "Perbaikan notifikasi complain & cancel order WhatsApp realtime",
+    "Restriksi task complain resmi dari grup CX <> QA Fresh Discussion (tolak japri foto)",
+    "Pembaruan autentikasi Google Firebase Cloud Messaging (FCM) & badge menu utama"
   ],
-  "releasedAt": "2026-09-13"
+  "releasedAt": "2026-09-20"
 }

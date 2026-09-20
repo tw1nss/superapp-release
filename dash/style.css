@@ -741,6 +741,14 @@ body.dash-body {
   color: #a7f3d0;
 }
 
+.row-cancel {
+  background: rgba(239, 68, 68, 0.05) !important;
+}
+
+.row-cancel:hover {
+  background: rgba(239, 68, 68, 0.1) !important;
+}
+
 /* Thumbnail cell */
 .thumb-cell {
   width: 44px;

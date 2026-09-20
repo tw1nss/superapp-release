@@ -9012,6 +9012,7 @@
     const id = f.id?.stringValue || d.name.split('/').pop();
     return {
       id: id,
+      type: f.type?.stringValue || 'complain',
       hub: f.hub?.stringValue || 'Hub MTG Menteng',
       invoice: f.invoice?.stringValue || '',
       sender: f.sender?.stringValue || '',
@@ -9176,8 +9177,8 @@
 
   let isFirstComplainPoll = true;
 
-  // Web Audio chime generator (crisp two-tone alert)
-  function playComplainAlertSound() {
+  // Web Audio chime generator (crisp two-tone alert for complain, urgent alert for cancel)
+  function playComplainAlertSound(isCancel = false) {
     try {
       const AudioCtx = window.AudioContext || window.webkitAudioContext;
       if (!AudioCtx) return;
@@ -9187,27 +9188,43 @@
       }
       const now = ctx.currentTime;
       
-      const osc1 = ctx.createOscillator();
-      const gain1 = ctx.createGain();
-      osc1.type = 'sine';
-      osc1.frequency.setValueAtTime(587.33, now); // D5
-      gain1.gain.setValueAtTime(0.35, now);
-      gain1.gain.exponentialRampToValueAtTime(0.01, now + 0.28);
-      osc1.connect(gain1);
-      gain1.connect(ctx.destination);
-      osc1.start(now);
-      osc1.stop(now + 0.28);
+      if (isCancel) {
+        // Urgent 3-tone buzzer alert for Cancel order
+        [784, 659.25, 523.25].forEach((freq, i) => {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'sawtooth';
+          osc.frequency.setValueAtTime(freq, now + i * 0.14);
+          gain.gain.setValueAtTime(0.35, now + i * 0.14);
+          gain.gain.exponentialRampToValueAtTime(0.01, now + (i + 1) * 0.14);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(now + i * 0.14);
+          osc.stop(now + (i + 1) * 0.14);
+        });
+      } else {
+        const osc1 = ctx.createOscillator();
+        const gain1 = ctx.createGain();
+        osc1.type = 'sine';
+        osc1.frequency.setValueAtTime(587.33, now); // D5
+        gain1.gain.setValueAtTime(0.35, now);
+        gain1.gain.exponentialRampToValueAtTime(0.01, now + 0.28);
+        osc1.connect(gain1);
+        gain1.connect(ctx.destination);
+        osc1.start(now);
+        osc1.stop(now + 0.28);
 
-      const osc2 = ctx.createOscillator();
-      const gain2 = ctx.createGain();
-      osc2.type = 'sine';
-      osc2.frequency.setValueAtTime(880, now + 0.16); // A5
-      gain2.gain.setValueAtTime(0.45, now + 0.16);
-      gain2.gain.exponentialRampToValueAtTime(0.01, now + 0.55);
-      osc2.connect(gain2);
-      gain2.connect(ctx.destination);
-      osc2.start(now + 0.16);
-      osc2.stop(now + 0.55);
+        const osc2 = ctx.createOscillator();
+        const gain2 = ctx.createGain();
+        osc2.type = 'sine';
+        osc2.frequency.setValueAtTime(880, now + 0.16); // A5
+        gain2.gain.setValueAtTime(0.45, now + 0.16);
+        gain2.gain.exponentialRampToValueAtTime(0.01, now + 0.55);
+        osc2.connect(gain2);
+        gain2.connect(ctx.destination);
+        osc2.start(now + 0.16);
+        osc2.stop(now + 0.55);
+      }
     } catch (e) {}
   }
 
@@ -9220,11 +9237,16 @@
     const hub = latest.hub || 'Hub MTG Menteng';
     const inv = latest.invoice || 'INV';
     const desc = latest.description || 'Keluhan baru masuk';
-    const title = `🚨 Complain Baru: ${hub}`;
+    const isCancel = latest.type === 'cancel' ||
+      /cancel|batal|dibatalkan/i.test(latest.title || '') ||
+      /cancel|batal|dibatalkan/i.test(latest.description || '') ||
+      /cancel|batal|dibatalkan/i.test(latest.rawText || '');
+
+    const title = isCancel ? `🚫 CANCEL ORDER: ${hub}` : `🚨 Complain Baru: ${hub}`;
     const body = `Inv: ${inv} | ${desc.substring(0, 75)}`;
 
     // 1. Play alert chime
-    playComplainAlertSound();
+    playComplainAlertSound(isCancel);
 
     // 2. Native Android Notification (via WebView bridge)
     if (window.AndroidUpdateBridge && typeof window.AndroidUpdateBridge.showNativeNotification === 'function') {
@@ -9259,8 +9281,8 @@
       } catch (e) {}
     }
 
-    // 4. In-App HUD Toast Banner
-    showGlobalToast('warning', title, body);
+    // 4. In-App HUD Toast Banner (danger red for cancel, warning amber for complain)
+    showGlobalToast(isCancel ? 'danger' : 'warning', title, body);
   }
 
   // Request browser notification permission if not yet decided
@@ -9313,18 +9335,33 @@
       }
 
       if (fetchedItems && Array.isArray(fetchedItems)) {
-        if (isFirstComplainPoll) {
-          // Pertama kali load, catat ID yang sudah ada agar tidak spam notifikasi untuk tiket lama
-          fetchedItems.forEach(c => lastKnownComplainIds.add(c.id));
-          isFirstComplainPoll = false;
-        } else {
-          // Cari tiket baru yang belum pernah dilihat sebelumnya
-          const trulyNewItems = fetchedItems.filter(c => !lastKnownComplainIds.has(c.id));
-          if (trulyNewItems.length > 0) {
-            handleNewComplainNotification(trulyNewItems);
-            trulyNewItems.forEach(c => lastKnownComplainIds.add(c.id));
+        let notifiedSet = new Set();
+        try {
+          const stored = localStorage.getItem('superapp_notified_complain_ids');
+          if (stored) {
+            notifiedSet = new Set(JSON.parse(stored));
           }
+        } catch (_) {}
+
+        // Deteksi tiket berstatus 'baru' yang belum pernah dinotifikasikan di perangkat ini (dalam 24 jam terakhir)
+        const unnotifiedNew = fetchedItems.filter(c => {
+          if (c.status !== 'baru') return false;
+          if (notifiedSet.has(c.id)) return false;
+          const ageHours = (Date.now() - new Date(c.createdAt || 0).getTime()) / (1000 * 60 * 60);
+          return ageHours < 24;
+        });
+
+        if (unnotifiedNew.length > 0) {
+          handleNewComplainNotification(unnotifiedNew);
+          unnotifiedNew.forEach(c => notifiedSet.add(c.id));
+          try {
+            const arr = Array.from(notifiedSet).slice(-200);
+            localStorage.setItem('superapp_notified_complain_ids', JSON.stringify(arr));
+          } catch (_) {}
         }
+
+        fetchedItems.forEach(c => lastKnownComplainIds.add(c.id));
+        isFirstComplainPoll = false;
 
         complainList = fetchedItems;
         try {
@@ -9361,6 +9398,16 @@
     if (badge) {
       badge.textContent = countBaru;
       badge.classList.toggle('empty', countBaru === 0);
+    }
+
+    const homeBadge = document.getElementById('homeComplainBadge');
+    if (homeBadge) {
+      if (countBaru > 0) {
+        homeBadge.textContent = countBaru > 99 ? '99+' : countBaru;
+        homeBadge.classList.remove('hidden');
+      } else {
+        homeBadge.classList.add('hidden');
+      }
     }
 
     // Tab counts
@@ -9438,11 +9485,19 @@
       return;
     }
 
-    container.innerHTML = list.map(item => `
-      <div class="cpl-card status-${item.status}" onclick="showComplainDetail('${item.id}')">
+    container.innerHTML = list.map(item => {
+      const isCancel = item.type === 'cancel' ||
+        /cancel|batal|dibatalkan/i.test(item.description || '') ||
+        /cancel|batal|dibatalkan/i.test(item.rawText || '');
+
+      return `
+      <div class="cpl-card status-${item.status} ${isCancel ? 'is-cancel' : ''}" onclick="showComplainDetail('${item.id}')">
         <div class="cpl-card-header">
           <div class="cpl-card-hub">${escapeHtml(item.hub)}</div>
-          <span class="cpl-status-badge ${item.status}">${getStatusLabel(item.status)}</span>
+          <div style="display:flex; align-items:center; gap:5px;">
+            ${isCancel ? `<span class="cpl-type-badge cancel">🚫 CANCEL</span>` : ''}
+            <span class="cpl-status-badge ${item.status}">${getStatusLabel(item.status)}</span>
+          </div>
         </div>
         <div class="cpl-card-invoice">
           ${escapeHtml(item.invoice)}
@@ -9461,7 +9516,8 @@
           </div>` : ''}
         </div>
       </div>
-    `).join('');
+      `;
+    }).join('');
   }
 
 
@@ -9476,6 +9532,10 @@
     complainEvidenceData = null;
     complainEvidenceFilename = null;
 
+    const isCancel = item.type === 'cancel' ||
+      /cancel|batal|dibatalkan/i.test(item.description || '') ||
+      /cancel|batal|dibatalkan/i.test(item.rawText || '');
+
     let statusHeroClass = item.status;
     let statusHeroText = getStatusLabel(item.status).toUpperCase();
     let statusHeroSub = '';
@@ -9487,7 +9547,7 @@
     let timelineHtml = `
       <div class="cpl-timeline-item">
         <div class="cpl-timeline-dot baru active"></div>
-        <div class="cpl-timeline-label">Complain Masuk</div>
+        <div class="cpl-timeline-label">${isCancel ? 'Cancel Masuk' : 'Complain Masuk'}</div>
         <div class="cpl-timeline-time">${formatComplainDate(item.createdAt)}</div>
         <div class="cpl-timeline-user">Via WhatsApp Group</div>
       </div>
@@ -9534,7 +9594,7 @@
     if (item.status === 'selesai' && item.evidenceUrl) {
       evidenceHtml = `
         <div class="cpl-evidence-card">
-          <div class="cpl-evidence-title">Bukti Reply Complain</div>
+          <div class="cpl-evidence-title">${isCancel ? 'Bukti Konfirmasi / Tarik Barang' : 'Bukti Reply Complain'}</div>
           <img src="${item.evidenceUrl}" class="cpl-evidence-preview-existing" alt="Bukti reply complain" onerror="this.style.display='none'">
         </div>
         <div class="cpl-completed-banner">
@@ -9571,7 +9631,7 @@
         <div class="cpl-actions">
           <button type="button" class="cpl-btn-primary" onclick="claimComplain('${item.id}')">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
-            Kerjakan Complain Ini
+            ${isCancel ? 'Kerjakan Pembatalan Ini' : 'Kerjakan Complain Ini'}
           </button>
         </div>
       `;
@@ -9594,14 +9654,27 @@
             <polyline points="15 18 9 12 15 6"></polyline>
           </svg>
         </button>
-        <div class="cpl-detail-title-text">Detail Complain</div>
-        <span class="cpl-status-badge ${item.status}">${getStatusLabel(item.status)}</span>
+        <div class="cpl-detail-title-text">${isCancel ? 'Detail Pembatalan (Cancel)' : 'Detail Complain'}</div>
+        <div style="display:flex; align-items:center; gap:5px;">
+          ${isCancel ? `<span class="cpl-type-badge cancel" style="background:rgba(239,68,68,0.22); color:#ef4444; border:1px solid rgba(239,68,68,0.5); font-size:10px; font-weight:800; padding:2px 6px; border-radius:4px;">🚫 CANCEL</span>` : ''}
+          <span class="cpl-status-badge ${item.status}">${getStatusLabel(item.status)}</span>
+        </div>
       </div>
 
       <div class="cpl-detail-body">
+        ${isCancel ? `
+        <!-- Cancel Warning Alert Banner -->
+        <div class="cpl-cancel-alert-box" style="background:rgba(239,68,68,0.14); border:1px solid rgba(239,68,68,0.45); border-radius:10px; padding:12px 14px; margin-bottom:14px; display:flex; align-items:center; gap:12px;">
+          <span style="font-size:24px; line-height:1;">🚫</span>
+          <div>
+            <div style="font-size:13px; font-weight:800; color:#ef4444; letter-spacing:0.4px;">PESANAN DIBATALKAN (CANCEL ORDER)</div>
+            <div style="font-size:11.5px; color:#cbd5e1; margin-top:2px;">Harap segera hentikan proses packing invoice ini atau koordinasikan agar barang tidak terkirim.</div>
+          </div>
+        </div>` : ''}
+
         <!-- Status Hero -->
         <div class="cpl-status-hero ${statusHeroClass}">
-          <div class="cpl-status-hero-label">Status Complain</div>
+          <div class="cpl-status-hero-label">${isCancel ? 'Status Pembatalan Order' : 'Status Complain'}</div>
           <div class="cpl-status-hero-text">${statusHeroText}</div>
           <div class="cpl-status-hero-sub">${statusHeroSub}</div>
         </div>
