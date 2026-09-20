@@ -6737,8 +6737,8 @@
   //  IN-APP UPDATE & VERSION CHECKING ENGINE
   // ══════════════════════════════════════════════
 
-  const APP_VERSION_CODE = 20; // Local current version code (v1.2.4 Master OTA)
-  const APP_VERSION_NAME = '1.2.4';
+  const APP_VERSION_CODE = 21; // Local current version code (v1.2.5 Master OTA)
+  const APP_VERSION_NAME = '1.2.5';
   const UPDATE_MANIFEST_URL = 'https://raw.githubusercontent.com/tw1nss/superapp-release/main/version.json';
 
   let currentUpdateData = null;
