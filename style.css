@@ -1601,14 +1601,15 @@ body::after {
 }
 
 .qr-wrapper canvas {
-  display: none !important;
-}
-
-.qr-wrapper canvas:only-child {
   display: block !important;
   width: 200px !important;
   height: 200px !important;
   margin: 0 auto;
+  border-radius: 4px;
+}
+
+.qr-wrapper canvas + img {
+  display: none !important;
 }
 
 .qr-wrapper img {
@@ -1618,6 +1619,36 @@ body::after {
   aspect-ratio: 1 / 1 !important;
   object-fit: contain !important;
   margin: 0 auto;
+  border-radius: 4px;
+}
+
+.product-barcode-1d-wrap {
+  margin: 12px auto 6px;
+  background: #ffffff;
+  padding: 8px 14px;
+  border-radius: var(--border-radius-md, 8px);
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.25);
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.product-barcode-1d-wrap svg {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
+
+.product-barcode-1d-label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--text-muted, #94a3b8);
+  margin-top: 4px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
 }
 
 .qr-wrapper.zoomable-qr {
@@ -5673,15 +5704,16 @@ select.dcc-field-input option {
 }
 
 .qr-zoom-wrapper canvas {
-  display: none !important;
-}
-
-.qr-zoom-wrapper canvas:only-child {
   display: block !important;
   width: 260px !important;
   height: 260px !important;
   aspect-ratio: 1 / 1 !important;
   margin: 0 auto;
+  border-radius: 6px;
+}
+
+.qr-zoom-wrapper canvas + img {
+  display: none !important;
 }
 
 .qr-zoom-wrapper img {
@@ -5692,6 +5724,7 @@ select.dcc-field-input option {
   aspect-ratio: 1 / 1 !important;
   object-fit: contain !important;
   margin: 0 auto !important;
+  border-radius: 6px;
 }
 
 .qr-zoom-sub {
@@ -10333,16 +10366,16 @@ select.dcc-field-input option {
 
 /* Fix: qrcodejs renders canvas and img. Support both cleanly so barcode kotak is never blank */
 .koli-qr-white-frame canvas {
-  display: none !important;
-}
-
-.koli-qr-white-frame canvas:only-child {
   display: block !important;
   width: 160px !important;
   height: 160px !important;
   image-rendering: -webkit-optimize-contrast;
   image-rendering: pixelated;
   margin: 0 auto;
+}
+
+.koli-qr-white-frame canvas + img {
+  display: none !important;
 }
 
 .koli-qr-white-frame img {

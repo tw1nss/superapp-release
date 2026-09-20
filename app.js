@@ -478,9 +478,17 @@
     const queryWords = lowerQuery.split(' ').filter(w => w.length > 0);
 
     // 1. Direct SKU check in Master Data map
-    if (dataMap.has(cleaned)) return dataMap.get(cleaned);
+    if (dataMap.has(cleaned)) {
+      const items = [...dataMap.get(cleaned)];
+      items.sort((a, b) => compareSlocNatural(a.sloc || a.masterSloc, b.sloc || b.masterSloc));
+      return items;
+    }
     for (const [key, value] of dataMap) {
-      if (key.toLowerCase().trim() === cleaned.toLowerCase()) return value;
+      if (key.toLowerCase().trim() === cleaned.toLowerCase()) {
+        const items = [...value];
+        items.sort((a, b) => compareSlocNatural(a.sloc || a.masterSloc, b.sloc || b.masterSloc));
+        return items;
+      }
     }
 
     // 2. Direct SKU check in MSLTC map
@@ -499,7 +507,7 @@
     if (msltcFound && msltcFound.length > 0) {
       const withRack = msltcFound.filter(m => m.rackName && m.rackName.trim() !== '');
       const itemsToUse = withRack.length > 0 ? withRack : msltcFound;
-      return itemsToUse.map(m => ({
+      const mapped = itemsToUse.map(m => ({
         sku: m.sku || m.productId || cleaned,
         sloc: m.rackName || 'Belum Ada SLOC di Sistem',
         productName: m.productName || 'Produk MSLTC',
@@ -507,6 +515,8 @@
         type: m.type || 'Fresh',
         left: m.productId || ''
       }));
+      mapped.sort((a, b) => compareSlocNatural(a.sloc, b.sloc));
+      return mapped;
     }
 
     // 3. Search by Product Name in Master Data map
@@ -597,27 +607,27 @@
     // 1. Direct SKU check in dataMap
     for (const [skuKey, items] of dataMap) {
       if (skuKey.toLowerCase().trim() === cleaned.toLowerCase() && items.length > 0) {
-        const firstItem = items[0] || {};
-        const actualSku = firstItem.sku || skuKey;
+        const bestItem = items.find(it => !isBadSloc(it.sloc || it.masterSloc)) || items[0] || {};
+        const actualSku = bestItem.sku || skuKey;
         suggestionMap.set(actualSku, {
           sku: actualSku,
-          productName: firstItem.productName || skuKey,
-          sloc: firstItem.sloc || firstItem.masterSloc || '',
-          type: firstItem.type || '',
+          productName: bestItem.productName || skuKey,
+          sloc: bestItem.sloc || bestItem.masterSloc || '',
+          type: bestItem.type || '',
           expDate: expDate,
           score: 100
         });
       }
     }
     for (const [skuKey, items] of msltcMap) {
-      const firstItem = items[0] || {};
-      const actualSku = firstItem.sku || skuKey;
+      const bestItem = items.find(it => !isBadSloc(it.rackName || it.locationName)) || items[0] || {};
+      const actualSku = bestItem.sku || skuKey;
       if (skuKey.toLowerCase().trim() === cleaned.toLowerCase() && items.length > 0 && !suggestionMap.has(actualSku)) {
         suggestionMap.set(actualSku, {
           sku: actualSku,
-          productName: firstItem.productName || skuKey,
-          sloc: firstItem.rackName || firstItem.locationName || '',
-          type: firstItem.type || '',
+          productName: bestItem.productName || skuKey,
+          sloc: bestItem.rackName || bestItem.locationName || '',
+          type: bestItem.type || '',
           expDate: expDate,
           score: 95
         });
@@ -626,17 +636,17 @@
 
     // 2. Search by Product Name in dataMap
     for (const [skuKey, items] of dataMap) {
-      const firstItem = items[0] || {};
-      const actualSku = firstItem.sku || skuKey;
+      const bestItem = items.find(it => !isBadSloc(it.sloc || it.masterSloc)) || items[0] || {};
+      const actualSku = bestItem.sku || skuKey;
       if (suggestionMap.has(actualSku)) continue;
       
-      const score = matchProductName(firstItem.productName, lowerQuery, queryWords);
+      const score = matchProductName(bestItem.productName, lowerQuery, queryWords);
       if (score > 0) {
         suggestionMap.set(actualSku, {
           sku: actualSku,
-          productName: firstItem.productName || skuKey,
-          sloc: firstItem.sloc || firstItem.masterSloc || '',
-          type: firstItem.type || '',
+          productName: bestItem.productName || skuKey,
+          sloc: bestItem.sloc || bestItem.masterSloc || '',
+          type: bestItem.type || '',
           expDate: expDate,
           score: score
         });
@@ -645,17 +655,17 @@
 
     // 3. Search in MSLTC map
     for (const [skuKey, items] of msltcMap) {
-      const firstItem = items[0] || {};
-      const actualSku = firstItem.sku || skuKey;
+      const bestItem = items.find(it => !isBadSloc(it.rackName || it.locationName)) || items[0] || {};
+      const actualSku = bestItem.sku || skuKey;
       if (suggestionMap.has(actualSku)) continue;
 
-      const score = matchProductName(firstItem.productName, lowerQuery, queryWords);
+      const score = matchProductName(bestItem.productName, lowerQuery, queryWords);
       if (score > 0) {
         suggestionMap.set(actualSku, {
           sku: actualSku,
-          productName: firstItem.productName || skuKey,
-          sloc: firstItem.rackName || firstItem.locationName || '',
-          type: firstItem.type || '',
+          productName: bestItem.productName || skuKey,
+          sloc: bestItem.rackName || bestItem.locationName || '',
+          type: bestItem.type || '',
           expDate: expDate,
           score: score
         });
@@ -758,7 +768,7 @@
 
     let results = null;
     if (dataMap.has(sku)) {
-      results = dataMap.get(sku);
+      results = [...dataMap.get(sku)];
     } else if (msltcMap.has(sku)) {
       const msltcFound = msltcMap.get(sku);
       results = msltcFound.map(m => ({
@@ -773,6 +783,9 @@
       results = searchSKU(sku);
     }
 
+    if (results && Array.isArray(results)) {
+      results.sort((a, b) => compareSlocNatural(a.sloc || a.masterSloc, b.sloc || b.masterSloc));
+    }
     lastSearchResults = results;
 
     if (results && results.length > 0) {
@@ -813,6 +826,9 @@
     lastSearchQuery = searchQuery;
     lastSearchExpiredDate = scannedDateStr;
     const results = searchSKU(searchQuery);
+    if (results && Array.isArray(results)) {
+      results.sort((a, b) => compareSlocNatural(a.sloc || a.masterSloc, b.sloc || b.masterSloc));
+    }
     lastSearchResults = results;
 
     if (results && results.length > 0) {
@@ -941,10 +957,15 @@
               </button>
             </div>
 
-            <div class="qr-wrapper is-qr zoomable-qr" id="${qrId}" title="Klik / Ketuk untuk memperbesar QR Code" onclick="openQrZoomModal('${qrId}', '${escapeAttr(isSlocMode ? (item.sloc || itemSku) : barcodeValue)}', '${escapeAttr(isSlocMode ? ('SLOC: ' + (item.sloc || itemSku)) : ('Produk SKU: ' + itemSku))}', '${escapeAttr(item.productName || '')}')"></div>
-            <div class="qr-zoom-hint-wrap" onclick="openQrZoomModal('${qrId}', '${escapeAttr(isSlocMode ? (item.sloc || itemSku) : barcodeValue)}', '${escapeAttr(isSlocMode ? ('SLOC: ' + (item.sloc || itemSku)) : ('Produk SKU: ' + itemSku))}', '${escapeAttr(item.productName || '')}')">
+            <div class="qr-wrapper is-qr zoomable-qr" id="${qrId}" title="Klik / Ketuk untuk memperbesar QR Code" onclick="openQrZoomModal('${qrId}', '${escapeAttr(isSlocMode ? ((item.sloc && !isPlaceholderSloc(item.sloc)) ? item.sloc : itemSku) : barcodeValue)}', '${escapeAttr(isSlocMode ? ('SLOC: ' + ((item.sloc && !isPlaceholderSloc(item.sloc)) ? item.sloc : itemSku)) : ('Produk SKU: ' + itemSku))}', '${escapeAttr(item.productName || '')}')"></div>
+            <div class="qr-zoom-hint-wrap" onclick="openQrZoomModal('${qrId}', '${escapeAttr(isSlocMode ? ((item.sloc && !isPlaceholderSloc(item.sloc)) ? item.sloc : itemSku) : barcodeValue)}', '${escapeAttr(isSlocMode ? ('SLOC: ' + ((item.sloc && !isPlaceholderSloc(item.sloc)) ? item.sloc : itemSku)) : ('Produk SKU: ' + itemSku))}', '${escapeAttr(item.productName || '')}')">
               <span class="qr-zoom-hint">🔍 Ketuk untuk perbesar</span>
             </div>
+            ${!isSlocMode ? `
+            <div class="product-barcode-1d-wrap">
+              <svg id="bc1d_${idx}"></svg>
+              <span class="product-barcode-1d-label">Barcode 1D Linear (Code 128)</span>
+            </div>` : ''}
 
             <div class="result-info">
               <div class="result-info-row">
@@ -1000,17 +1021,31 @@
       const container = document.getElementById(qrId);
       if (!container) return;
 
-      container.innerHTML = '';
+      const hasValidSloc = item.sloc && !isPlaceholderSloc(item.sloc);
+      const qrValue = currentMode === 'sloc' ? (hasValidSloc ? item.sloc : itemSku) : barcodeValue;
+      renderBarcodeToContainer(container, qrValue, 200);
 
-      const qrValue = currentMode === 'sloc' ? (item.sloc || itemSku) : barcodeValue;
-      new QRCode(container, {
-        text: qrValue,
-        width: 200,
-        height: 200,
-        colorDark: '#000000',
-        colorLight: '#ffffff',
-        correctLevel: QRCode.CorrectLevel.H,
-      });
+      // Render 1D barcode in product mode
+      if (currentMode !== 'sloc') {
+        const bcSvg = document.getElementById(`bc1d_${idx}`);
+        if (bcSvg && typeof JsBarcode !== 'undefined') {
+          try {
+            JsBarcode(bcSvg, itemSku, {
+              format: 'CODE128',
+              width: 1.6,
+              height: 44,
+              displayValue: true,
+              fontSize: 12,
+              fontOptions: 'bold',
+              margin: 4,
+              background: '#ffffff',
+              lineColor: '#000000'
+            });
+          } catch (e) {
+            console.warn('1D barcode render warning:', e);
+          }
+        }
+      }
     });
   }
 
@@ -1043,12 +1078,16 @@
       let rack = '-';
       if (dataMap && dataMap.has(itemSku)) {
         const masterList = dataMap.get(itemSku);
-        if (masterList && masterList.length > 0 && masterList[0].sloc) {
-          rack = masterList[0].sloc;
+        if (masterList && masterList.length > 0) {
+          const best = masterList.find(m => m.sloc && !isBadSloc(m.sloc)) || masterList[0];
+          if (best && best.sloc) rack = best.sloc;
         }
       }
-      if (rack === '-' || !rack) {
-        rack = item.sloc || item.rackName || '-';
+      if (rack === '-' || !rack || isBadSloc(rack)) {
+        const candidate = item.sloc || item.rackName;
+        if (candidate && (!isBadSloc(candidate) || rack === '-')) {
+          rack = candidate;
+        }
       }
       const typeBadge = item.type ? `<span class="type-badge ${getTypeBadgeClass(item.type)}">${escapeHtml(item.type)}</span>` : '';
 
@@ -1723,8 +1762,15 @@
 
     getLogoDataUrl().then(function (logoSrc) {
       setTimeout(() => {
-        const qrImg = qrWrapper.querySelector('img') || qrWrapper.querySelector('canvas');
-        const qrSrc = qrImg ? (qrImg.src || (qrImg.toDataURL ? qrImg.toDataURL() : '')) : '';
+        const canvas = qrWrapper.querySelector('canvas');
+        const img = qrWrapper.querySelector('img');
+        let qrSrc = '';
+        if (canvas && canvas.toDataURL) {
+          try { qrSrc = canvas.toDataURL('image/png'); } catch (e) {}
+        }
+        if (!qrSrc && img && img.src && !img.src.startsWith('data:image/gif')) {
+          qrSrc = img.src;
+        }
         const bcSrc = barcodeCanvas.toDataURL ? barcodeCanvas.toDataURL() : '';
         document.body.removeChild(qrWrapper);
 
@@ -1827,27 +1873,7 @@
       }
     }
 
-    container.innerHTML = '';
-    new QRCode(container, {
-      text: qrText,
-      width: 260,
-      height: 260,
-      colorDark: '#000000',
-      colorLight: '#ffffff',
-      correctLevel: QRCode.CorrectLevel.H,
-    });
-
-    // Prevent duplicate canvas + img stacking by removing redundant canvas
-    requestAnimationFrame(() => {
-      const canvas = container.querySelector('canvas');
-      const img = container.querySelector('img');
-      if (img && canvas) {
-        canvas.remove();
-        img.style.display = 'block';
-        img.style.width = '260px';
-        img.style.height = '260px';
-      }
-    });
+    renderBarcodeToContainer(container, qrText, 260);
 
     modal.classList.remove('hidden');
   };
@@ -1934,13 +1960,152 @@
     return str.replace(/'/g, "\\'").replace(/"/g, '&quot;');
   }
 
+  function isBadSloc(sloc) {
+    if (!sloc) return true;
+    const s = String(sloc).trim().toLowerCase();
+    if (!s || s === '-' || s === 'none' || s === 'null' || s === 'undefined') return true;
+    if (s.includes('belum ada') || s.includes('tidak ada')) return true;
+
+    // Bad racks: badfresh, bad inbound, badinbound, bad-fresh, bad_fresh, bad stock, etc.
+    if (/^bad[\s\-_]*/i.test(s) || /\bbad\b/i.test(s) || s.includes('badfresh') || s.includes('badinbound') || s.includes('badstock')) {
+      return true;
+    }
+
+    // Reject, rusak, damage, quarantine, retur, hold, afkir
+    if (/^(reject|rusak|damage|damaged|quarantine|karantina|retur|return|hold|afkir)/i.test(s) ||
+        /\b(reject|rusak|damage|damaged|quarantine|karantina|retur|afkir)\b/i.test(s)) {
+      return true;
+    }
+
+    return false;
+  }
+
+  function getSlocScore(sloc) {
+    if (!sloc) return 999;
+    const s = String(sloc).trim().toLowerCase();
+    if (!s || s === '-' || s === 'none' || s.includes('belum ada') || s.includes('tidak ada')) {
+      return 999;
+    }
+
+    // 1. Defect "bad..." racks go to bottom
+    if (/^bad[\s\-_]*/i.test(s) || /\bbad\b/i.test(s) || s.includes('badfresh') || s.includes('badinbound') || s.includes('badstock')) {
+      return 900;
+    }
+
+    // 2. Reject, rusak, damage, quarantine, retur
+    if (/^(reject|rusak|damage|damaged|quarantine|karantina|retur|return|hold|afkir)/i.test(s) ||
+        /\b(reject|rusak|damage|damaged|quarantine|karantina|retur|afkir)\b/i.test(s)) {
+      return 800;
+    }
+
+    // 3. Staging, transit, temporary, inbound/outbound
+    if (/^(staging|transit|temp|temporary|inbound|outbound)/i.test(s)) {
+      return 100;
+    }
+
+    // 4. Physical standard racks (e.g. CH-01-A-01, FR-02-B-01, DR-01-A-01, AM-01, RK-01, ST-01, etc.)
+    if (/^[a-z]{1,5}-\d+/i.test(s) || /^[a-z]\d+-\d+/i.test(s)) {
+      return 10;
+    }
+
+    // 5. Any other legitimate rack name
+    return 20;
+  }
+
+  function isPlaceholderSloc(str) {
+    if (!str) return true;
+    const s = String(str).trim().toLowerCase();
+    return !s || s === '-' || s.includes('belum ada') || s.includes('tidak ada');
+  }
+
   function compareSlocNatural(a, b) {
     const sA = String(a || '').trim();
     const sB = String(b || '').trim();
     if (!sA && !sB) return 0;
     if (!sA) return 1;
     if (!sB) return -1;
+
+    const scoreA = getSlocScore(sA);
+    const scoreB = getSlocScore(sB);
+
+    if (scoreA !== scoreB) {
+      return scoreA - scoreB;
+    }
+
     return sA.localeCompare(sB, 'id', { numeric: true, sensitivity: 'base' });
+  }
+
+  function renderBarcodeToContainer(container, value, size = 200) {
+    if (!container) return;
+    container.innerHTML = '';
+
+    const cleanVal = String(value || '').trim();
+    if (!cleanVal) {
+      container.innerHTML = `
+        <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;width:${size}px;height:${size}px;color:#64748b;font-size:0.8rem;text-align:center;padding:10px;">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-bottom:6px;opacity:0.6;"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          <span>Barcode tidak tersedia</span>
+        </div>`;
+      return;
+    }
+
+    let rendered = false;
+
+    // 1. Try QRCode.js
+    if (typeof QRCode !== 'undefined') {
+      try {
+        new QRCode(container, {
+          text: cleanVal,
+          width: size,
+          height: size,
+          colorDark: '#000000',
+          colorLight: '#ffffff',
+          correctLevel: QRCode.CorrectLevel.H,
+        });
+
+        const canvas = container.querySelector('canvas');
+        const img = container.querySelector('img');
+
+        if (canvas) {
+          canvas.style.display = 'block';
+          canvas.style.width = `${size}px`;
+          canvas.style.height = `${size}px`;
+          canvas.style.margin = '0 auto';
+          canvas.style.borderRadius = '4px';
+
+          // Try converting canvas to data URL for img
+          try {
+            const dataUrl = canvas.toDataURL('image/png');
+            if (img && dataUrl && dataUrl.length > 50) {
+              img.src = dataUrl;
+            }
+          } catch (e) {}
+
+          if (img) {
+            img.style.display = 'none';
+          }
+          rendered = true;
+        } else if (img && img.src && !img.src.startsWith('data:image/gif')) {
+          img.style.display = 'block';
+          img.style.width = `${size}px`;
+          img.style.height = `${size}px`;
+          img.style.margin = '0 auto';
+          rendered = true;
+        }
+      } catch (err) {
+        console.warn('QRCode JS generation warning, falling back to image:', err);
+      }
+    }
+
+    // 2. Fallback: If not rendered or canvas missing, use reliable QR Image API
+    if (!rendered) {
+      container.innerHTML = `
+        <img src="https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&data=${encodeURIComponent(cleanVal)}" 
+             alt="QR Code" 
+             style="display:block;width:${size}px;height:${size}px;margin:0 auto;border-radius:4px;object-fit:contain;"
+             onerror="this.onerror=null;this.parentElement.innerHTML='<span style=\\'color:#ef4444;font-size:0.8rem;padding:10px;display:block;text-align:center;\\'>Gagal memuat barcode</span>';" />
+      `;
+    }
   }
 
   function parseFlexibleDate(rawStr) {
@@ -2991,17 +3156,23 @@
 
     // 1. Search in Master Rack dataMap
     if (dataMap) {
+      const candidates = [];
       if (dataMap.has(cleanSku)) {
-        const items = dataMap.get(cleanSku);
-        for (const it of items) {
-          const s = (it.sloc || it.masterSloc || '').trim();
-          if (s && s !== 'Belum Ada SLOC di Sistem' && s !== 'Belum ada SLOC') return s;
-        }
+        candidates.push(...dataMap.get(cleanSku));
       }
       const noZero = cleanSku.replace(/^0+/, '');
       if (noZero && noZero !== cleanSku && dataMap.has(noZero)) {
-        const items = dataMap.get(noZero);
-        for (const it of items) {
+        candidates.push(...dataMap.get(noZero));
+      }
+
+      if (candidates.length > 0) {
+        const good = candidates.find(it => {
+          const s = (it.sloc || it.masterSloc || '').trim();
+          return s && !isBadSloc(s);
+        });
+        if (good) return (good.sloc || good.masterSloc || '').trim();
+
+        for (const it of candidates) {
           const s = (it.sloc || it.masterSloc || '').trim();
           if (s && s !== 'Belum Ada SLOC di Sistem' && s !== 'Belum ada SLOC') return s;
         }
@@ -3010,17 +3181,23 @@
 
     // 2. Search in MSLTC msltcMap
     if (msltcMap) {
+      const candidates = [];
       if (msltcMap.has(cleanSku)) {
-        const items = msltcMap.get(cleanSku);
-        for (const it of items) {
-          const r = (it.rackName || it.locationName || '').trim();
-          if (r && r !== 'Belum Ada SLOC di Sistem' && r !== 'Belum ada SLOC') return r;
-        }
+        candidates.push(...msltcMap.get(cleanSku));
       }
       const noZero = cleanSku.replace(/^0+/, '');
       if (noZero && noZero !== cleanSku && msltcMap.has(noZero)) {
-        const items = msltcMap.get(noZero);
-        for (const it of items) {
+        candidates.push(...msltcMap.get(noZero));
+      }
+
+      if (candidates.length > 0) {
+        const good = candidates.find(it => {
+          const r = (it.rackName || it.locationName || '').trim();
+          return r && !isBadSloc(r);
+        });
+        if (good) return (good.rackName || good.locationName || '').trim();
+
+        for (const it of candidates) {
           const r = (it.rackName || it.locationName || '').trim();
           if (r && r !== 'Belum Ada SLOC di Sistem' && r !== 'Belum ada SLOC') return r;
         }
@@ -3033,9 +3210,11 @@
   function enrichDccItemWithSupersheet(item) {
     if (!item) return item;
     const cur = (item.slocExisting || '').trim();
-    if (!cur || cur === 'Belum ada SLOC' || cur === 'Belum Ada SLOC di Sistem') {
+    if (!cur || cur === 'Belum ada SLOC' || cur === 'Belum Ada SLOC di Sistem' || isBadSloc(cur)) {
       const superSloc = getSuperSheetSloc(item.sku);
-      if (superSloc) {
+      if (superSloc && !isBadSloc(superSloc)) {
+        item.slocExisting = superSloc;
+      } else if (!cur && superSloc) {
         item.slocExisting = superSloc;
       }
     }
