@@ -6858,8 +6858,12 @@
     }
     const badge = document.getElementById('alreadyLatestBadge');
     const sub = document.getElementById('alreadyLatestSubtitle');
+    const changelog = document.getElementById('alreadyLatestChangelog');
     if (badge) badge.textContent = `Versi Aktif: v${local.versionName} (Build ${local.versionCode})`;
-    if (sub) sub.textContent = manifest.title || 'Super App MTG sudah versi paling mutakhir';
+    if (sub) sub.textContent = manifest.title || 'Super App MTG v1.2.5 sudah aktif';
+    if (changelog && Array.isArray(manifest.changelog) && manifest.changelog.length > 0) {
+      changelog.innerHTML = manifest.changelog.map(c => `<li>${escapeHtml(c)}</li>`).join('');
+    }
     modal.classList.remove('hidden');
   }
 
