@@ -475,6 +475,12 @@ function syncDataUpdateToMainList(isSilent) {
     ]);
   });
 
+  // Unhide seluruh baris agar data baru tidak tersembunyi filter lama
+  const maxRows = mainSheet.getMaxRows();
+  if (maxRows > 1) {
+    mainSheet.showRows(1, maxRows);
+  }
+
   // Bersihkan data lama baris 2 ke bawah
   const currentLastRow = mainSheet.getLastRow();
   if (currentLastRow > 1) {

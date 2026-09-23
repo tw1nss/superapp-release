@@ -7289,6 +7289,7 @@
   let edsMainListData = [];
   let edsSubmittedSkuSet = new Set();
   let edsAuditResultsMap = new Map(); // sku -> { done, remaks, fisikGood, fisikBad, actualSloc, expiredDate, pic, timestamp }
+  let edsUpdateDataMap = new Map(); // Global lookup from Data Update (AstroDash Superset pull)
   let edsHasilRows = [];
   let edsPhotoList = [];
   let selectedEdsSku = null;
@@ -7612,7 +7613,21 @@
 
     const skuInput = document.getElementById('edsSkuInput');
     const sku = (skuInput?.value || selectedEdsSku || '').trim().toLowerCase();
-    const item = edsMainListData.find(i => i.sku.toLowerCase() === sku) || {};
+
+    // Cari item di edsMainListData, edsUpdateDataMap, atau master MSLTC
+    let item = edsMainListData.find(i => i.sku.toLowerCase() === sku);
+    if (!item && edsUpdateDataMap && edsUpdateDataMap.has(sku)) {
+      const u = edsUpdateDataMap.get(sku);
+      item = {
+        sku: u.sku,
+        productName: u.productName,
+        msltc: u.msltcDays,
+        msltcDays: u.msltcDays,
+        msltcDate: excelDateToDateStr(u.msltcDateRaw),
+        remainingDays: u.remainingDays
+      };
+    }
+    const masterInfo = typeof getMsltcInfo === 'function' ? getMsltcInfo(sku) : null;
 
     const now = new Date();
     const todayMid = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -7620,15 +7635,18 @@
     // Hitung Sisa Hari menuju Expired
     const daysToExpire = Math.round((expObj.getTime() - todayMid.getTime()) / 86400000);
 
-    // Standar MSLTC produk (ambil dari data sheet, atau default 7 hari)
-    let msltcDays = 7;
-    if (item.msltc !== undefined && item.msltc !== null && item.msltc !== '' && !isNaN(Number(item.msltc))) {
+    // Standar MSLTC produk:
+    // Prioritas: item.msltc -> item.msltcDays -> masterInfo.msltcDays -> default 1 hari (H-1 sebelum ED)
+    let msltcDays = 1;
+    if (item && item.msltc !== undefined && item.msltc !== null && item.msltc !== '' && !isNaN(Number(item.msltc))) {
       msltcDays = Number(item.msltc);
-    } else if (item.msltcDays && !isNaN(Number(item.msltcDays))) {
+    } else if (item && item.msltcDays !== undefined && item.msltcDays !== null && item.msltcDays !== '' && !isNaN(Number(item.msltcDays))) {
       msltcDays = Number(item.msltcDays);
+    } else if (masterInfo && masterInfo.msltcDays !== undefined && masterInfo.msltcDays !== null && !isNaN(Number(masterInfo.msltcDays))) {
+      msltcDays = Number(masterInfo.msltcDays);
     }
 
-    // Hitung Batas Tanggal MSLTC (Expired Date minus Standar MSLTC)
+    // Hitung Batas Tanggal MSLTC (Expired Date minus Standar MSLTC H-X)
     const msltcDateObj = new Date(expObj.getTime() - (msltcDays * 86400000));
     const daysToMsltc = Math.round((msltcDateObj.getTime() - todayMid.getTime()) / 86400000);
 
@@ -7654,7 +7672,7 @@
       msColor = '#fde047'; // Warning
     }
 
-    helper.innerHTML = `<span style="color:${msColor}; font-weight:700;">MSLTC: ${msDateFormatted} (${msText})</span> | <span style="color:#93c5fd; font-weight:600;">Expired: ${expDateFormatted} (${expText})</span>`;
+    helper.innerHTML = `<span style="color:${msColor}; font-weight:700;">MSLTC (H-${msltcDays}): ${msDateFormatted} (${msText})</span> | <span style="color:#93c5fd; font-weight:600;">Expired: ${expDateFormatted} (${expText})</span>`;
   }
 
   // ── Flatpickr Initialization ──
@@ -7747,13 +7765,14 @@
         fetch(`${EDS_UPDATE_URL}&_t=${t}&_r=${nonce}`, fetchOpts).then(r => r.ok ? r.text() : '').catch(() => '')
       ]);
 
-      // 1. Parse Data Update untuk fallback referensi jika rumus Main List #ERROR!
+      // 1. Parse Data Update untuk fallback referensi & sinkronisasi data live Superset
+      edsUpdateDataMap.clear();
       const updateDataLookupMap = new Map();
       if (updateRes) {
         const updateLines = parseCSV(updateRes);
         if (updateLines && updateLines.length > 1) {
           const upHeader = updateLines[0].map(h => String(h || '').trim().toLowerCase());
-          const colSku = upHeader.indexOf('sku_number') !== -1 ? upHeader.indexOf('sku_number') : 0;
+          const colSku = upHeader.indexOf('sku_number') !== -1 ? upHeader.indexOf('sku_number') : (upHeader.indexOf('sku') !== -1 ? upHeader.indexOf('sku') : 0);
           const colName = upHeader.indexOf('product_name') !== -1 ? upHeader.indexOf('product_name') : 1;
           const colLoc = upHeader.indexOf('location_name') !== -1 ? upHeader.indexOf('location_name') : 2;
           const colExp = upHeader.indexOf('expiry_date') !== -1 ? upHeader.indexOf('expiry_date') : 4;
@@ -7763,7 +7782,7 @@
           const colCat1 = upHeader.indexOf('l1_category_name') !== -1 ? upHeader.indexOf('l1_category_name') : 8;
           const colCat2 = upHeader.indexOf('l2_category_name') !== -1 ? upHeader.indexOf('l2_category_name') : 9;
           const colMsDate = upHeader.indexOf('msltc_date') !== -1 ? upHeader.indexOf('msltc_date') : 10;
-          const colRemDays = upHeader.indexOf('remaining days') !== -1 ? upHeader.indexOf('remaining days') : 11;
+          const colRemDays = upHeader.indexOf('remaining days') !== -1 ? upHeader.indexOf('remaining days') : (upHeader.indexOf('remaining_days') !== -1 ? upHeader.indexOf('remaining_days') : 11);
           const colAlert = upHeader.indexOf('alert') !== -1 ? upHeader.indexOf('alert') : 12;
 
           for (let u = 1; u < updateLines.length; u++) {
@@ -7771,11 +7790,12 @@
             if (!uRow || uRow.length === 0) continue;
             const uSku = String(uRow[colSku] || '').trim().toLowerCase();
             if (uSku) {
-              updateDataLookupMap.set(uSku, {
+              const uObj = {
+                sku: String(uRow[colSku] || '').trim(),
                 productName: uRow[colName] || '',
                 hub: uRow[colLoc] || '',
                 expiryDateRaw: uRow[colExp],
-                msltcDays: uRow[colMsltc] || '',
+                msltcDays: uRow[colMsltc] !== undefined && uRow[colMsltc] !== null && String(uRow[colMsltc]).trim() !== '' ? String(uRow[colMsltc]).trim() : '1',
                 qtySystem: Number(uRow[colQty]) || 0,
                 rackName: uRow[colRack] || '',
                 l1Category: uRow[colCat1] || '',
@@ -7783,7 +7803,9 @@
                 msltcDateRaw: uRow[colMsDate],
                 remainingDays: Number(uRow[colRemDays]) || 999,
                 alertText: uRow[colAlert] || ''
-              });
+              };
+              updateDataLookupMap.set(uSku, uObj);
+              edsUpdateDataMap.set(uSku, uObj);
             }
           }
         }
@@ -7833,221 +7855,201 @@
         }
       }
 
-      // 3. Parse Main List SKU (Hanya menampilkan SKU tugas yang ada di Main List)
+      // 3. Bangun List Tugas EDS (Sinkronisasi Data Tarik Superset / Data Update + Main List SKU)
+      const list = [];
+      const processedSkuSet = new Set();
+      let idxCounter = 1;
+      const now = new Date();
+      const todayMid = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+      function addEdsItemToList(rawItem) {
+        const skuKey = String(rawItem.sku || '').trim().toLowerCase();
+        if (!skuKey || processedSkuSet.has(skuKey)) return;
+
+        // Ambil data fresh dari Data Update jika tersedia
+        const updateInfo = updateDataLookupMap.get(skuKey) || {};
+        const masterInfo = typeof getMsltcInfo === 'function' ? getMsltcInfo(skuKey) : null;
+
+        const skuClean = rawItem.sku || updateInfo.sku || skuKey;
+        const name = updateInfo.productName || rawItem.productName || (masterInfo ? masterInfo.productName : `SKU ${skuClean}`);
+        const lokasiRack = updateInfo.rackName || rawItem.lokasiRack || rawItem.rackName || (masterInfo ? masterInfo.rackName : '-');
+        const qtySystem = updateInfo.qtySystem !== undefined ? updateInfo.qtySystem : (rawItem.qty_system !== undefined ? rawItem.qty_system : (rawItem.stockAvailable || 0));
+        const hub = updateInfo.hub || rawItem.hub || 'MTG - Menteng';
+        const l1Category = updateInfo.l1Category || rawItem.l1Category || '';
+        const l2Category = updateInfo.l2Category || rawItem.l2Category || '';
+
+        const expiryDateRaw = updateInfo.expiryDateRaw || rawItem.expiryDateRaw || rawItem.expiryDate || '';
+        const expDateClean = excelDateToDateStr(expiryDateRaw);
+
+        // Standar MSLTC produk (Prioritas: Data Update -> Main List -> Master MSLTC -> Default 1 hari / H-1 sebelum ED)
+        let msltcDays = 1;
+        if (updateInfo.msltcDays !== undefined && updateInfo.msltcDays !== null && updateInfo.msltcDays !== '' && !isNaN(Number(updateInfo.msltcDays))) {
+          msltcDays = Number(updateInfo.msltcDays);
+        } else if (rawItem.msltcDays !== undefined && rawItem.msltcDays !== null && rawItem.msltcDays !== '' && !isNaN(Number(rawItem.msltcDays))) {
+          msltcDays = Number(rawItem.msltcDays);
+        } else if (rawItem.msltc !== undefined && rawItem.msltc !== null && rawItem.msltc !== '' && !isNaN(Number(rawItem.msltc))) {
+          msltcDays = Number(rawItem.msltc);
+        } else if (masterInfo && masterInfo.msltcDays !== undefined && masterInfo.msltcDays !== null && !isNaN(Number(masterInfo.msltcDays))) {
+          msltcDays = Number(masterInfo.msltcDays);
+        }
+
+        let daysToExpire = null;
+        let daysToMsltc = null;
+        let computedMsltcDateClean = '';
+
+        if (expDateClean && /^\d{4}-\d{2}-\d{2}$/.test(expDateClean)) {
+          const [ey, em, ed] = expDateClean.split('-').map(Number);
+          const expObj = new Date(ey, em - 1, ed);
+          daysToExpire = Math.round((expObj.getTime() - todayMid.getTime()) / 86400000);
+
+          // Hitung Batas Tanggal MSLTC: Expired Date minus Standar MSLTC (H-X)
+          const msObj = new Date(expObj.getTime() - (msltcDays * 86400000));
+          daysToMsltc = Math.round((msObj.getTime() - todayMid.getTime()) / 86400000);
+          const my = msObj.getFullYear();
+          const mm = String(msObj.getMonth() + 1).padStart(2, '0');
+          const md = String(msObj.getDate()).padStart(2, '0');
+          computedMsltcDateClean = `${my}-${mm}-${md}`;
+        } else {
+          const msRaw = updateInfo.msltcDateRaw || rawItem.msltcDateRaw || rawItem.msltcDate || '';
+          computedMsltcDateClean = excelDateToDateStr(msRaw);
+          if (computedMsltcDateClean && /^\d{4}-\d{2}-\d{2}$/.test(computedMsltcDateClean)) {
+            const [my, mm, md] = computedMsltcDateClean.split('-').map(Number);
+            daysToMsltc = Math.round((new Date(my, mm - 1, md) - todayMid) / 86400000);
+          } else {
+            daysToMsltc = updateInfo.remainingDays !== undefined ? updateInfo.remainingDays : (rawItem.remainingDays || 999);
+          }
+        }
+
+        // Tentukan Alert sesuai sisa hari MSLTC sesungguhnya
+        let alertText = updateInfo.alertText || rawItem.alert || '';
+        if (daysToMsltc !== null && !isNaN(daysToMsltc)) {
+          if (daysToMsltc <= 0) {
+            alertText = '🔴 CRITICAL';
+          } else if (daysToMsltc === 1) {
+            alertText = '🔴 HARD WARNING';
+          } else if (daysToMsltc <= 3) {
+            alertText = '🟡 WARNING';
+          } else {
+            alertText = '🟢 SAFE';
+          }
+        }
+
+        // Filter: Hanya tampilkan SKU dengan alert CRITICAL, HARD WARNING, atau WARNING (<= 3 hari)
+        const alertLower = alertText.toLowerCase();
+        const isCritical = alertLower.includes('critical') || (daysToMsltc !== null && daysToMsltc <= 0);
+        const isHard = alertLower.includes('hard') || (daysToMsltc !== null && daysToMsltc === 1);
+        const isWarn = alertLower.includes('warning') || (daysToMsltc !== null && daysToMsltc <= 3);
+        if (!isCritical && !isHard && !isWarn) {
+          return;
+        }
+
+        // Status Done dari riwayat Hasil EDS
+        let isDone = false;
+        let doneVal = 'Belum';
+        let remaksVal = '-';
+        let fisikSystemVal = '-';
+
+        if (edsAuditResultsMap.has(skuKey)) {
+          const audit = edsAuditResultsMap.get(skuKey);
+          isDone = true;
+          doneVal = 'Done';
+          remaksVal = audit.reasonBad || audit.reasonSloc || audit.remaks || 'Sesuai';
+          fisikSystemVal = `${audit.fisikGood}/${qtySystem}`;
+          edsSubmittedSkuSet.add(skuKey);
+        }
+
+        list.push({
+          index: idxCounter++,
+          tanggal: rawItem.tanggal || '',
+          sku: skuClean,
+          productName: name,
+          lokasiRack: lokasiRack,
+          stockAvailable: qtySystem,
+          stockBad: 0,
+          stockLdp: 0,
+          hub: hub,
+          expiryDate: expDateClean,
+          expiryDateRaw: expiryDateRaw,
+          msltc: msltcDays,
+          qty_system: qtySystem,
+          rackName: lokasiRack,
+          l1Category: l1Category,
+          l2Category: l2Category,
+          msltcDate: computedMsltcDateClean,
+          remainingDays: daysToMsltc,
+          daysToMsltc: daysToMsltc,
+          daysToExpire: daysToExpire,
+          alert: alertText,
+          isDone: isDone,
+          doneVal: doneVal,
+          remaksVal: remaksVal,
+          fisikSystemVal: fisikSystemVal
+        });
+
+        processedSkuSet.add(skuKey);
+      }
+
+      // Prioritas 1: Seluruh SKU aktif dari Data Update (hasil tarikan live Superset)
+      if (updateDataLookupMap.size > 0) {
+        updateDataLookupMap.forEach(upItem => {
+          addEdsItemToList({
+            sku: upItem.sku,
+            productName: upItem.productName,
+            lokasiRack: upItem.rackName,
+            stockAvailable: upItem.qtySystem,
+            hub: upItem.hub,
+            expiryDateRaw: upItem.expiryDateRaw,
+            msltcDays: upItem.msltcDays,
+            qty_system: upItem.qtySystem,
+            rackName: upItem.rackName,
+            l1Category: upItem.l1Category,
+            l2Category: upItem.l2Category,
+            msltcDateRaw: upItem.msltcDateRaw,
+            remainingDays: upItem.remainingDays,
+            alert: upItem.alertText
+          });
+        });
+      }
+
+      // Prioritas 2: Tambahkan SKU dari Main List SKU jika ada SKU manual yang belum ada di Data Update
       if (mainRes) {
         const mainLines = parseCSV(mainRes);
         if (mainLines && mainLines.length > 1) {
-          const list = [];
           for (let i = 1; i < mainLines.length; i++) {
             const row = mainLines[i];
             if (!row || row.length === 0) continue;
             const cleanSku = String(row[1] || '').trim();
-            // FILTER HANYA SKU YANG VALID DI MAIN LIST (Abaikan baris kosong, header, error)
             if (!cleanSku || cleanSku.toLowerCase() === 'sku' || cleanSku.toLowerCase() === 'tanggal' || cleanSku.includes('#ERROR') || cleanSku.length < 3) {
               continue;
             }
 
-            const fallback = updateDataLookupMap.get(cleanSku.toLowerCase()) || {};
-
-            let name = (row[2] || '').trim();
-            if (!name || name === '#ERROR!' || name === '#REF!' || name === '#N/A') {
-              name = fallback.productName || `SKU ${cleanSku}`;
-            }
-
-            let lokasiRack = (row[3] || row[11] || '').trim();
-            if (!lokasiRack || lokasiRack === '#ERROR!' || lokasiRack === '#REF!') {
-              lokasiRack = fallback.rackName || '-';
-            }
-
-            let stockAvail = Number(row[4]);
-            if (isNaN(stockAvail) || (row[4] && String(row[4]).includes('#ERROR'))) {
-              stockAvail = fallback.qtySystem || 0;
-            }
-
-            const stockBad = Number(row[5]) || 0;
-            const stockLdp = Number(row[6]) || 0;
-            const hub = (row[7] || fallback.hub || 'MTG - Menteng').trim();
-
-            let expiryDateRaw = row[8];
-            if (!expiryDateRaw || String(expiryDateRaw).includes('#ERROR')) {
-              expiryDateRaw = fallback.expiryDateRaw || '';
-            }
-
-            let msltcDays = row[9] || fallback.msltcDays || '';
-            let qtySystem = Number(row[10]);
-            if (isNaN(qtySystem) || (row[10] && String(row[10]).includes('#ERROR'))) {
-              qtySystem = fallback.qtySystem || stockAvail;
-            }
-
-            let l1Category = (row[12] || fallback.l1Category || '').trim();
-            let l2Category = (row[13] || fallback.l2Category || '').trim();
-            let msltcDateRaw = row[14] || fallback.msltcDateRaw || '';
-
-            let remainingDays = Number(row[15]);
-            if (isNaN(remainingDays) || (row[15] && String(row[15]).includes('#ERROR'))) {
-              remainingDays = fallback.remainingDays !== undefined ? fallback.remainingDays : 999;
-            }
-
-            let alertText = (row[16] || '').trim();
-            if (!alertText || alertText.includes('#ERROR')) {
-              alertText = fallback.alertText || (remainingDays <= 0 ? '🔴 CRITICAL' : (remainingDays === 1 ? '🔴 HARD WARNING' : (remainingDays <= 3 ? '🟡 WARNING' : '🟢 SAFE')));
-            }
-
-            // 🎯 FILTER PRODUK DENGAN ALERT WARNING, HARD WARNING, & CRITICAL
-            const alertClean = alertText.toLowerCase();
-            const isCritical = alertClean.includes('critical') || remainingDays <= 0;
-            const isHardWarning = alertClean.includes('hard warning') || alertClean.includes('hard_warning') || remainingDays === 1;
-            const isWarning = alertClean.includes('warning') || remainingDays <= 3;
-            if (!isCritical && !isHardWarning && !isWarning) {
-              continue;
-            }
-
-            const sheetDone = (row[17] || '').trim();
-            const sheetRemaks = (row[18] || '').trim();
-            const sheetFisik = (row[19] || '').trim();
-
-            // ── STATUS HANYA DONE JIKA SKU BENAR-BENAR TERCATAT DI HASIL EDS ──
-            let isDone = false;
-            let doneVal = 'Belum';
-            let remaksVal = '-';
-            let fisikSystemVal = '-';
-
-            if (edsAuditResultsMap.has(cleanSku.toLowerCase())) {
-              const audit = edsAuditResultsMap.get(cleanSku.toLowerCase());
-              isDone = true;
-              doneVal = 'Done';
-              remaksVal = audit.reasonBad || audit.reasonSloc || audit.remaks || 'Sesuai';
-              fisikSystemVal = `${audit.fisikGood}/${qtySystem}`;
-              edsSubmittedSkuSet.add(cleanSku.toLowerCase());
-            }
-
-            const expDateClean = excelDateToDateStr(expiryDateRaw);
-            const msltcDateClean = excelDateToDateStr(msltcDateRaw);
-
-            // Hitung sisa hari dinamis terhadap hari ini
-            const now = new Date();
-            const todayMid = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-
-            let daysToExpire = null;
-            if (expDateClean && /^\d{4}-\d{2}-\d{2}$/.test(expDateClean)) {
-              const [ey, em, ed] = expDateClean.split('-').map(Number);
-              const expObj = new Date(ey, em - 1, ed);
-              daysToExpire = Math.round((expObj.getTime() - todayMid.getTime()) / 86400000);
-            }
-
-            let daysToMsltc = remainingDays;
-            if (msltcDateClean && /^\d{4}-\d{2}-\d{2}$/.test(msltcDateClean)) {
-              const [my, mm, md] = msltcDateClean.split('-').map(Number);
-              const msObj = new Date(my, mm - 1, md);
-              daysToMsltc = Math.round((msObj.getTime() - todayMid.getTime()) / 86400000);
-            } else if (!isNaN(remainingDays)) {
-              daysToMsltc = remainingDays;
-            }
-
-            if (daysToExpire === null) {
-              const msDaysNum = Number(msltcDays) || 0;
-              daysToExpire = !isNaN(daysToMsltc) ? (daysToMsltc + msDaysNum) : remainingDays;
-            }
-
-            list.push({
-              index: i,
+            addEdsItemToList({
               tanggal: row[0] || '',
               sku: cleanSku,
-              productName: name,
-              lokasiRack: lokasiRack,
-              stockAvailable: stockAvail,
-              stockBad: stockBad,
-              stockLdp: stockLdp,
-              hub: hub,
-              expiryDate: expDateClean,
-              expiryDateRaw: expiryDateRaw,
-              msltc: msltcDays,
-              qty_system: qtySystem,
-              rackName: lokasiRack,
-              l1Category: l1Category,
-              l2Category: l2Category,
-              msltcDate: msltcDateClean,
-              remainingDays: daysToMsltc,
-              daysToMsltc: daysToMsltc,
-              daysToExpire: daysToExpire,
-              alert: alertText,
-              isDone: isDone,
-              doneVal: doneVal,
-              remaksVal: remaksVal,
-              fisikSystemVal: fisikSystemVal
+              productName: (row[2] || '').trim(),
+              lokasiRack: (row[3] || row[11] || '').trim(),
+              stockAvailable: Number(row[4]) || 0,
+              hub: (row[7] || '').trim(),
+              expiryDateRaw: row[8],
+              msltcDays: row[9],
+              qty_system: Number(row[10]) || 0,
+              rackName: (row[3] || row[11] || '').trim(),
+              l1Category: (row[12] || '').trim(),
+              l2Category: (row[13] || '').trim(),
+              msltcDateRaw: row[14],
+              remainingDays: Number(row[15]),
+              alert: (row[16] || '').trim()
             });
-          }
-
-          if (list.length === 0 && updateDataLookupMap.size > 0) {
-            // Fallback: jika Main List SKU di spreadsheet belum diisi supervisor,
-            // tampilkan seluruh SKU dari Data Update otomatis agar petugas tetap dapat bertugas
-            let idxCounter = 1;
-            updateDataLookupMap.forEach((fallback, uSku) => {
-              const remDays = fallback.remainingDays !== undefined ? fallback.remainingDays : 999;
-              const alertText = fallback.alertText || (remDays <= 0 ? '🔴 CRITICAL' : (remDays === 1 ? '🔴 HARD WARNING' : (remDays <= 3 ? '🟡 WARNING' : '🟢 SAFE')));
-
-              const alertClean = alertText.toLowerCase();
-              const isCritical = alertClean.includes('critical') || remDays <= 0;
-              const isHardWarning = alertClean.includes('hard') || remDays === 1;
-              const isWarning = alertClean.includes('warning') || remDays <= 3;
-              if (!isCritical && !isHardWarning && !isWarning) return;
-
-              const isDone = edsAuditResultsMap.has(uSku);
-              const audit = isDone ? edsAuditResultsMap.get(uSku) : null;
-              const expDateClean = excelDateToDateStr(fallback.expiryDateRaw);
-              const msltcDateClean = excelDateToDateStr(fallback.msltcDateRaw);
-
-              const now = new Date();
-              const todayMid = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-              let daysToExpire = null;
-              if (expDateClean && /^\d{4}-\d{2}-\d{2}$/.test(expDateClean)) {
-                const [ey, em, ed] = expDateClean.split('-').map(Number);
-                daysToExpire = Math.round((new Date(ey, em - 1, ed) - todayMid) / 86400000);
-              }
-              let daysToMsltc = remDays;
-              if (msltcDateClean && /^\d{4}-\d{2}-\d{2}$/.test(msltcDateClean)) {
-                const [my, mm, md] = msltcDateClean.split('-').map(Number);
-                daysToMsltc = Math.round((new Date(my, mm - 1, md) - todayMid) / 86400000);
-              }
-
-              list.push({
-                index: idxCounter++,
-                tanggal: '',
-                sku: uSku,
-                productName: fallback.productName,
-                lokasiRack: fallback.rackName,
-                stockAvailable: fallback.qtySystem,
-                stockBad: 0,
-                stockLdp: 0,
-                hub: fallback.hub,
-                expiryDate: expDateClean,
-                expiryDateRaw: fallback.expiryDateRaw,
-                msltc: fallback.msltcDays,
-                qty_system: fallback.qtySystem,
-                rackName: fallback.rackName,
-                l1Category: fallback.l1Category,
-                l2Category: fallback.l2Category,
-                msltcDate: msltcDateClean,
-                remainingDays: daysToMsltc,
-                daysToMsltc: daysToMsltc,
-                daysToExpire: daysToExpire,
-                alert: alertText,
-                isDone: isDone,
-                doneVal: isDone ? 'Done' : 'Belum',
-                remaksVal: audit ? (audit.reasonBad || audit.reasonSloc || audit.remaks || 'Sesuai') : '-',
-                fisikSystemVal: audit ? `${audit.fisikGood}/${fallback.qtySystem}` : '-'
-              });
-            });
-          }
-
-          if (list.length > 0) {
-            edsMainListData = list;
-            try {
-              localStorage.setItem(EDS_MAIN_CACHE_KEY, JSON.stringify(list));
-              localStorage.setItem(EDS_SUBMITTED_CACHE_KEY, JSON.stringify(Array.from(edsSubmittedSkuSet)));
-            } catch (e) { }
           }
         }
+      }
+
+      if (list.length > 0) {
+        edsMainListData = list;
+        try {
+          localStorage.setItem(EDS_MAIN_CACHE_KEY, JSON.stringify(list));
+          localStorage.setItem(EDS_SUBMITTED_CACHE_KEY, JSON.stringify(Array.from(edsSubmittedSkuSet)));
+        } catch (e) { }
       }
 
       filterEdSweeperList();
@@ -8331,7 +8333,37 @@
   function lookupEdsSku(sku) {
     if (!sku) return;
     const clean = String(sku).trim();
-    const item = edsMainListData.find(i => i.sku.toLowerCase() === clean.toLowerCase());
+    let item = edsMainListData.find(i => i.sku.toLowerCase() === clean.toLowerCase());
+    if (!item && edsUpdateDataMap && edsUpdateDataMap.has(clean.toLowerCase())) {
+      const u = edsUpdateDataMap.get(clean.toLowerCase());
+      item = {
+        sku: u.sku,
+        productName: u.productName,
+        lokasiRack: u.rackName,
+        qty_system: u.qtySystem,
+        expiryDate: excelDateToDateStr(u.expiryDateRaw),
+        msltc: u.msltcDays,
+        msltcDays: u.msltcDays,
+        msltcDate: excelDateToDateStr(u.msltcDateRaw),
+        remainingDays: u.remainingDays
+      };
+    }
+    if (!item) {
+      const master = typeof getMsltcInfo === 'function' ? getMsltcInfo(clean) : null;
+      if (master) {
+        item = {
+          sku: clean,
+          productName: master.productName,
+          lokasiRack: master.rackName || master.locationName || '-',
+          qty_system: 0,
+          expiryDate: '',
+          msltc: master.msltcDays,
+          msltcDays: master.msltcDays,
+          msltcDate: '',
+          remainingDays: 999
+        };
+      }
+    }
 
     const skuInput = document.getElementById('edsSkuInput');
     const namaInput = document.getElementById('edsNamaSku');
@@ -8343,9 +8375,9 @@
     if (skuInput) skuInput.value = clean;
 
     if (item) {
-      if (namaInput) namaInput.value = item.productName;
-      if (slocInput) slocInput.value = item.lokasiRack;
-      if (qtyInput) qtyInput.value = `${item.qty_system} pcs`;
+      if (namaInput) namaInput.value = item.productName || '';
+      if (slocInput) slocInput.value = item.lokasiRack || '-';
+      if (qtyInput) qtyInput.value = `${item.qty_system || 0} pcs`;
       if (item.expiryDate) {
         if (edsFlatpickrInstance) {
           edsFlatpickrInstance.setDate(item.expiryDate);
@@ -8749,7 +8781,7 @@
             if (ey && em && ed) {
               const expObj = new Date(ey, em - 1, ed);
               it.daysToExpire = Math.round((expObj.getTime() - todayMid.getTime()) / 86400000);
-              const msltcDays = Number(it.msltc) || 7;
+              const msltcDays = Number(it.msltc) || 1;
               const msltcObj = new Date(expObj.getTime() - (msltcDays * 86400000));
               it.daysToMsltc = Math.round((msltcObj.getTime() - todayMid.getTime()) / 86400000);
               it.msltcDate = msltcObj.toISOString().slice(0, 10);
