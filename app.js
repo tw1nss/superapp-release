@@ -7668,8 +7668,8 @@
       msColor = '#f87171'; // Critical
     } else if (daysToMsltc === 1) {
       msColor = '#fb923c'; // Hard warning
-    } else if (daysToMsltc <= 3) {
-      msColor = '#fde047'; // Warning
+    } else {
+      msColor = '#38bdf8'; // Normal
     }
 
     helper.innerHTML = `<span style="color:${msColor}; font-weight:700;">MSLTC (H-${msltcDays}): ${msDateFormatted} (${msText})</span> | <span style="color:#93c5fd; font-weight:600;">Expired: ${expDateFormatted} (${expText})</span>`;
@@ -7920,28 +7920,18 @@
           }
         }
 
-        // Tentukan Alert sesuai sisa hari MSLTC sesungguhnya
-        let alertText = updateInfo.alertText || rawItem.alert || '';
-        if (daysToMsltc !== null && !isNaN(daysToMsltc)) {
-          if (daysToMsltc <= 0) {
-            alertText = '🔴 CRITICAL';
-          } else if (daysToMsltc === 1) {
-            alertText = '🔴 HARD WARNING';
-          } else if (daysToMsltc <= 3) {
-            alertText = '🟡 WARNING';
-          } else {
-            alertText = '🟢 SAFE';
-          }
-        }
+        // Tentukan Alert: Sesuai SOP SuperApp & GSheet, HANYA CRITICAL dan HARD WARNING (TIDAK ADA ALERT WARNING!)
+        let rawAlert = (rawItem.alert || updateInfo.alertText || '').trim();
+        const alertLower = rawAlert.toLowerCase();
 
-        // Filter: Hanya tampilkan SKU dengan alert CRITICAL, HARD WARNING, atau WARNING (<= 3 hari)
-        const alertLower = alertText.toLowerCase();
+        // Filter ketat: HANYA CRITICAL dan HARD WARNING! Jangan pernah masukkan ALERT WARNING!
         const isCritical = alertLower.includes('critical') || (daysToMsltc !== null && daysToMsltc <= 0);
         const isHard = alertLower.includes('hard') || (daysToMsltc !== null && daysToMsltc === 1);
-        const isWarn = alertLower.includes('warning') || (daysToMsltc !== null && daysToMsltc <= 3);
-        if (!isCritical && !isHard && !isWarn) {
+        if (!isCritical && !isHard) {
           return;
         }
+
+        const alertText = isCritical ? '🔴 CRITICAL' : '🔴 HARD WARNING';
 
         // Status Done dari riwayat Hasil EDS
         let isDone = false;
@@ -7989,29 +7979,7 @@
         processedSkuSet.add(skuKey);
       }
 
-      // Prioritas 1: Seluruh SKU aktif dari Data Update (hasil tarikan live Superset)
-      if (updateDataLookupMap.size > 0) {
-        updateDataLookupMap.forEach(upItem => {
-          addEdsItemToList({
-            sku: upItem.sku,
-            productName: upItem.productName,
-            lokasiRack: upItem.rackName,
-            stockAvailable: upItem.qtySystem,
-            hub: upItem.hub,
-            expiryDateRaw: upItem.expiryDateRaw,
-            msltcDays: upItem.msltcDays,
-            qty_system: upItem.qtySystem,
-            rackName: upItem.rackName,
-            l1Category: upItem.l1Category,
-            l2Category: upItem.l2Category,
-            msltcDateRaw: upItem.msltcDateRaw,
-            remainingDays: upItem.remainingDays,
-            alert: upItem.alertText
-          });
-        });
-      }
-
-      // Prioritas 2: Tambahkan SKU dari Main List SKU jika ada SKU manual yang belum ada di Data Update
+      // Prioritas Utama: BACA PERSIS DARI SHEET "Main List SKU" (Hasil filter supervisor di GSheet)
       if (mainRes) {
         const mainLines = parseCSV(mainRes);
         if (mainLines && mainLines.length > 1) {
@@ -8042,6 +8010,28 @@
             });
           }
         }
+      }
+
+      // Fallback HANYA jika sheet Main List SKU di spreadsheet benar-benar belum diisi supervisor:
+      if (list.length === 0 && updateDataLookupMap.size > 0) {
+        updateDataLookupMap.forEach(upItem => {
+          addEdsItemToList({
+            sku: upItem.sku,
+            productName: upItem.productName,
+            lokasiRack: upItem.rackName,
+            stockAvailable: upItem.qtySystem,
+            hub: upItem.hub,
+            expiryDateRaw: upItem.expiryDateRaw,
+            msltcDays: upItem.msltcDays,
+            qty_system: upItem.qtySystem,
+            rackName: upItem.rackName,
+            l1Category: upItem.l1Category,
+            l2Category: upItem.l2Category,
+            msltcDateRaw: upItem.msltcDateRaw,
+            remainingDays: upItem.remainingDays,
+            alert: upItem.alertText
+          });
+        });
       }
 
       if (list.length > 0) {
@@ -8207,24 +8197,18 @@
     const html = itemsToRender.map(item => {
       const isDone = item.isDone;
 
-      // ── DETEKSI ALERT PERSIS DARI SPREADSHEET (🔴 CRITICAL, 🔴 HARD WARNING, 🟡 WARNING, 🟢 SAFE) ──
+      // ── DETEKSI ALERT PERSIS DARI SPREADSHEET (🔴 CRITICAL, 🔴 HARD WARNING) ──
       const rawAlert = (item.alert || '').toUpperCase();
-      let alertIcon = '🟢 SAFE';
-      let alertClass = 'safe';
+      let alertIcon = '🔴 HARD WARNING';
+      let alertClass = 'hard-warning';
 
       const msltcVal = item.daysToMsltc !== undefined ? item.daysToMsltc : item.remainingDays;
       if (rawAlert.includes('CRITICAL') || msltcVal <= 0) {
         alertIcon = '🔴 CRITICAL';
         alertClass = 'critical';
-      } else if (rawAlert.includes('HARD WARNING') || rawAlert.includes('HARD') || msltcVal === 1) {
+      } else {
         alertIcon = '🔴 HARD WARNING';
         alertClass = 'hard-warning';
-      } else if (rawAlert.includes('WARNING') || msltcVal <= 3) {
-        alertIcon = '🟡 WARNING';
-        alertClass = 'warning';
-      } else {
-        alertIcon = '🟢 SAFE';
-        alertClass = 'safe';
       }
 
       const doneBadge = isDone
