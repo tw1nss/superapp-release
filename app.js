@@ -4218,15 +4218,10 @@
     try {
       const p2 = getDccPetugas2Name() || 'Petugas Siang';
 
-      // Fetch Mainlist SKU, Hasil DCC, and legacy Task sheets in parallel
-      const [resMain, resHasilDcc, resTask1, resTask2, resHasil1, resHasil2, resMtg] = await Promise.all([
+      // Fetch Mainlist SKU and Hasil DCC in parallel
+      const [resMain, resHasilDcc] = await Promise.all([
         fetch(DCC_MAIN_SHEET_URL + '&_t=' + Date.now()).catch(() => null),
-        fetch(DCC_HASIL_SHEET_URL + '&_t=' + Date.now()).catch(() => null),
-        fetch(DCC_TASK1_URL + '&_t=' + Date.now()).catch(() => null),
-        fetch(DCC_TASK2_URL + '&_t=' + Date.now()).catch(() => null),
-        fetch(DCC_HASIL1_URL + '&_t=' + Date.now()).catch(() => null),
-        fetch(DCC_HASIL2_URL + '&_t=' + Date.now()).catch(() => null),
-        fetch(DCC_MTG_SHEET_URL + '&_t=' + Date.now()).catch(() => null)
+        fetch(DCC_HASIL_SHEET_URL + '&_t=' + Date.now()).catch(() => null)
       ]);
 
       let parsedFromMainlist = false;
@@ -4356,64 +4351,6 @@
             if (sku1) dccSubmittedSkuSet.add(sku1);
             if (sku17) dccSubmittedSkuSet.add(sku17);
             if (name) dccSubmittedSkuSet.add(name);
-          }
-        }
-      }
-
-      // 3. Fallback: Parse Legacy Task 1 & Task 2 sheets if Mainlist SKU is empty
-      if (!parsedFromMainlist) {
-        if (resTask1 && resTask1.ok) {
-          const textTask1 = await resTask1.text();
-          dccTask1List = parseTaskSheetRows(textTask1, 'Bintang', 'task1');
-        }
-        if (resTask2 && resTask2.ok) {
-          const textTask2 = await resTask2.text();
-          dccTask2List = parseTaskSheetRows(textTask2, p2, 'task2');
-        }
-        if (resHasil1 && resHasil1.ok) {
-          const textHasil1 = await resHasil1.text();
-          const parsedHasil1 = parseHasilSheetRows(textHasil1);
-          dccSubmittedTask1Set = parsedHasil1.skuSet;
-          dccHasil1Rows = parsedHasil1.rows;
-        }
-        if (resHasil2 && resHasil2.ok) {
-          const textHasil2 = await resHasil2.text();
-          const parsedHasil2 = parseHasilSheetRows(textHasil2);
-          dccSubmittedTask2Set = parsedHasil2.skuSet;
-          dccHasil2Rows = parsedHasil2.rows;
-        }
-        if (resMtg && resMtg.ok) {
-          try {
-            const csvMtg = await resMtg.text();
-            const rowsMtg = parseCSV(csvMtg);
-            for (let r = 1; r < rowsMtg.length; r++) {
-              const row = rowsMtg[r];
-              const timestamp = (row[0] || '').trim();
-              if (timestamp) {
-                let sku1 = (row[1] || '').trim().toLowerCase();
-                if (sku1.includes('|')) sku1 = sku1.split('|')[0].trim();
-                let sku17 = (row[17] || '').trim().toLowerCase();
-                if (sku17.includes('|')) sku17 = sku17.split('|')[0].trim();
-                const name2 = (row[2] || '').trim().toLowerCase();
-                const inputBy = (row[18] || '').trim().toLowerCase();
-
-                if (inputBy.includes('bintang')) {
-                  if (sku1) dccSubmittedTask1Set.add(sku1);
-                  if (sku17) dccSubmittedTask1Set.add(sku17);
-                  if (name2) dccSubmittedTask1Set.add(name2);
-                } else if (inputBy) {
-                  if (sku1) dccSubmittedTask2Set.add(sku1);
-                  if (sku17) dccSubmittedTask2Set.add(sku17);
-                  if (name2) dccSubmittedTask2Set.add(name2);
-                }
-
-                if (sku1) dccSubmittedSkuSet.add(sku1);
-                if (sku17) dccSubmittedSkuSet.add(sku17);
-                if (name2) dccSubmittedSkuSet.add(name2);
-              }
-            }
-          } catch (mtgErr) {
-            console.warn('Could not parse MTG submitted rows:', mtgErr);
           }
         }
       }
