@@ -1103,10 +1103,9 @@ function handleEdsSubmit(payload) {
         evidance1Name = 'EDS_' + skuNo + '_1_' + dateStr + '.jpg';
         const cleanBase64_1 = payload.imageBase64.replace(/^data:image\/(png|jpeg|jpg);base64,/, "");
         const decoded1 = Utilities.base64Decode(cleanBase64_1);
-        const blob1 = Utilities.newBlob(decoded1, 'image/jpeg', evidance1Name);
-        const file1 = folder.createFile(blob1);
-        file1.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+        const fileId1 = file1.getId();
         evidanceLink1 = file1.getUrl();
+        evidance1Name = '=HYPERLINK("' + evidanceLink1 + '", IMAGE("https://drive.google.com/uc?export=view&id=' + fileId1 + '"))';
 
         if (payload.imageBase64_2) {
           evidance2Name = 'EDS_' + skuNo + '_2_' + dateStr + '.jpg';
@@ -1115,7 +1114,9 @@ function handleEdsSubmit(payload) {
           const blob2 = Utilities.newBlob(decoded2, 'image/jpeg', evidance2Name);
           const file2 = folder.createFile(blob2);
           file2.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+          const fileId2 = file2.getId();
           evidanceLink2 = file2.getUrl();
+          evidance2Name = '=HYPERLINK("' + evidanceLink2 + '", IMAGE("https://drive.google.com/uc?export=view&id=' + fileId2 + '"))';
         }
       } catch (errUpload) {
         console.warn('Gagal upload foto EDS:', errUpload);
@@ -1245,9 +1246,10 @@ function handleDccSubmit(payload) {
         const cleanBase64_1 = payload.imageBase64.replace(/^data:image\/(png|jpeg|jpg);base64,/, "");
         const decoded1 = Utilities.base64Decode(cleanBase64_1);
         const blob1 = Utilities.newBlob(decoded1, 'image/jpeg', evidance1Name);
-        const file1 = folder.createFile(blob1);
-        file1.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+        const fileId1 = file1.getId();
         evidanceLink1 = file1.getUrl();
+        // Gunakan formula IMAGE agar foto fisik langsung tampil sebagai gambar thumbnail di dalam sel Google Sheets
+        evidance1Name = '=HYPERLINK("' + evidanceLink1 + '", IMAGE("https://drive.google.com/uc?export=view&id=' + fileId1 + '"))';
 
         if (payload.imageBase64_2) {
           evidance2Name = 'DCC_' + skuNo + '_2_' + dateStr + '.jpg';
@@ -1256,7 +1258,9 @@ function handleDccSubmit(payload) {
           const blob2 = Utilities.newBlob(decoded2, 'image/jpeg', evidance2Name);
           const file2 = folder.createFile(blob2);
           file2.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+          const fileId2 = file2.getId();
           evidanceLink2 = file2.getUrl();
+          evidance2Name = '=HYPERLINK("' + evidanceLink2 + '", IMAGE("https://drive.google.com/uc?export=view&id=' + fileId2 + '"))';
         }
       } catch (errUpload) {
         console.warn('Gagal upload foto DCC:', errUpload);
@@ -1291,42 +1295,9 @@ function handleDccSubmit(payload) {
 
     hasilDccSheet.appendRow(dccRowData);
 
-    // Auto-update Sheet "Mainlist SKU" (Kolom H - P)
-    try {
-      const mainlistSheet = ss.getSheetByName('Mainlist SKU') || ss.getSheetByName('Mainlist Sku');
-      if (mainlistSheet && skuNo) {
-        const lastMRow = mainlistSheet.getLastRow();
-        if (lastMRow > 1) {
-          const mSkuValues = mainlistSheet.getRange(2, 3, lastMRow - 1, 1).getValues();
-          for (let r = 0; r < mSkuValues.length; r++) {
-            const rawVal = String(mSkuValues[r][0] || '').trim();
-            if (rawVal && (rawVal.toLowerCase() === skuNo.toLowerCase() || rawVal.includes(skuNo))) {
-              const targetRow = r + 2;
-              const fg = Number(fisikGood) || 0;
-              const fb = Number(fisikBad) || 0;
-              const tot = fg + fb;
-              const sysQty = Number(mainlistSheet.getRange(targetRow, 6).getValue()) || 0;
-              const diff = tot - sysQty;
-              const slocMatch = (slocActual.toLowerCase() === 'match') ? 'MATCH' : 'UNMATCH';
-              const remaksVal = reasonBad || reasonSloc || payload.remaks || 'Sesuai';
-
-              mainlistSheet.getRange(targetRow, 8).setValue(fg);
-              mainlistSheet.getRange(targetRow, 9).setValue(fb);
-              mainlistSheet.getRange(targetRow, 10).setValue(tot);
-              mainlistSheet.getRange(targetRow, 11).setValue(diff);
-              mainlistSheet.getRange(targetRow, 12).setValue(slocMatch);
-              mainlistSheet.getRange(targetRow, 13).setValue(remaksVal);
-              mainlistSheet.getRange(targetRow, 14).setValue(inputBy);
-              mainlistSheet.getRange(targetRow, 15).setValue('DONE');
-              mainlistSheet.getRange(targetRow, 16).setValue(timestamp);
-              break;
-            }
-          }
-        }
-      }
-    } catch (errSync) {
-      console.warn('Gagal auto-update Mainlist SKU:', errSync);
-    }
+    // CATATAN: Sheet "Mainlist SKU" menggunakan rumus otomatis =MAP(...) di H2
+    // yang otomatis membaca dari 'Hasil DCC'. JANGAN menulis setValue manual ke Mainlist SKU
+    // karena akan menyebabkan error "#REF! Hasil array tidak diperluas karena akan menimpa data".
 
     return ContentService.createTextOutput(JSON.stringify({
       status: 'success',
