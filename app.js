@@ -2988,7 +2988,7 @@
   const DCC_HASIL2_URL = DCC_BASE_SHEET_URL + '&sheet=Hasil%20Task%202';
   const DCC_MTG_SHEET_URL = DCC_BASE_SHEET_URL + '&sheet=MTG';
   const DCC_REPORT_URL = DCC_BASE_SHEET_URL + '&sheet=Report';
-  const DCC_WEBAPP_URL = 'https://script.google.com/macros/s/AKfycbzRrR_j-8bV29djmaLl85Uhe3KOHd8PsW_7GQWAYIIciNvDeDoYrTtPs0377F63stid0Q/exec';
+  const DCC_WEBAPP_URL = 'https://script.google.com/macros/s/AKfycbzRhVQZEv3TJwTfUhKKV0QtzexKvMS8mfz-iE72LiVRLKulE4_IlU4IW10rII8k7ICpLQ/exec';
 
   const DCC_MAIN_CACHE_KEY = 'DCC_MAIN_CACHE_MTG_V9';
   const DCC_REPORT_CACHE_KEY = 'DCC_REPORT_CACHE_MTG_V9';
@@ -7358,7 +7358,7 @@
   const EDS_HASIL_URL = EDS_BASE_SHEET_URL + '&sheet=' + encodeURIComponent('Hasil EDS');
   const EDS_UPDATE_URL = EDS_BASE_SHEET_URL + '&sheet=' + encodeURIComponent('Data Update ED Sweeper');
   const EDS_REPORT_URL = EDS_BASE_SHEET_URL + '&sheet=Report';
-  const EDS_DEFAULT_WEBAPP_URL = 'https://script.google.com/macros/s/AKfycbztOsGIAVVfd2SjvkW_euEa7PyU76A4_PJ0HdJgw80eUOHe4XuRuLKoftL9ZxgrDfFLcw/exec';
+  const EDS_DEFAULT_WEBAPP_URL = 'https://script.google.com/macros/s/AKfycbzRhVQZEv3TJwTfUhKKV0QtzexKvMS8mfz-iE72LiVRLKulE4_IlU4IW10rII8k7ICpLQ/exec';
 
   const EDS_MAIN_CACHE_KEY = 'EDS_MAIN_CACHE_MTG_V4';
   const EDS_SUBMITTED_CACHE_KEY = 'EDS_SUBMITTED_CACHE_MTG_V4';

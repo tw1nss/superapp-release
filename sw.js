@@ -2,12 +2,12 @@
  * Service Worker for QR SLOC & MSLTC Generator MTG (Android PWA)
  */
 
-const CACHE_NAME = 'superapp-pwa-v90';
+const CACHE_NAME = 'superapp-pwa-v91';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
-  './style.css?v=90',
-  './app.js?v=90',
+  './style.css?v=91',
+  './app.js?v=91',
   './qrcode.min.js',
   './manifest.json',
   './app-logo.jpg',

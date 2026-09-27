@@ -1205,6 +1205,143 @@ function handleEdsSubmit(payload) {
   }
 }
 
+// ── 8. HANDLER POST UNTUK DCC SCREENING (ALL-IN-ONE ROUTER) ──
+
+function handleDccSubmit(payload) {
+  try {
+    const ss = getEdsSpreadsheet();
+    const skuNo = String(payload.skuNo || payload.sku || payload.sku_number || '').trim();
+    const namaSku = String(payload.namaSku || payload.productName || '').trim();
+    const slocExisting = String(payload.slocExisting || payload.lokasiRack || '').trim();
+    const slocActual = String(payload.slocActual || 'Match').trim();
+    const expiredDate = String(payload.expiredDate || '').trim();
+    const fisikGood = payload.fisikGood !== undefined ? payload.fisikGood : '0';
+    const fisikBad = payload.fisikBad !== undefined ? payload.fisikBad : '0';
+    const sales = payload.sales !== undefined ? payload.sales : '0';
+    const reasonSloc = String(payload.reasonSloc || '').trim();
+    const reasonBad = String(payload.reasonBad || '').trim();
+    const inputBy = String(payload.inputBy || payload.pic || payload.penginput || '').trim();
+    const msltc = String(payload.msltc || '').trim();
+
+    let evidanceLink1 = '';
+    let evidanceLink2 = '';
+    let evidance1Name = '';
+    let evidance2Name = '';
+
+    if (payload.imageBase64) {
+      try {
+        const folderName = 'DCC_MTG_EVIDANCE';
+        let folder;
+        const folders = DriveApp.getFoldersByName(folderName);
+        if (folders.hasNext()) {
+          folder = folders.next();
+        } else {
+          folder = DriveApp.createFolder(folderName);
+          folder.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+        }
+
+        const dateStr = Utilities.formatDate(new Date(), "Asia/Jakarta", "yyyyMMdd_HHmmss");
+        evidance1Name = 'DCC_' + skuNo + '_1_' + dateStr + '.jpg';
+        const cleanBase64_1 = payload.imageBase64.replace(/^data:image\/(png|jpeg|jpg);base64,/, "");
+        const decoded1 = Utilities.base64Decode(cleanBase64_1);
+        const blob1 = Utilities.newBlob(decoded1, 'image/jpeg', evidance1Name);
+        const file1 = folder.createFile(blob1);
+        file1.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+        evidanceLink1 = file1.getUrl();
+
+        if (payload.imageBase64_2) {
+          evidance2Name = 'DCC_' + skuNo + '_2_' + dateStr + '.jpg';
+          const cleanBase64_2 = payload.imageBase64_2.replace(/^data:image\/(png|jpeg|jpg);base64,/, "");
+          const decoded2 = Utilities.base64Decode(cleanBase64_2);
+          const blob2 = Utilities.newBlob(decoded2, 'image/jpeg', evidance2Name);
+          const file2 = folder.createFile(blob2);
+          file2.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+          evidanceLink2 = file2.getUrl();
+        }
+      } catch (errUpload) {
+        console.warn('Gagal upload foto DCC:', errUpload);
+      }
+    }
+
+    const timestamp = Utilities.formatDate(new Date(), "Asia/Jakarta", "dd/MM/yyyy HH:mm:ss");
+    let hasilDccSheet = ss.getSheetByName('Hasil DCC') || ss.getSheetByName('MTG') || ss.insertSheet('Hasil DCC');
+
+    if (hasilDccSheet.getLastRow() === 0) {
+      hasilDccSheet.appendRow([
+        "Timestamp", "SKU Number", "Nama SKU ", "SLOC Existing", "SLOC Actual",
+        "Expired Date", "Fisik Good", "Fisik Bad", "Sales (jika ada)",
+        "Reason SLOC", "Reason Bad", "Evidance 1", "Evidance 2",
+        "Evidance Link 1", "Evidance Link 2", "Fisik/System", "MSLTC",
+        "SKU No", "Input by", "Label Barcode Product", "Label Sloc"
+      ]);
+    }
+
+    const labelProduct = String(payload.labelProduct || 'Ada').trim();
+    const labelSloc = String(payload.labelSloc || 'Ada').trim();
+    const qtySysVal = payload.qty_system || payload.qtySistem || '';
+    const fisikSystem = qtySysVal !== '' ? (fisikGood + '/' + qtySysVal) : String(fisikGood);
+
+    const dccRowData = [
+      timestamp, skuNo, namaSku, slocExisting, slocActual,
+      expiredDate, fisikGood, fisikBad, sales, reasonSloc,
+      reasonBad, evidance1Name, evidance2Name, evidanceLink1,
+      evidanceLink2, fisikSystem, msltc, skuNo, inputBy,
+      labelProduct, labelSloc
+    ];
+
+    hasilDccSheet.appendRow(dccRowData);
+
+    // Auto-update Sheet "Mainlist SKU" (Kolom H - P)
+    try {
+      const mainlistSheet = ss.getSheetByName('Mainlist SKU') || ss.getSheetByName('Mainlist Sku');
+      if (mainlistSheet && skuNo) {
+        const lastMRow = mainlistSheet.getLastRow();
+        if (lastMRow > 1) {
+          const mSkuValues = mainlistSheet.getRange(2, 3, lastMRow - 1, 1).getValues();
+          for (let r = 0; r < mSkuValues.length; r++) {
+            const rawVal = String(mSkuValues[r][0] || '').trim();
+            if (rawVal && (rawVal.toLowerCase() === skuNo.toLowerCase() || rawVal.includes(skuNo))) {
+              const targetRow = r + 2;
+              const fg = Number(fisikGood) || 0;
+              const fb = Number(fisikBad) || 0;
+              const tot = fg + fb;
+              const sysQty = Number(mainlistSheet.getRange(targetRow, 6).getValue()) || 0;
+              const diff = tot - sysQty;
+              const slocMatch = (slocActual.toLowerCase() === 'match') ? 'MATCH' : 'UNMATCH';
+              const remaksVal = reasonBad || reasonSloc || payload.remaks || 'Sesuai';
+
+              mainlistSheet.getRange(targetRow, 8).setValue(fg);
+              mainlistSheet.getRange(targetRow, 9).setValue(fb);
+              mainlistSheet.getRange(targetRow, 10).setValue(tot);
+              mainlistSheet.getRange(targetRow, 11).setValue(diff);
+              mainlistSheet.getRange(targetRow, 12).setValue(slocMatch);
+              mainlistSheet.getRange(targetRow, 13).setValue(remaksVal);
+              mainlistSheet.getRange(targetRow, 14).setValue(inputBy);
+              mainlistSheet.getRange(targetRow, 15).setValue('DONE');
+              mainlistSheet.getRange(targetRow, 16).setValue(timestamp);
+              break;
+            }
+          }
+        }
+      }
+    } catch (errSync) {
+      console.warn('Gagal auto-update Mainlist SKU:', errSync);
+    }
+
+    return ContentService.createTextOutput(JSON.stringify({
+      status: 'success',
+      message: 'Data audit SKU ' + skuNo + ' berhasil disimpan ke Hasil DCC dan Mainlist SKU.',
+      photoUrl1: evidanceLink1,
+      photoUrl2: evidanceLink2
+    })).setMimeType(ContentService.MimeType.JSON);
+  } catch (err) {
+    return ContentService.createTextOutput(JSON.stringify({
+      status: 'error',
+      message: err.toString()
+    })).setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
 // Router Fallback doPost jika doPost dipanggil dari file ini
 function doPost(e) {
   try {
@@ -1220,12 +1357,8 @@ function doPost(e) {
       return handleEdsSubmit(payload);
     }
 
-    // Jika ada handler DCC
-    if (typeof handleDccSubmit === 'function') {
-      return handleDccSubmit(payload);
-    }
-
-    return handleEdsSubmit(payload);
+    // Default adalah DCC Screening
+    return handleDccSubmit(payload);
   } catch (err) {
     return ContentService.createTextOutput(JSON.stringify({
       status: 'error',
