@@ -3595,6 +3595,15 @@
   }
 
   window.refreshDccData = function () {
+    try {
+      localStorage.removeItem(DCC_MAIN_CACHE_KEY);
+      localStorage.removeItem(DCC_SUBMITTED_CACHE_KEY);
+    } catch (e) {}
+    dccTask1List = [];
+    dccTask2List = [];
+    dccSubmittedTask1Set = new Set();
+    dccSubmittedTask2Set = new Set();
+    dccSubmittedSkuSet = new Set();
     if (currentDccTab === 'report') {
       fetchDccReport(true);
     } else {
@@ -4243,6 +4252,9 @@
 
           dccTask1List = [];
           dccTask2List = [];
+          dccSubmittedTask1Set = new Set();
+          dccSubmittedTask2Set = new Set();
+          dccSubmittedSkuSet = new Set();
 
           for (let i = 1; i < mainRows.length; i++) {
             const row = mainRows[i];
@@ -4304,27 +4316,47 @@
         const parsedHasilDcc = parseHasilSheetRows(textHasilDcc);
         dccHasil1Rows = [];
         dccHasil2Rows = [];
+
+        // Fast lookup for items explicitly marked as PENDING in Mainlist SKU
+        const pendingSkuMap = new Set();
+        if (parsedFromMainlist) {
+          [...dccTask1List, ...dccTask2List].forEach(it => {
+            if (it.status === 'PENDING') {
+              if (it.sku) pendingSkuMap.add(it.sku.toLowerCase());
+              if (it.productName) pendingSkuMap.add(it.productName.toLowerCase());
+            }
+          });
+        }
+
         for (const row of parsedHasilDcc.rows) {
           const sku1 = (row[1] || '').trim().toLowerCase();
           const sku17 = (row[17] || '').trim().toLowerCase();
           const name = (row[2] || '').trim().toLowerCase();
           const inputBy = (row[18] || '').trim().toLowerCase();
 
+          const isExplicitPending = pendingSkuMap.has(sku1) || (sku17 && pendingSkuMap.has(sku17)) || (name && pendingSkuMap.has(name));
+
           const isTask1Item = inputBy.includes('bintang') || (sku1 && dccTask1List.some(it => it.sku.toLowerCase() === sku1));
           if (isTask1Item) {
             dccHasil1Rows.push(row);
-            if (sku1) dccSubmittedTask1Set.add(sku1);
-            if (sku17) dccSubmittedTask1Set.add(sku17);
-            if (name) dccSubmittedTask1Set.add(name);
+            if (!isExplicitPending) {
+              if (sku1) dccSubmittedTask1Set.add(sku1);
+              if (sku17) dccSubmittedTask1Set.add(sku17);
+              if (name) dccSubmittedTask1Set.add(name);
+            }
           } else {
             dccHasil2Rows.push(row);
-            if (sku1) dccSubmittedTask2Set.add(sku1);
-            if (sku17) dccSubmittedTask2Set.add(sku17);
-            if (name) dccSubmittedTask2Set.add(name);
+            if (!isExplicitPending) {
+              if (sku1) dccSubmittedTask2Set.add(sku1);
+              if (sku17) dccSubmittedTask2Set.add(sku17);
+              if (name) dccSubmittedTask2Set.add(name);
+            }
           }
-          if (sku1) dccSubmittedSkuSet.add(sku1);
-          if (sku17) dccSubmittedSkuSet.add(sku17);
-          if (name) dccSubmittedSkuSet.add(name);
+          if (!isExplicitPending) {
+            if (sku1) dccSubmittedSkuSet.add(sku1);
+            if (sku17) dccSubmittedSkuSet.add(sku17);
+            if (name) dccSubmittedSkuSet.add(name);
+          }
         }
       }
 
@@ -5259,20 +5291,35 @@
 
     // Helper: update local table records & sets
     const updateLocalState = () => {
+      const skuLower = skuNo.toLowerCase();
+      const allDccItems = [...dccTask1List, ...dccTask2List];
+      const foundItem = allDccItems.find(it => it.sku.toLowerCase() === skuLower);
+      if (foundItem) {
+        foundItem.status = 'DONE';
+      }
+
       if (selectedDccShift === 'pagi') {
-        dccSubmittedTask1Set.add(skuNo.toLowerCase());
+        dccSubmittedTask1Set.add(skuLower);
         if (namaSku) dccSubmittedTask1Set.add(namaSku.toLowerCase());
         dccHasil1Rows.push([timestamp, skuNo, namaSku, slocExisting, slocActual, expiredDate, fisikGood, fisikBad, sales, safeReasonSloc, reasonBad, finalEvidance, '', '', '', '', '', skuNo, inputByVal, labelProduct, labelSloc]);
       } else {
-        dccSubmittedTask2Set.add(skuNo.toLowerCase());
+        dccSubmittedTask2Set.add(skuLower);
         if (namaSku) dccSubmittedTask2Set.add(namaSku.toLowerCase());
         dccHasil2Rows.push([timestamp, skuNo, namaSku, slocExisting, slocActual, expiredDate, fisikGood, fisikBad, sales, safeReasonSloc, reasonBad, finalEvidance, '', '', '', '', '', skuNo, inputByVal, labelProduct, labelSloc]);
       }
-      dccSubmittedSkuSet.add(skuNo.toLowerCase());
+      dccSubmittedSkuSet.add(skuLower);
       if (namaSku) dccSubmittedSkuSet.add(namaSku.toLowerCase());
 
       try {
         localStorage.setItem(DCC_SUBMITTED_CACHE_KEY, JSON.stringify(Array.from(dccSubmittedSkuSet)));
+        localStorage.setItem(DCC_MAIN_CACHE_KEY, JSON.stringify({
+          task1: dccTask1List,
+          task2: dccTask2List,
+          submitted1: Array.from(dccSubmittedTask1Set),
+          submitted2: Array.from(dccSubmittedTask2Set),
+          hasil1: dccHasil1Rows,
+          hasil2: dccHasil2Rows
+        }));
       } catch (e) { }
 
       filterDccMainList();
