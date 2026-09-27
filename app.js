@@ -9,14 +9,14 @@
   'use strict';
 
   // ── Config ──
-  const SHEET_ID = '1AatdTplbM_Peg-pXWRihuhO0JGq3TwvaHhQ_f4sNeeo';
-  // Selective column query for Master Rack
-  const MASTER_CSV_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&tq=SELECT%20A,%20C,%20D,%20E,%20F,%20J`;
+  const SHEET_ID = '1fVQwSOoIU9pT5RHWi6-m8qCf_T0rQPZxEf_WuhlaD2g';
+  // Selective column query for Master Rack (from 'STOCK UPDATE')
+  const MASTER_CSV_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent('STOCK UPDATE')}&tq=SELECT%20A,%20C,%20D,%20E,%20F,%20J`;
   // CSV Query for MSLTC sheet
   const MSLTC_CSV_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=MSLTC`;
 
   const MAX_HISTORY = 8;
-  const DB_NAME = 'QRSLOC_DB_MTG_V2';
+  const DB_NAME = 'QRSLOC_DB_MTG_V3';
   const DB_VERSION = 1;
   const STORE_NAME = 'master_cache';
 
@@ -163,18 +163,47 @@
     const map = new Map();
     const masterArray = [];
     let count = 0;
+    if (!rows || rows.length < 2) return { map, count, masterArray };
+
+    const header = rows[0].map(h => (h || '').toLowerCase().trim());
+    
+    // Find column indexes dynamically by header name
+    let skuIdx = header.findIndex(h => h === 'sku_number' || h === 'sku' || h.includes('sku'));
+    let slocIdx = header.findIndex(h => h === 'rack_name' || h === 'sloc sistem' || h === 'sloc' || h.includes('rack') || h.includes('sloc'));
+    let prodIdx = header.findIndex(h => h === 'product_name' || h === 'nama produk' || h.includes('product') || h.includes('nama'));
+    let typeIdx = header.findIndex(h => h === 'product_type_name' || h === 'type' || h.includes('type') || h.includes('kategori'));
+    let masterSlocIdx = header.findIndex(h => h === 'master sloc' || h === 'master_sloc');
+    let leftIdx = header.findIndex(h => h === 'left' || h === 'location_name');
+    let qtyIdx = header.findIndex(h => h === 'quantity' || h === 'qty' || h.includes('stok') || h.includes('stock'));
+
+    // Fallbacks if header matching is not found
+    if (skuIdx === -1) skuIdx = 1;
+    if (slocIdx === -1) slocIdx = 2;
+    if (prodIdx === -1) prodIdx = 3;
+    if (typeIdx === -1) typeIdx = 5;
 
     for (let i = 1; i < rows.length; i++) {
       const row = rows[i];
-      const left = (row[0] || '').trim();
-      const masterSloc = (row[1] || '').trim();
-      const sku = (row[2] || '').trim();
-      const productName = (row[3] || '').trim();
-      const type = (row[4] || '').trim();
-      const sloc = (row[5] || '').trim();
+      const sku = (row[skuIdx] || '').trim();
+      const sloc = (row[slocIdx] || '').trim();
+      const productName = prodIdx !== -1 ? (row[prodIdx] || '').trim() : '';
+      const type = typeIdx !== -1 ? (row[typeIdx] || '').trim() : '';
+      const masterSloc = masterSlocIdx !== -1 && row[masterSlocIdx] ? row[masterSlocIdx].trim() : sloc;
+
+      // Extract floor / aisle prefix (e.g. L1-, L2-, L3-) for barcode card printing
+      let left = '';
+      if (sloc) {
+        const m = sloc.match(/^L\d+-/i);
+        if (m) left = m[0];
+      }
+      if (!left && leftIdx !== -1) {
+        left = (row[leftIdx] || '').trim();
+      }
+
+      const qty = qtyIdx !== -1 ? (row[qtyIdx] || '').trim() : '';
 
       if (sku && sloc) {
-        const item = { sku, sloc, productName, masterSloc, type, left };
+        const item = { sku, sloc, productName, masterSloc, type, left, qty };
         if (!map.has(sku)) {
           map.set(sku, []);
         }
@@ -2949,19 +2978,21 @@
   //  DCC SCREENING LOGIC (HIGH SPEED CACHING)
   // ══════════════════════════════════════════════
 
-  const DCC_BASE_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1ci0s4A65NAFv041_tS0ycTvvSPwzsVx1vALd0fbMRv0/gviz/tq?tqx=out:csv';
+  const DCC_SPREADSHEET_ID = '1fVQwSOoIU9pT5RHWi6-m8qCf_T0rQPZxEf_WuhlaD2g';
+  const DCC_BASE_SHEET_URL = `https://docs.google.com/spreadsheets/d/${DCC_SPREADSHEET_ID}/gviz/tq?tqx=out:csv`;
+  const DCC_MAIN_SHEET_URL = DCC_BASE_SHEET_URL + '&sheet=' + encodeURIComponent('Mainlist SKU');
+  const DCC_HASIL_SHEET_URL = DCC_BASE_SHEET_URL + '&sheet=' + encodeURIComponent('Hasil DCC');
   const DCC_TASK1_URL = DCC_BASE_SHEET_URL + '&sheet=Task%201';
   const DCC_TASK2_URL = DCC_BASE_SHEET_URL + '&sheet=Task%202';
   const DCC_HASIL1_URL = DCC_BASE_SHEET_URL + '&sheet=Hasil%20Task%201';
   const DCC_HASIL2_URL = DCC_BASE_SHEET_URL + '&sheet=Hasil%20Task%202';
-  const DCC_MAIN_SHEET_URL = DCC_BASE_SHEET_URL + '&sheet=Main%20List%20SKU';
   const DCC_MTG_SHEET_URL = DCC_BASE_SHEET_URL + '&sheet=MTG';
   const DCC_REPORT_URL = DCC_BASE_SHEET_URL + '&sheet=Report';
   const DCC_WEBAPP_URL = 'https://script.google.com/macros/s/AKfycbzRrR_j-8bV29djmaLl85Uhe3KOHd8PsW_7GQWAYIIciNvDeDoYrTtPs0377F63stid0Q/exec';
 
-  const DCC_MAIN_CACHE_KEY = 'DCC_MAIN_CACHE_MTG_V8';
-  const DCC_REPORT_CACHE_KEY = 'DCC_REPORT_CACHE_MTG_V8';
-  const DCC_SUBMITTED_CACHE_KEY = 'DCC_SUBMITTED_CACHE_MTG_V8';
+  const DCC_MAIN_CACHE_KEY = 'DCC_MAIN_CACHE_MTG_V9';
+  const DCC_REPORT_CACHE_KEY = 'DCC_REPORT_CACHE_MTG_V9';
+  const DCC_SUBMITTED_CACHE_KEY = 'DCC_SUBMITTED_CACHE_MTG_V9';
   const DCC_PETUGAS2_KEY = 'DCC_PETUGAS2_NAME_V1';
   const DCC_PIN_KEY = 'DCC_AUTH_PIN_KEY_V1';
   const DCC_PIN_DEFAULT = '071107';
@@ -4178,114 +4209,179 @@
     try {
       const p2 = getDccPetugas2Name() || 'Petugas Siang';
 
-      // Fetch Task 1, Task 2, Hasil 1, Hasil 2, and MTG in parallel
-      const [resTask1, resTask2, resHasil1, resHasil2, resMtg, resMain] = await Promise.all([
+      // Fetch Mainlist SKU, Hasil DCC, and legacy Task sheets in parallel
+      const [resMain, resHasilDcc, resTask1, resTask2, resHasil1, resHasil2, resMtg] = await Promise.all([
+        fetch(DCC_MAIN_SHEET_URL + '&_t=' + Date.now()).catch(() => null),
+        fetch(DCC_HASIL_SHEET_URL + '&_t=' + Date.now()).catch(() => null),
         fetch(DCC_TASK1_URL + '&_t=' + Date.now()).catch(() => null),
         fetch(DCC_TASK2_URL + '&_t=' + Date.now()).catch(() => null),
         fetch(DCC_HASIL1_URL + '&_t=' + Date.now()).catch(() => null),
         fetch(DCC_HASIL2_URL + '&_t=' + Date.now()).catch(() => null),
-        fetch(DCC_MTG_SHEET_URL + '&_t=' + Date.now()).catch(() => null),
-        fetch(DCC_MAIN_SHEET_URL + '&_t=' + Date.now()).catch(() => null)
+        fetch(DCC_MTG_SHEET_URL + '&_t=' + Date.now()).catch(() => null)
       ]);
 
-      // 1. Parse Task 1
-      if (resTask1 && resTask1.ok) {
-        const textTask1 = await resTask1.text();
-        dccTask1List = parseTaskSheetRows(textTask1, 'Bintang', 'task1');
-      }
+      let parsedFromMainlist = false;
 
-      // 2. Parse Task 2
-      if (resTask2 && resTask2.ok) {
-        const textTask2 = await resTask2.text();
-        dccTask2List = parseTaskSheetRows(textTask2, p2, 'task2');
-      }
-
-      // 3. Parse Hasil Task 1
-      if (resHasil1 && resHasil1.ok) {
-        const textHasil1 = await resHasil1.text();
-        const parsedHasil1 = parseHasilSheetRows(textHasil1);
-        dccSubmittedTask1Set = parsedHasil1.skuSet;
-        dccHasil1Rows = parsedHasil1.rows;
-      }
-
-      // 4. Parse Hasil Task 2
-      if (resHasil2 && resHasil2.ok) {
-        const textHasil2 = await resHasil2.text();
-        const parsedHasil2 = parseHasilSheetRows(textHasil2);
-        dccSubmittedTask2Set = parsedHasil2.skuSet;
-        dccHasil2Rows = parsedHasil2.rows;
-      }
-
-      // 5. Parse MTG sheet for submitted items (cross-check)
-      if (resMtg && resMtg.ok) {
-        try {
-          const csvMtg = await resMtg.text();
-          const rowsMtg = parseCSV(csvMtg);
-          for (let r = 1; r < rowsMtg.length; r++) {
-            const row = rowsMtg[r];
-            const timestamp = (row[0] || '').trim();
-            if (timestamp) {
-              let sku1 = (row[1] || '').trim().toLowerCase();
-              if (sku1.includes('|')) sku1 = sku1.split('|')[0].trim();
-              let sku17 = (row[17] || '').trim().toLowerCase();
-              if (sku17.includes('|')) sku17 = sku17.split('|')[0].trim();
-              const name2 = (row[2] || '').trim().toLowerCase();
-              const inputBy = (row[18] || '').trim().toLowerCase();
-
-              if (inputBy.includes('bintang')) {
-                if (sku1) dccSubmittedTask1Set.add(sku1);
-                if (sku17) dccSubmittedTask1Set.add(sku17);
-                if (name2) dccSubmittedTask1Set.add(name2);
-              } else if (inputBy) {
-                if (sku1) dccSubmittedTask2Set.add(sku1);
-                if (sku17) dccSubmittedTask2Set.add(sku17);
-                if (name2) dccSubmittedTask2Set.add(name2);
-              }
-
-              if (sku1) dccSubmittedSkuSet.add(sku1);
-              if (sku17) dccSubmittedSkuSet.add(sku17);
-              if (name2) dccSubmittedSkuSet.add(name2);
-            }
-          }
-        } catch (mtgErr) {
-          console.warn('Could not parse MTG submitted rows:', mtgErr);
-        }
-      }
-
-      // 6. Fallback to Main List SKU if Task 1 or Task 2 is empty
-      if (dccTask1List.length === 0 && dccTask2List.length === 0 && resMain && resMain.ok) {
+      // 1. Primary: Parse Mainlist SKU (Master Sheet unified layout: Shift 1 Pagi vs Shift 2 Siang)
+      if (resMain && resMain.ok) {
         const textMain = await resMain.text();
-        const fallbackRows = parseCSV(textMain);
-        if (fallbackRows && fallbackRows.length > 1) {
-          const headers = fallbackRows[0].map(h => h.toLowerCase().trim());
-          let skuIdx = headers.findIndex(h => (h === 'sku no' || h === 'sku number' || h === 'sku') && !h.includes('/'));
-          if (skuIdx === -1) skuIdx = 1;
-          const nameIdx = headers.findIndex(h => h === 'product name' || h.includes('product') || h.includes('nama'));
-          const slocIdx = headers.findIndex(h => h.includes('lokasi') || h.includes('rack') || (h.includes('sloc') && !h.includes('/')));
-          const stockIdx = headers.findIndex(h => h.includes('stock available') || h.includes('stock') || h.includes('stk'));
-          const assignIdx = headers.findIndex(h => h.includes('assign') || h.includes('pic') || h.includes('petugas') || h.includes('task'));
+        const mainRows = parseCSV(textMain);
+        if (mainRows && mainRows.length > 1) {
+          const headers = mainRows[0].map(h => (h || '').toLowerCase().trim());
+          const shiftIdx = headers.findIndex(h => h === 'shift');
+          let skuIdx = headers.findIndex(h => (h === 'sku' || h === 'sku no' || h === 'sku number') && !h.includes('/'));
+          if (skuIdx === -1) skuIdx = 2;
+          let nameIdx = headers.findIndex(h => h === 'nama produk' || h === 'product name' || h.includes('nama') || h.includes('product'));
+          if (nameIdx === -1) nameIdx = 3;
+          let slocIdx = headers.findIndex(h => h.includes('lokasi') || h.includes('rack') || (h.includes('sloc') && !h.includes('/')));
+          if (slocIdx === -1) slocIdx = 4;
+          let stockIdx = headers.findIndex(h => h.includes('qty sistem') || h.includes('stock available') || h.includes('qty') || h.includes('stock'));
+          if (stockIdx === -1) stockIdx = 5;
+          const typeIdx = headers.findIndex(h => h === 'type' || h.includes('type'));
+          const petugasIdx = headers.findIndex(h => h.includes('petugas') || h.includes('pic') || h.includes('assign'));
+          const statusIdx = headers.findIndex(h => h === 'status');
 
-          for (let i = 1; i < fallbackRows.length; i++) {
-            const row = fallbackRows[i];
-            let rawSku = skuIdx >= 0 ? (row[skuIdx] || '') : (row[1] || row[0] || '');
-            let cleanSku = rawSku.includes('|') ? rawSku.split('|')[0].trim() : rawSku.trim();
-            const name = nameIdx >= 0 ? (row[nameIdx] || '') : (row[2] || '');
-            const sloc = slocIdx >= 0 ? (row[slocIdx] || '') : (row[3] || '');
-            const stock = stockIdx >= 0 ? (row[stockIdx] || '') : (row[4] || '');
-            let assign = assignIdx >= 0 ? (row[assignIdx] || '') : '';
+          dccTask1List = [];
+          dccTask2List = [];
+
+          for (let i = 1; i < mainRows.length; i++) {
+            const row = mainRows[i];
+            let rawSku = (row[skuIdx] || '').trim();
+            let cleanSku = rawSku.includes('|') ? rawSku.split('|')[0].trim() : rawSku;
             if (!cleanSku) continue;
+
+            const name = (row[nameIdx] || '').trim();
+            const sloc = (row[slocIdx] || '').trim();
+            const stock = (row[stockIdx] || '').trim();
+            const typeVal = typeIdx !== -1 ? (row[typeIdx] || '').trim() : '';
+            const shiftStr = shiftIdx !== -1 ? (row[shiftIdx] || '').toLowerCase().trim() : '';
+            const statusVal = statusIdx !== -1 ? (row[statusIdx] || '').toUpperCase().trim() : '';
+            const petugasVal = petugasIdx !== -1 ? (row[petugasIdx] || '').trim() : '';
+
+            const isPagi = shiftStr.includes('1') || shiftStr.includes('pagi') || (!shiftStr && isItemTask1({ assign: petugasVal }));
+            const assign = petugasVal || (isPagi ? 'Bintang' : p2);
 
             const item = {
               sku: cleanSku,
-              productName: name.trim(),
-              slocExisting: sloc.trim(),
-              stock: stock.trim(),
-              assign: assign.trim() || 'Bintang',
-              task: isItemTask1({ assign }) ? 'task1' : 'task2'
+              productName: name,
+              slocExisting: sloc,
+              stock: stock,
+              type: typeVal,
+              assign: assign,
+              shift: isPagi ? 'Shift 1 (Pagi)' : 'Shift 2 (Siang)',
+              task: isPagi ? 'task1' : 'task2',
+              status: statusVal
             };
 
-            if (item.task === 'task1') dccTask1List.push(item);
-            else dccTask2List.push(item);
+            if (isPagi) {
+              dccTask1List.push(item);
+              if (statusVal === 'DONE') {
+                dccSubmittedTask1Set.add(cleanSku.toLowerCase());
+                if (name) dccSubmittedTask1Set.add(name.toLowerCase());
+              }
+            } else {
+              dccTask2List.push(item);
+              if (statusVal === 'DONE') {
+                dccSubmittedTask2Set.add(cleanSku.toLowerCase());
+                if (name) dccSubmittedTask2Set.add(name.toLowerCase());
+              }
+            }
+            if (statusVal === 'DONE') {
+              dccSubmittedSkuSet.add(cleanSku.toLowerCase());
+              if (name) dccSubmittedSkuSet.add(name.toLowerCase());
+            }
+          }
+
+          if (dccTask1List.length > 0 || dccTask2List.length > 0) {
+            parsedFromMainlist = true;
+          }
+        }
+      }
+
+      // 2. Primary: Parse Hasil DCC (Unified audit submission output)
+      if (resHasilDcc && resHasilDcc.ok) {
+        const textHasilDcc = await resHasilDcc.text();
+        const parsedHasilDcc = parseHasilSheetRows(textHasilDcc);
+        dccHasil1Rows = [];
+        dccHasil2Rows = [];
+        for (const row of parsedHasilDcc.rows) {
+          const sku1 = (row[1] || '').trim().toLowerCase();
+          const sku17 = (row[17] || '').trim().toLowerCase();
+          const name = (row[2] || '').trim().toLowerCase();
+          const inputBy = (row[18] || '').trim().toLowerCase();
+
+          const isTask1Item = inputBy.includes('bintang') || (sku1 && dccTask1List.some(it => it.sku.toLowerCase() === sku1));
+          if (isTask1Item) {
+            dccHasil1Rows.push(row);
+            if (sku1) dccSubmittedTask1Set.add(sku1);
+            if (sku17) dccSubmittedTask1Set.add(sku17);
+            if (name) dccSubmittedTask1Set.add(name);
+          } else {
+            dccHasil2Rows.push(row);
+            if (sku1) dccSubmittedTask2Set.add(sku1);
+            if (sku17) dccSubmittedTask2Set.add(sku17);
+            if (name) dccSubmittedTask2Set.add(name);
+          }
+          if (sku1) dccSubmittedSkuSet.add(sku1);
+          if (sku17) dccSubmittedSkuSet.add(sku17);
+          if (name) dccSubmittedSkuSet.add(name);
+        }
+      }
+
+      // 3. Fallback: Parse Legacy Task 1 & Task 2 sheets if Mainlist SKU is empty
+      if (!parsedFromMainlist) {
+        if (resTask1 && resTask1.ok) {
+          const textTask1 = await resTask1.text();
+          dccTask1List = parseTaskSheetRows(textTask1, 'Bintang', 'task1');
+        }
+        if (resTask2 && resTask2.ok) {
+          const textTask2 = await resTask2.text();
+          dccTask2List = parseTaskSheetRows(textTask2, p2, 'task2');
+        }
+        if (resHasil1 && resHasil1.ok) {
+          const textHasil1 = await resHasil1.text();
+          const parsedHasil1 = parseHasilSheetRows(textHasil1);
+          dccSubmittedTask1Set = parsedHasil1.skuSet;
+          dccHasil1Rows = parsedHasil1.rows;
+        }
+        if (resHasil2 && resHasil2.ok) {
+          const textHasil2 = await resHasil2.text();
+          const parsedHasil2 = parseHasilSheetRows(textHasil2);
+          dccSubmittedTask2Set = parsedHasil2.skuSet;
+          dccHasil2Rows = parsedHasil2.rows;
+        }
+        if (resMtg && resMtg.ok) {
+          try {
+            const csvMtg = await resMtg.text();
+            const rowsMtg = parseCSV(csvMtg);
+            for (let r = 1; r < rowsMtg.length; r++) {
+              const row = rowsMtg[r];
+              const timestamp = (row[0] || '').trim();
+              if (timestamp) {
+                let sku1 = (row[1] || '').trim().toLowerCase();
+                if (sku1.includes('|')) sku1 = sku1.split('|')[0].trim();
+                let sku17 = (row[17] || '').trim().toLowerCase();
+                if (sku17.includes('|')) sku17 = sku17.split('|')[0].trim();
+                const name2 = (row[2] || '').trim().toLowerCase();
+                const inputBy = (row[18] || '').trim().toLowerCase();
+
+                if (inputBy.includes('bintang')) {
+                  if (sku1) dccSubmittedTask1Set.add(sku1);
+                  if (sku17) dccSubmittedTask1Set.add(sku17);
+                  if (name2) dccSubmittedTask1Set.add(name2);
+                } else if (inputBy) {
+                  if (sku1) dccSubmittedTask2Set.add(sku1);
+                  if (sku17) dccSubmittedTask2Set.add(sku17);
+                  if (name2) dccSubmittedTask2Set.add(name2);
+                }
+
+                if (sku1) dccSubmittedSkuSet.add(sku1);
+                if (sku17) dccSubmittedSkuSet.add(sku17);
+                if (name2) dccSubmittedSkuSet.add(name2);
+              }
+            }
+          } catch (mtgErr) {
+            console.warn('Could not parse MTG submitted rows:', mtgErr);
           }
         }
       }
@@ -7256,23 +7352,25 @@
   //  EXPIRED DATE SWEEPER (EDS) MODULE ENGINE
   // ══════════════════════════════════════════════
 
-  const EDS_SPREADSHEET_ID = '17CgSdhmrp-pRSaiudQvtBGu7wCpWXUdnCV4aP53sK-A';
+  const EDS_SPREADSHEET_ID = '1fVQwSOoIU9pT5RHWi6-m8qCf_T0rQPZxEf_WuhlaD2g';
   const EDS_BASE_SHEET_URL = `https://docs.google.com/spreadsheets/d/${EDS_SPREADSHEET_ID}/gviz/tq?tqx=out:csv`;
-  const EDS_MAIN_URL = EDS_BASE_SHEET_URL + '&sheet=' + encodeURIComponent('Main List SKU');
+  const EDS_MAIN_URL = EDS_BASE_SHEET_URL + '&sheet=' + encodeURIComponent('Main List SKU ED Sweeper');
   const EDS_HASIL_URL = EDS_BASE_SHEET_URL + '&sheet=' + encodeURIComponent('Hasil EDS');
-  const EDS_UPDATE_URL = EDS_BASE_SHEET_URL + '&sheet=' + encodeURIComponent('Data Update');
+  const EDS_UPDATE_URL = EDS_BASE_SHEET_URL + '&sheet=' + encodeURIComponent('Data Update ED Sweeper');
   const EDS_REPORT_URL = EDS_BASE_SHEET_URL + '&sheet=Report';
   const EDS_DEFAULT_WEBAPP_URL = 'https://script.google.com/macros/s/AKfycbztOsGIAVVfd2SjvkW_euEa7PyU76A4_PJ0HdJgw80eUOHe4XuRuLKoftL9ZxgrDfFLcw/exec';
 
-  const EDS_MAIN_CACHE_KEY = 'EDS_MAIN_CACHE_MTG_V3';
-  const EDS_SUBMITTED_CACHE_KEY = 'EDS_SUBMITTED_CACHE_MTG_V3';
+  const EDS_MAIN_CACHE_KEY = 'EDS_MAIN_CACHE_MTG_V4';
+  const EDS_SUBMITTED_CACHE_KEY = 'EDS_SUBMITTED_CACHE_MTG_V4';
   const EDS_PIC_KEY = 'EDS_DEFAULT_PIC_V2';
   const EDS_WEBAPP_KEY = 'EDS_CUSTOM_WEBAPP_URL_V3';
 
-  // Bersihkan cache usang V2 agar tidak ada status Done hantu yang nyangkut
+  // Bersihkan cache usang V2 & V3 agar tidak ada status Done hantu yang nyangkut
   try {
     localStorage.removeItem('EDS_MAIN_CACHE_MTG_V2');
     localStorage.removeItem('EDS_SUBMITTED_CACHE_MTG_V2');
+    localStorage.removeItem('EDS_MAIN_CACHE_MTG_V3');
+    localStorage.removeItem('EDS_SUBMITTED_CACHE_MTG_V3');
     localStorage.removeItem('EDS_MAIN_CACHE_MTG');
     localStorage.removeItem('EDS_SUBMITTED_CACHE_MTG');
     localStorage.removeItem('EDS_CUSTOM_WEBAPP_URL_V2');

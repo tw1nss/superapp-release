@@ -1,28 +1,81 @@
 /**
  * ==============================================================================
- * GOOGLE APPS SCRIPT: ED SWEEPER MTG #STAR
- * Spreadsheet: https://docs.google.com/spreadsheets/d/17CgSdhmrp-pRSaiudQvtBGu7wCpWXUdnCV4aP53sK-A/edit
+ * 🚀 GOOGLE APPS SCRIPT: ED SWEEPER MTG (INTEGRATED)
+ * Spreadsheet Target: Dashboard STK MTG 2K26
+ * ID: 1fVQwSOoIU9pT5RHWi6-m8qCf_T0rQPZxEf_WuhlaD2g
  * 
- * ALUR SISTEM:
- * 1. Sheet "Data Update" = Data mentah (raw data) produk, rak, stok & tanggal kadaluarsa.
- * 2. Sheet "Main List SKU" = List tugas harian! SKU diisi manual oleh supervisor, 
- *    sedangkan nama produk, rak, stok dll. otomatis dihitung lewat RUMUS.
- * 3. Sheet "Hasil EDS" = Merekap hasil audit petugas yang diinput melalui SuperApp MTG (doPost).
- * 4. Sheet "Backup Data" = Arsip backup hasil rekapan EDS (Backup Manual & Otomatis 23:00 WIB).
+ * ALUR SISTEM & NAMA SHEET:
+ * 1. Sheet "Data Update ED Sweeper" = Data mentah (raw data) produk, rak, stok & tanggal kadaluarsa.
+ * 2. Sheet "Main List SKU ED Sweeper" = List tugas harian! SKU diisi manual oleh supervisor 
+ *    atau dimasukkan via menu otomatis (Critical & Hard Warning).
+ * 3. Sheet "Hasil EDS ED Sweeper" = Merekap hasil audit petugas yang diinput melalui SuperApp MTG (doPost).
+ * 4. Sheet "Backup Data ED Sweeper" = Arsip backup hasil rekapan EDS (Backup Manual & Otomatis 23:00 WIB).
  * ==============================================================================
  */
 
 // =============================
-// ⚙️ CONFIG SUPERSET ASTRODASH
+// ⚙️ CONFIG SUPERSET ASTRODASH & EDS
 // =============================
 var SUPERSET_CONFIG = {
   BASE_URL: "https://dash.astronauts.id/",
-  DEFAULT_CHART_ID: 24592, // Slice ID ED Sweeper dari link dashboard
+  TARGET_FILE_ID: "1fVQwSOoIU9pT5RHWi6-m8qCf_T0rQPZxEf_WuhlaD2g",
+  DEFAULT_CHART_ID: 24592, // Slice ID ED Sweeper dari dashboard AstroDash
   DASHBOARD_PAGE_ID: "U3z99CtEM_b7ZlpM-m6TD",
   MAX_RETRY: 3,
   RETRY_DELAY: 2000,
   TIMEZONE: "Asia/Jakarta"
 };
+
+// =============================
+// 📑 NAMA SHEET KHUSUS ED SWEEPER
+// =============================
+var EDS_SHEETS = {
+  DATA_UPDATE: "Data Update ED Sweeper",
+  MAIN_LIST: "Main List SKU ED Sweeper",
+  HASIL: "Hasil EDS ED Sweeper",
+  BACKUP: "Backup Data ED Sweeper"
+};
+
+// Helper: Ambil spreadsheet target (Bisa bound atau standalone ID)
+function getEdsSpreadsheet() {
+  try {
+    if (SUPERSET_CONFIG.TARGET_FILE_ID) {
+      return SpreadsheetApp.openById(SUPERSET_CONFIG.TARGET_FILE_ID);
+    }
+  } catch (e) {
+    console.warn("Gagal openById EDS, menggunakan Active Spreadsheet:", e);
+  }
+  return SpreadsheetApp.getActiveSpreadsheet();
+}
+
+// 🔍 HELPER FLEKSIBEL: Cari sheet EDS dengan toleransi typo / nama lama
+function getEdsSheet(type) {
+  var ss = getEdsSpreadsheet();
+  if (type === 'MAIN_LIST') {
+    return ss.getSheetByName('Main List SKU ED Sweeper') || 
+           ss.getSheetByName('Main List SKU ED Sweepe') || 
+           ss.getSheetByName('Mainlist SKU ED Sweeper') || 
+           ss.getSheetByName('Main List ED Sweeper') || 
+           ss.getSheetByName('Main List SKU');
+  }
+  if (type === 'DATA_UPDATE') {
+    return ss.getSheetByName('Data Update ED Sweeper') || 
+           ss.getSheetByName('Data Update ED Sweepe') || 
+           ss.getSheetByName('Data Update');
+  }
+  if (type === 'HASIL') {
+    return ss.getSheetByName('Hasil EDS ED Sweeper') || 
+           ss.getSheetByName('Hasil ED Sweeper') || 
+           ss.getSheetByName('Hasil EDS');
+  }
+  if (type === 'BACKUP') {
+    return ss.getSheetByName('Backup Data ED Sweeper') || 
+           ss.getSheetByName('Backup ED Sweeper') || 
+           ss.getSheetByName('Backup Data') || 
+           ss.getSheetByName('Backup data');
+  }
+  return null;
+}
 
 // ── 1. MENU CUSTOM DI GOOGLE SHEETS ──
 function onOpen() {
@@ -30,31 +83,47 @@ function onOpen() {
     ensureDailyBackupTrigger();
     ensureAutoSupersetTrigger();
   } catch (e) {
-    console.warn('Gagal set trigger:', e);
+    console.warn('Gagal set trigger EDS:', e);
   }
 
-  const ui = SpreadsheetApp.getUi();
+  var ui = SpreadsheetApp.getUi();
+  // Bangun menu Superset & DCC jika function-nya ada
+  if (typeof buildSupersetMenu === 'function') buildSupersetMenu(ui);
+  if (typeof buildDccMenu === 'function') buildDccMenu(ui);
+  // Bangun menu ED Sweeper
+  buildEdSweeperMenu(ui);
+}
+
+function buildEdSweeperMenu(ui) {
+  if (!ui) ui = SpreadsheetApp.getUi();
   ui.createMenu('⚡ ED Sweeper Control')
-    .addItem('🔄 Update Data (Tarik dari Superset)', 'updateDataFromSupersetManual')
-    .addItem('📋 Sinkronkan Data Update ke Main List (Bebas #ERROR!)', 'syncDataUpdateToMainListManual')
-    .addItem('🔧 Pasang Rumus VLOOKUP (Sintaks Titik Koma ;)', 'restoreMainListFormulas')
-    .addItem('⚡ Refresh & Sinkronisasi', 'updateDataManual')
+    .addItem('🔄 Tarik Data Superset ke Data Update', 'updateDataFromSupersetManual')
     .addSeparator()
-    .addSubMenu(ui.createMenu('🎯 Filter Kategori Alert')
-      .addItem('🟢 Semua Alert (Warning, Hard Warning & Critical)', 'filterSheetAlertAllWarningCritical')
+    .addSubMenu(ui.createMenu('📥 Masukkan SKU Tugas ke Main List')
+      .addItem('🔥 Masukkan SKU Critical & Hard Warning', 'populateMainListCriticalAndHard')
+      .addItem('🔴 Masukkan Hanya SKU Critical', 'populateMainListCriticalOnly')
+      .addItem('🟠 Masukkan Hanya SKU Hard Warning', 'populateMainListHardWarningOnly')
+      .addItem('🟢 Masukkan Semua Alert (Warning, Hard & Critical)', 'populateMainListAllAlerts')
+    )
+    .addItem('📋 Sinkronkan Detail SKU di Main List', 'syncDataUpdateToMainListManual')
+    .addItem('🧹 Kosongkan / Reset Sheet Main List SKU', 'clearMainListSkuPrompt')
+    .addItem('🔧 Pasang Rumus VLOOKUP (Opsional)', 'restoreMainListFormulas')
+    .addSeparator()
+    .addSubMenu(ui.createMenu('🎯 Filter Kategori Alert (Tampilan Saja)')
+      .addItem('🔥 Critical & Hard Warning', 'filterSheetAlertCriticalAndHard')
       .addItem('🔴 Hanya Critical', 'filterSheetAlertCriticalOnly')
       .addItem('🔴 Hanya Hard Warning', 'filterSheetAlertHardWarningOnly')
       .addItem('🟡 Hanya Warning', 'filterSheetAlertWarningOnly')
-      .addItem('🔥 Critical & Hard Warning', 'filterSheetAlertCriticalAndHard')
+      .addItem('🟢 Semua Alert (Warning, Hard Warning & Critical)', 'filterSheetAlertAllWarningCritical')
       .addSeparator()
       .addItem('🔄 Reset / Tampilkan Semua Baris', 'resetSheetAlertFilter')
     )
     .addSeparator()
-    .addItem('🔑 Set / Ganti Cookie Superset', 'setSupersetCookiePrompt')
-    .addItem('🎯 Set ID Chart Superset', 'setSupersetChartIdPrompt')
+    .addItem('📦 Backup Data Hasil EDS & Kosongkan Main List', 'backupHasilEdsManual')
+    .addItem('🔄 Backup & Reset Total (Hasil EDS + Main List)', 'backupAndResetHasilEdsManual')
     .addSeparator()
-    .addItem('📦 Backup Data Hasil EDS ke "Backup Data"', 'backupHasilEdsManual')
-    .addItem('🔄 Backup & Reset Sheet "Hasil EDS"', 'backupAndResetHasilEdsManual')
+    .addItem('🔑 Set / Ganti Cookie Superset', 'setSupersetCookiePrompt')
+    .addItem('🎯 Set ID Chart Superset EDS', 'setSupersetChartIdPrompt')
     .addToUi();
 }
 
@@ -62,7 +131,7 @@ function showDeployGuidePrompt() {
   const ui = SpreadsheetApp.getUi();
   ui.alert(
     '📋 Panduan Pasang WebApp URL ke SuperApp MTG',
-    'Langkah agar hasil audit dari SuperApp masuk ke sheet "Hasil EDS":\n\n' +
+    'Langkah agar hasil audit dari SuperApp masuk ke sheet Hasil EDS:\n\n' +
     '1. Di menu atas Apps Script ini, klik tombol biru "Terapkan" (Deploy) ➔ "Penerapan baru".\n' +
     '2. Klik ikon Gerigi (⚙️) ➔ Pilih "Aplikasi web".\n' +
     '3. Konfigurasi:\n' +
@@ -70,7 +139,7 @@ function showDeployGuidePrompt() {
     '   - Yang memiliki akses: "Siapa saja"\n' +
     '4. Klik "Terapkan" ➔ Salin (Copy) "URL Aplikasi Web" yang berakhiran /exec.\n' +
     '5. Buka SuperApp MTG di HP ➔ Masuk menu Expired Date Sweeper ➔ Tab Scan/Input ➔ Klik banner/tombol "Koneksi WebApp" dan paste URL tersebut.\n\n' +
-    '✅ Seketika setiap audit yang dikirim dari HP akan langsung masuk ke sheet "Hasil EDS" dan kolom Done otomatis terisi!',
+    '✅ Seketika setiap audit yang dikirim dari HP akan langsung masuk ke sheet Hasil EDS dan kolom Done otomatis terisi!',
     ui.ButtonSet.OK
   );
 }
@@ -93,7 +162,7 @@ function ensureDailyBackupTrigger() {
       .everyDays(1)
       .atHour(23)
       .create();
-    console.log('Background Daily Backup Trigger (23:00 WIB) aktif.');
+    console.log('Background Daily Backup Trigger EDS (23:00 WIB) aktif.');
   }
 }
 
@@ -101,7 +170,7 @@ function dailyAutoBackupTask() {
   try {
     backupHasilEdsToBackupSheet(false);
   } catch (err) {
-    console.error('Error saat auto-backup harian:', err);
+    console.error('Error saat auto-backup harian EDS:', err);
   }
 }
 
@@ -121,58 +190,41 @@ function ensureAutoSupersetTrigger() {
       .timeBased()
       .everyMinutes(5)
       .create();
-    console.log('Background Auto-Pull Superset (Setiap 5 Menit) aktif.');
+    console.log('Background Auto-Pull Superset EDS (Setiap 5 Menit) aktif.');
   }
 }
 
 function autoPullSupersetBackground() {
   try {
-    pullSupersetDataToSheet('Data Update', true);
+    const updateSheet = getEdsSheet('DATA_UPDATE');
+    const targetName = updateSheet ? updateSheet.getName() : EDS_SHEETS.DATA_UPDATE;
+    pullSupersetDataToSheet(targetName, true);
   } catch (e) {
-    console.error('Background auto-pull Superset error:', e);
+    console.error('Background auto-pull Superset EDS error:', e);
   }
 }
 
 function updateDataFromSupersetManual() {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const ss = getEdsSpreadsheet();
+  const updateSheet = getEdsSheet('DATA_UPDATE');
+  const targetName = updateSheet ? updateSheet.getName() : EDS_SHEETS.DATA_UPDATE;
   ss.toast('⚡ Menghubungkan ke AstroDash Superset...', 'Loading', 3);
-  const ok = pullSupersetDataToSheet('Data Update', false);
-  if (ok) {
-    updateDataManual();
-  }
-}
-
-function setSupersetCookiePrompt() {
-  const ui = SpreadsheetApp.getUi();
-  const current = PropertiesService.getScriptProperties().getProperty('MY_COOKIE') || '';
-  const resp = ui.prompt(
-    '🔑 Set Cookie Superset (AstroDash)',
-    'Salin nilai Cookie dari browser Anda saat membuka dash.astronauts.id lalu paste di sini:\n' +
-    (current ? '(Cookie saat ini sudah terpasang. Paste yang baru jika cookie sebelumnya expired)' : ''),
-    ui.ButtonSet.OK_CANCEL
-  );
-  if (resp.getSelectedButton() === ui.Button.OK) {
-    const cookie = resp.getResponseText().trim();
-    if (cookie) {
-      PropertiesService.getScriptProperties().setProperty('MY_COOKIE', cookie);
-      ui.alert('Sukses', '✅ Cookie Superset berhasil disimpan! Sekarang Anda bisa menarik data kapan saja.', ui.ButtonSet.OK);
-    }
-  }
+  pullSupersetDataToSheet(targetName, false);
 }
 
 function setSupersetChartIdPrompt() {
   const ui = SpreadsheetApp.getUi();
-  const current = PropertiesService.getScriptProperties().getProperty('SUPERSET_CHART_ID') || SUPERSET_CONFIG.DEFAULT_CHART_ID;
+  const current = PropertiesService.getScriptProperties().getProperty('SUPERSET_CHART_ID_EDS') || SUPERSET_CONFIG.DEFAULT_CHART_ID;
   const resp = ui.prompt(
-    '🎯 Set ID Chart Superset',
-    'Masukkan ID Chart (Slice ID) untuk data ED Sweeper / MSLTC (Default: ' + current + '):',
+    '🎯 Set ID Chart Superset ED Sweeper',
+    'Masukkan ID Chart (Slice ID) untuk data ED Sweeper (Default: ' + current + '):',
     ui.ButtonSet.OK_CANCEL
   );
   if (resp.getSelectedButton() === ui.Button.OK) {
     const id = resp.getResponseText().trim();
     if (id) {
-      PropertiesService.getScriptProperties().setProperty('SUPERSET_CHART_ID', id);
-      ui.alert('Sukses', '✅ ID Chart berhasil diset ke: ' + id, ui.ButtonSet.OK);
+      PropertiesService.getScriptProperties().setProperty('SUPERSET_CHART_ID_EDS', id);
+      ui.alert('Sukses', '✅ ID Chart ED Sweeper berhasil diset ke: ' + id, ui.ButtonSet.OK);
     }
   }
 }
@@ -180,7 +232,7 @@ function setSupersetChartIdPrompt() {
 function pullSupersetDataToSheet(sheetName, isSilent) {
   const props = PropertiesService.getScriptProperties();
   const cookie = props.getProperty('MY_COOKIE');
-  let chartId = props.getProperty('SUPERSET_CHART_ID');
+  let chartId = props.getProperty('SUPERSET_CHART_ID_EDS') || props.getProperty('SUPERSET_CHART_ID');
   if (!chartId || chartId === '11815') {
     chartId = SUPERSET_CONFIG.DEFAULT_CHART_ID;
   }
@@ -270,11 +322,8 @@ function pullSupersetDataToSheet(sheetName, isSilent) {
   }
 
   if (success) {
-    // 🚀 Auto-sync seluruh SKU dari Data Update ke Main List SKU!
-    syncDataUpdateToMainList(true);
-
     if (!isSilent) {
-      SpreadsheetApp.getActiveSpreadsheet().toast('✅ Berhasil menarik ' + data.length + ' data terbaru dari AstroDash Superset ke "' + sheetName + '" & menyinkronkan Main List SKU!', 'Update Sukses ⚡', 5);
+      getEdsSpreadsheet().toast('✅ Berhasil menarik ' + data.length + ' data terbaru dari AstroDash Superset ke "' + sheetName + '"!', 'Update Sukses ⚡', 5);
     }
     return true;
   } else {
@@ -286,31 +335,25 @@ function pullSupersetDataToSheet(sheetName, isSilent) {
 }
 
 function processSupersetDataToSheet(data, sheetName) {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const ss = getEdsSpreadsheet();
   const sheet = ss.getSheetByName(sheetName) || ss.insertSheet(sheetName);
 
   if (!data || data.length === 0) return;
 
-  // 🎯 FILTER PRODUK DENGAN ALERT WARNING, HARD WARNING & CRITICAL
+  // Filter alert produk
   const filteredData = data.filter(function(item) {
     const alertVal = String(item.alert || item.Alert || item.ALERT || item.status || '').toLowerCase();
     const remDaysRaw = item['remaining days'] !== undefined ? item['remaining days'] : (item.remaining_days !== undefined ? item.remaining_days : (item.remainingDays !== undefined ? item.remainingDays : ''));
     const remainingDays = (remDaysRaw !== '' && !isNaN(Number(remDaysRaw))) ? Number(remDaysRaw) : NaN;
 
-    // Critical: sisa <= 0 hari atau alert mengandung critical
     const isCritical = alertVal.includes('critical') || (!isNaN(remainingDays) && remainingDays <= 0);
-
-    // Hard Warning: sisa === 1 hari atau alert mengandung hard
     const isHardWarning = alertVal.includes('hard') || (!isNaN(remainingDays) && remainingDays === 1);
-
-    // Warning: sisa 2 s/d 3 hari ATAU alert mengandung warning (tanpa kata hard)
     const isWarning = (!alertVal.includes('hard') && alertVal.includes('warning')) || (!isNaN(remainingDays) && remainingDays >= 2 && remainingDays <= 3);
 
     return isCritical || isHardWarning || isWarning;
   });
 
   const finalData = filteredData.length > 0 ? filteredData : data;
-
   const headers = Object.keys(finalData[0]);
 
   const rows = finalData.map(function(item) {
@@ -318,12 +361,10 @@ function processSupersetDataToSheet(data, sheetName) {
       const value = item[key];
       const cleanKey = key.toLowerCase();
 
-      // SKU wajib string agar digit awal tidak hilang
       if (cleanKey.includes("sku")) {
         return String(value);
       }
 
-      // Format tanggal jika numeric timestamp
       if (cleanKey.includes("date") && value && !isNaN(value) && typeof value === 'number') {
         try {
           return Utilities.formatDate(
@@ -357,27 +398,48 @@ function processSupersetDataToSheet(data, sheetName) {
   SpreadsheetApp.flush();
 }
 
-// ── 4. SINKRONISASI OTOMATIS: DATA UPDATE ➔ MAIN LIST SKU ──
+// ── 4. SINKRONISASI DETAIL: DATA UPDATE ➔ MAIN LIST SKU ──
 
 function syncDataUpdateToMainListManual() {
   syncDataUpdateToMainList(false);
 }
 
 function syncDataUpdateToMainList(isSilent) {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const updateSheet = ss.getSheetByName('Data Update');
-  const mainSheet = ss.getSheetByName('Main List SKU');
-  const hasilSheet = ss.getSheetByName('Hasil EDS');
+  const ss = getEdsSpreadsheet();
+  const updateSheet = getEdsSheet('DATA_UPDATE');
+  const mainSheet = getEdsSheet('MAIN_LIST');
+  const hasilSheet = getEdsSheet('HASIL');
 
   if (!updateSheet || updateSheet.getLastRow() <= 1) {
-    if (!isSilent) ss.toast('Sheet "Data Update" belum memiliki data. Tarik data dari Superset terlebih dahulu.', 'Perhatian', 4);
+    if (!isSilent) ss.toast('Sheet Data Update belum memiliki data. Tarik data dari Superset terlebih dahulu.', 'Perhatian', 4);
     return;
   }
 
   if (!mainSheet) {
-    if (!isSilent) ss.toast('Sheet "Main List SKU" tidak ditemukan.', 'Error', 4);
+    if (!isSilent) ss.toast('Sheet Main List SKU ED Sweeper tidak ditemukan.', 'Error', 4);
     return;
   }
+
+  const lastRow = mainSheet.getLastRow();
+  if (lastRow <= 1) {
+    if (!isSilent) {
+      ss.toast('Sheet "' + mainSheet.getName() + '" masih kosong. Silakan gunakan menu "Masukkan SKU Tugas ke Main List" terlebih dahulu.', 'Info', 5);
+    }
+    return;
+  }
+
+  const mainHeaders = mainSheet.getRange(1, 1, 1, Math.max(mainSheet.getLastColumn(), 20)).getValues()[0].map(function(h) {
+    return String(h || '').trim().toLowerCase();
+  });
+  let mainSkuColIdx = mainHeaders.indexOf('sku');
+  if (mainSkuColIdx === -1) mainSkuColIdx = mainHeaders.indexOf('sku_number');
+  if (mainSkuColIdx === -1) mainSkuColIdx = mainHeaders.indexOf('sku number');
+  if (mainSkuColIdx === -1) mainSkuColIdx = 1;
+
+  const numRows = lastRow - 1;
+  const numCols = Math.max(mainSheet.getLastColumn(), 20);
+  const mainDataRange = mainSheet.getRange(2, 1, numRows, numCols);
+  const mainRows = mainDataRange.getValues();
 
   const upData = updateSheet.getDataRange().getValues();
   const upHeaders = upData[0].map(function(h) { return String(h || '').trim().toLowerCase(); });
@@ -395,7 +457,6 @@ function syncDataUpdateToMainList(isSilent) {
   const colRemDays = upHeaders.indexOf('remaining days') !== -1 ? upHeaders.indexOf('remaining days') : (upHeaders.indexOf('remaining_days') !== -1 ? upHeaders.indexOf('remaining_days') : 11);
   const colAlert = upHeaders.indexOf('alert') !== -1 ? upHeaders.indexOf('alert') : 12;
 
-  // Kumpulkan detail lengkap produk unik dari Data Update
   const updateDataMap = new Map();
   for (let i = 1; i < upData.length; i++) {
     const row = upData[i];
@@ -418,12 +479,6 @@ function syncDataUpdateToMainList(isSilent) {
     }
   }
 
-  if (updateDataMap.size === 0) {
-    if (!isSilent) ss.toast('Tidak ada SKU yang ditemukan di Data Update.', 'Info', 3);
-    return;
-  }
-
-  // Riwayat audit yang sudah tersimpan di Hasil EDS agar status Done & Remaks tidak hilang
   const hasilMap = new Map();
   if (hasilSheet && hasilSheet.getLastRow() > 1) {
     const hRows = hasilSheet.getDataRange().getValues();
@@ -439,110 +494,256 @@ function syncDataUpdateToMainList(isSilent) {
     }
   }
 
-  // Siapkan baris data langsung (NILAI BERSIH / REAL DATA LANGSUNG DARI DATA UPDATE, BEBAS #ERROR!)
   const todayDate = Utilities.formatDate(new Date(), "Asia/Jakarta", "dd/MM/yyyy");
-  const newRows = [];
+  let matchedCount = 0;
 
-  updateDataMap.forEach(function(item) {
-    const sku = item.sku;
-    const audit = hasilMap.get(sku.toLowerCase());
+  for (let r = 0; r < mainRows.length; r++) {
+    const row = mainRows[r];
+    let skuVal = String(row[mainSkuColIdx] || '').trim();
+    if (!skuVal && mainSkuColIdx !== 1) skuVal = String(row[1] || '').trim();
+    if (!skuVal && mainSkuColIdx !== 0) skuVal = String(row[0] || '').trim();
 
+    if (!skuVal) continue;
+
+    const skuKey = skuVal.toLowerCase();
+    const upItem = updateDataMap.get(skuKey);
+    const audit = hasilMap.get(skuKey);
+
+    if (!row[0]) {
+      row[0] = todayDate;
+    }
+
+    if (mainSkuColIdx === 1) {
+      row[1] = skuVal;
+    }
+
+    if (upItem) {
+      row[2] = upItem.productName;
+      row[3] = upItem.rackName;
+      row[4] = upItem.qtySystem;
+      if (row[5] === '' || row[5] === undefined || row[5] === null) row[5] = 0;
+      if (row[6] === '' || row[6] === undefined || row[6] === null) row[6] = 0;
+      row[7] = upItem.hub;
+      row[8] = upItem.expiryDate;
+      row[9] = upItem.msltc;
+      row[10] = upItem.qtySystem;
+      row[11] = upItem.rackName;
+      row[12] = upItem.l1Category;
+      row[13] = upItem.l2Category;
+      row[14] = upItem.msltcDate;
+      row[15] = upItem.remainingDays;
+      row[16] = upItem.alert;
+      matchedCount++;
+    }
+
+    if (audit) {
+      row[17] = 'Done';
+      row[18] = audit.remaks;
+      const qtySys = upItem ? upItem.qtySystem : (row[10] || row[4] || 0);
+      row[19] = audit.fisikGood + '/' + qtySys;
+    }
+  }
+
+  mainDataRange.setValues(mainRows);
+  SpreadsheetApp.flush();
+
+  if (!isSilent) {
+    ss.toast('✅ Berhasil menyinkronkan detail untuk ' + matchedCount + ' SKU di "' + mainSheet.getName() + '"!', 'Sinkronisasi Sukses ⚡', 5);
+  }
+}
+
+// ── 4B. FITUR OTOMATIS: MASUKKAN SKU TUGAS KE MAIN LIST EDS ──
+
+function populateMainListCriticalAndHard() {
+  populateMainListFromAlert('CRITICAL_AND_HARD', 'Critical & Hard Warning');
+}
+
+function populateMainListCriticalOnly() {
+  populateMainListFromAlert('CRITICAL', 'Hanya Critical');
+}
+
+function populateMainListHardWarningOnly() {
+  populateMainListFromAlert('HARD_WARNING', 'Hanya Hard Warning');
+}
+
+function populateMainListAllAlerts() {
+  populateMainListFromAlert('ALL', 'Semua Alert (Warning, Hard & Critical)');
+}
+
+function populateMainListFromAlert(mode, label) {
+  const ss = getEdsSpreadsheet();
+  const updateSheet = getEdsSheet('DATA_UPDATE');
+  const mainSheet = getEdsSheet('MAIN_LIST');
+  const hasilSheet = getEdsSheet('HASIL');
+
+  if (!updateSheet || updateSheet.getLastRow() <= 1) {
+    SpreadsheetApp.getUi().alert('Data Update Kosong', 'Sheet Data Update belum memiliki data. Silakan klik menu "Tarik Data Superset" terlebih dahulu.', SpreadsheetApp.getUi().ButtonSet.OK);
+    return;
+  }
+
+  if (!mainSheet) {
+    SpreadsheetApp.getUi().alert('Error', 'Sheet Main List SKU ED Sweeper tidak ditemukan.\nPastikan nama tab berakhiran "ED Sweeper".', SpreadsheetApp.getUi().ButtonSet.OK);
+    return;
+  }
+
+  const upData = updateSheet.getDataRange().getValues();
+  const upHeaders = upData[0].map(function(h) { return String(h || '').trim().toLowerCase(); });
+
+  const colSku = upHeaders.indexOf('sku_number') !== -1 ? upHeaders.indexOf('sku_number') : (upHeaders.indexOf('sku') !== -1 ? upHeaders.indexOf('sku') : 0);
+  const colName = upHeaders.indexOf('product_name') !== -1 ? upHeaders.indexOf('product_name') : 1;
+  const colHub = upHeaders.indexOf('location_name') !== -1 ? upHeaders.indexOf('location_name') : 2;
+  const colExp = upHeaders.indexOf('expiry_date') !== -1 ? upHeaders.indexOf('expiry_date') : 4;
+  const colMsltc = upHeaders.indexOf('msltc') !== -1 ? upHeaders.indexOf('msltc') : 5;
+  const colQty = upHeaders.indexOf('qty_system') !== -1 ? upHeaders.indexOf('qty_system') : 6;
+  const colRack = upHeaders.indexOf('rack_name') !== -1 ? upHeaders.indexOf('rack_name') : 7;
+  const colCat1 = upHeaders.indexOf('l1_category_name') !== -1 ? upHeaders.indexOf('l1_category_name') : 8;
+  const colCat2 = upHeaders.indexOf('l2_category_name') !== -1 ? upHeaders.indexOf('l2_category_name') : 9;
+  const colMsDate = upHeaders.indexOf('msltc_date') !== -1 ? upHeaders.indexOf('msltc_date') : 10;
+  const colRemDays = upHeaders.indexOf('remaining days') !== -1 ? upHeaders.indexOf('remaining days') : (upHeaders.indexOf('remaining_days') !== -1 ? upHeaders.indexOf('remaining_days') : 11);
+  const colAlert = upHeaders.indexOf('alert') !== -1 ? upHeaders.indexOf('alert') : 12;
+
+  const hasilMap = new Map();
+  if (hasilSheet && hasilSheet.getLastRow() > 1) {
+    const hRows = hasilSheet.getDataRange().getValues();
+    for (let h = 1; h < hRows.length; h++) {
+      const hSku = String(hRows[h][0] || hRows[h][16] || '').trim().toLowerCase();
+      if (hSku) {
+        hasilMap.set(hSku, {
+          done: 'Done',
+          remaks: hRows[h][9] || hRows[h][8] || 'Sesuai',
+          fisikGood: hRows[h][5]
+        });
+      }
+    }
+  }
+
+  const todayDate = Utilities.formatDate(new Date(), "Asia/Jakarta", "dd/MM/yyyy");
+  const filteredRows = [];
+  const seenSkus = new Set();
+
+  for (let i = 1; i < upData.length; i++) {
+    const row = upData[i];
+    const sku = String(row[colSku] || '').trim();
+    if (!sku) continue;
+
+    const skuKey = sku.toLowerCase();
+    if (seenSkus.has(skuKey)) continue;
+
+    const remDaysRaw = row[colRemDays];
+    const remainingDays = (remDaysRaw !== '' && !isNaN(Number(remDaysRaw))) ? Number(remDaysRaw) : NaN;
+    const alertText = String(row[colAlert] || '').toLowerCase();
+
+    const isCritical = alertText.includes('critical') || (!isNaN(remainingDays) && remainingDays <= 0);
+    const isHard = alertText.includes('hard') || (!isNaN(remainingDays) && remainingDays === 1);
+    const isWarn = (!alertText.includes('hard') && alertText.includes('warning')) || (!isNaN(remainingDays) && remainingDays >= 2 && remainingDays <= 3);
+
+    let match = false;
+    if (mode === 'ALL') {
+      match = isCritical || isHard || isWarn;
+    } else if (mode === 'CRITICAL') {
+      match = isCritical;
+    } else if (mode === 'HARD_WARNING') {
+      match = isHard;
+    } else if (mode === 'WARNING') {
+      match = isWarn;
+    } else if (mode === 'CRITICAL_AND_HARD') {
+      match = isCritical || isHard;
+    }
+
+    if (!match) continue;
+
+    seenSkus.add(skuKey);
+    const audit = hasilMap.get(skuKey);
     const doneVal = audit ? 'Done' : '';
     const remaksVal = audit ? audit.remaks : '';
-    const fisikVal = audit ? (audit.fisikGood + '/' + item.qtySystem) : '';
+    const qtySys = (row[colQty] !== '' && !isNaN(row[colQty])) ? Number(row[colQty]) : (row[colQty] || 0);
+    const fisikVal = audit ? (audit.fisikGood + '/' + qtySys) : '';
 
-    newRows.push([
+    filteredRows.push([
       todayDate,                  // Kolom A: Tanggal
       sku,                        // Kolom B: SKU
-      item.productName,           // Kolom C: Product Name
-      item.rackName,              // Kolom D: Lokasi Rack
-      item.qtySystem,             // Kolom E: Stock Available
+      row[colName] || '',         // Kolom C: Product Name
+      row[colRack] || '',         // Kolom D: Lokasi Rack
+      qtySys,                     // Kolom E: Stock Available
       0,                          // Kolom F: Stock Bad
       0,                          // Kolom G: Stock LDP
-      item.hub,                   // Kolom H: Hub
-      item.expiryDate,            // Kolom I: expiry_date
-      item.msltc,                 // Kolom J: msltc
-      item.qtySystem,             // Kolom K: qty_system
-      item.rackName,              // Kolom L: rack_name
-      item.l1Category,            // Kolom M: l1_category_name
-      item.l2Category,            // Kolom N: l2_category_name
-      item.msltcDate,             // Kolom O: MSLTC_date
-      item.remainingDays,         // Kolom P: remaining days
-      item.alert,                 // Kolom Q: alert
+      row[colHub] || 'MTG - Menteng', // Kolom H: Hub
+      row[colExp] || '',          // Kolom I: expiry_date
+      row[colMsltc] || '',        // Kolom J: msltc
+      qtySys,                     // Kolom K: qty_system
+      row[colRack] || '',         // Kolom L: rack_name
+      row[colCat1] || '',         // Kolom M: l1_category_name
+      row[colCat2] || '',         // Kolom N: l2_category_name
+      row[colMsDate] || '',       // Kolom O: MSLTC_date
+      row[colRemDays] !== undefined ? row[colRemDays] : '', // Kolom P: remaining days
+      row[colAlert] || '',        // Kolom Q: alert
       doneVal,                    // Kolom R: Done
       remaksVal,                  // Kolom S: Remaks DCC
       fisikVal                    // Kolom T: Fisik/System
     ]);
-  });
+  }
 
-  // Unhide seluruh baris agar data baru tidak tersembunyi filter lama
+  if (filteredRows.length === 0) {
+    SpreadsheetApp.getUi().alert('Info', 'Tidak ditemukan produk dengan kategori alert "' + label + '" di Data Update.', SpreadsheetApp.getUi().ButtonSet.OK);
+    return;
+  }
+
+  const confirm = SpreadsheetApp.getUi().alert(
+    'Konfirmasi Masukkan Tugas SKU',
+    'Ditemukan ' + filteredRows.length + ' SKU berstatus ' + label + '.\n\nApakah Anda ingin memasukkan ' + filteredRows.length + ' SKU ini ke sheet "' + mainSheet.getName() + '" sebagai daftar tugas?',
+    SpreadsheetApp.getUi().ButtonSet.YES_NO
+  );
+  if (confirm !== SpreadsheetApp.getUi().Button.YES) return;
+
+  // Unhide semua baris di Main List SKU ED Sweeper
   const maxRows = mainSheet.getMaxRows();
   if (maxRows > 1) {
     mainSheet.showRows(1, maxRows);
   }
 
-  // Bersihkan data lama baris 2 ke bawah
+  // Bersihkan baris lama di Main List SKU ED Sweeper dari baris 2 ke bawah
   const currentLastRow = mainSheet.getLastRow();
   if (currentLastRow > 1) {
-    mainSheet.getRange(2, 1, currentLastRow - 1, 20).clearContent();
+    mainSheet.getRange(2, 1, currentLastRow - 1, Math.max(mainSheet.getLastColumn(), 20)).clearContent();
   }
 
-  if (newRows.length > 0) {
-    mainSheet.getRange(2, 1, newRows.length, 20).setValues(newRows);
-  }
-
+  // Tulis baris baru yang bersih dan rapi
+  mainSheet.getRange(2, 1, filteredRows.length, 20).setValues(filteredRows);
   SpreadsheetApp.flush();
-  if (!isSilent) {
-    ss.toast('✅ Berhasil menyinkronkan ' + newRows.length + ' SKU dari Data Update ke Main List SKU! Bebas #ERROR!', 'Sinkronisasi Sukses ⚡', 5);
-  }
+
+  ss.setActiveSheet(mainSheet);
+  ss.toast('✅ Berhasil memasukkan ' + filteredRows.length + ' SKU (' + label + ') ke "' + mainSheet.getName() + '"!', 'Sukses ⚡', 5);
 }
 
-// ── OPSIONAL: PASANG RUMUS VLOOKUP JIKA SUPERVISOR INGIN FORMAT RUMUS DINAMIS ──
-function restoreMainListFormulas() {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const mainSheet = ss.getSheetByName('Main List SKU');
-  if (!mainSheet) return;
+// ── 4C. FITUR RESET / KOSONGKAN MAIN LIST SKU EDS ──
 
-  const lastRow = mainSheet.getLastRow();
-  if (lastRow <= 1) {
-    ss.toast('Main List SKU masih kosong. Klik menu "Sinkronkan Data Update ke Main List" terlebih dahulu.', 'Perhatian', 4);
+function clearMainListSkuPrompt() {
+  const ui = SpreadsheetApp.getUi();
+  const mainSheet = getEdsSheet('MAIN_LIST');
+  if (!mainSheet) {
+    ui.alert('Error', 'Sheet Main List SKU ED Sweeper tidak ditemukan.', ui.ButtonSet.OK);
     return;
   }
 
-  const numRows = lastRow - 1;
-  const formulas = [];
+  const confirm = ui.alert(
+    '🧹 Konfirmasi Kosongkan Main List',
+    'Apakah Anda yakin ingin mengosongkan seluruh baris data tugas di sheet "' + mainSheet.getName() + '"?\n\n(Semua baris tugas akan dihapus dan disiapkan kosong kembali).',
+    ui.ButtonSet.YES_NO
+  );
+  if (confirm !== ui.Button.YES) return;
 
-  // Menggunakan sintaks titik koma (;) dan angka 0 yang 100% didukung locale Indonesia
-  for (let r = 2; r <= lastRow; r++) {
-    formulas.push([
-      '=IF(B' + r + '=""; ""; IFERROR(VLOOKUP(B' + r + '; \'Data Update\'!A:N; 2; 0); ""))',   // C: Product Name
-      '=IF(B' + r + '=""; ""; IFERROR(VLOOKUP(B' + r + '; \'Data Update\'!A:N; 8; 0); ""))',   // D: Lokasi Rack
-      '=IF(B' + r + '=""; ""; IFERROR(VLOOKUP(B' + r + '; \'Data Update\'!A:N; 7; 0); ""))',   // E: Stock Available
-      0,                                                                                        // F: Stock Bad
-      0,                                                                                        // G: Stock LDP
-      '=IF(B' + r + '=""; ""; IFERROR(VLOOKUP(B' + r + '; \'Data Update\'!A:N; 3; 0); "MTG - Menteng"))', // H: Hub
-      '=IF(B' + r + '=""; ""; IFERROR(VLOOKUP(B' + r + '; \'Data Update\'!A:N; 5; 0); ""))',   // I: expiry_date
-      '=IF(B' + r + '=""; ""; IFERROR(VLOOKUP(B' + r + '; \'Data Update\'!A:N; 6; 0); ""))',   // J: msltc
-      '=IF(B' + r + '=""; ""; IFERROR(VLOOKUP(B' + r + '; \'Data Update\'!A:N; 7; 0); ""))',   // K: qty_system
-      '=IF(B' + r + '=""; ""; IFERROR(VLOOKUP(B' + r + '; \'Data Update\'!A:N; 8; 0); ""))',   // L: rack_name
-      '=IF(B' + r + '=""; ""; IFERROR(VLOOKUP(B' + r + '; \'Data Update\'!A:N; 9; 0); ""))',   // M: l1_category_name
-      '=IF(B' + r + '=""; ""; IFERROR(VLOOKUP(B' + r + '; \'Data Update\'!A:N; 10; 0); ""))',  // N: l2_category_name
-      '=IF(B' + r + '=""; ""; IFERROR(VLOOKUP(B' + r + '; \'Data Update\'!A:N; 11; 0); ""))',  // O: MSLTC_date
-      '=IF(B' + r + '=""; ""; IFERROR(VLOOKUP(B' + r + '; \'Data Update\'!A:N; 12; 0); ""))',  // P: remaining days
-      '=IF(B' + r + '=""; ""; IFERROR(VLOOKUP(B' + r + '; \'Data Update\'!A:N; 13; 0); ""))'   // Q: alert
-    ]);
+  const ss = getEdsSpreadsheet();
+  const maxRows = mainSheet.getMaxRows();
+  if (maxRows > 1) mainSheet.showRows(1, maxRows);
+  const lastRow = mainSheet.getLastRow();
+  if (lastRow > 1) {
+    mainSheet.getRange(2, 1, lastRow - 1, Math.max(mainSheet.getLastColumn(), 20)).clearContent();
   }
-
-  mainSheet.getRange(2, 3, numRows, 15).setValues(formulas);
   SpreadsheetApp.flush();
-  ss.toast('✅ Rumus VLOOKUP (sintaks regional titik koma ;) berhasil dipasang untuk ' + numRows + ' baris!', 'Rumus Pulih ⚡', 5);
+  ss.toast('✅ Sheet "' + mainSheet.getName() + '" berhasil dikosongkan!', 'Reset Berhasil', 4);
 }
 
-function updateDataManual() {
-  syncDataUpdateToMainList(false);
-}
-
-// ── 5. SUBMENU FILTER KATEGORI ALERT (WARNING, HARD WARNING, CRITICAL) DI GOOGLE SHEET ──
+// ── 5. SUBMENU FILTER KATEGORI ALERT DI GOOGLE SHEET ──
 
 function filterSheetAlertAllWarningCritical() {
   applySheetAlertFilter('ALL', '🟢 Semua Alert (Warning, Hard Warning & Critical)');
@@ -565,31 +766,30 @@ function filterSheetAlertCriticalAndHard() {
 }
 
 function resetSheetAlertFilter() {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const targetSheets = ['Main List SKU', 'Data Update'];
-  let totalUnhidden = 0;
+  const mainSheet = getEdsSheet('MAIN_LIST');
+  const updateSheet = getEdsSheet('DATA_UPDATE');
+  const targetSheets = [mainSheet, updateSheet].filter(Boolean);
 
-  targetSheets.forEach(function(sName) {
-    const sheet = ss.getSheetByName(sName);
-    if (!sheet) return;
-    const lastRow = sheet.getLastRow();
-    if (lastRow > 1) {
-      sheet.showRows(2, lastRow - 1);
-      totalUnhidden += (lastRow - 1);
+  targetSheets.forEach(function(sheet) {
+    const maxRows = sheet.getMaxRows();
+    if (maxRows > 1) {
+      sheet.showRows(1, maxRows);
     }
   });
 
   SpreadsheetApp.flush();
-  ss.toast('✅ Filter di-reset! Seluruh baris kini ditampilkan kembali.', 'Reset Filter Berhasil', 4);
+  getEdsSpreadsheet().toast('✅ Filter di-reset! Seluruh baris kini ditampilkan kembali.', 'Reset Filter Berhasil', 4);
 }
 
 function applySheetAlertFilter(mode, label) {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const ss = getEdsSpreadsheet();
   const activeSheet = ss.getActiveSheet();
   const activeName = activeSheet.getName();
 
-  // Jika sedang membuka Data Update, filter sheet tersebut; jika tidak, gunakan Main List SKU
-  const targetSheet = (activeName === 'Data Update') ? activeSheet : (ss.getSheetByName('Main List SKU') || activeSheet);
+  const updateSheet = getEdsSheet('DATA_UPDATE');
+  const mainSheet = getEdsSheet('MAIN_LIST');
+
+  const targetSheet = (updateSheet && activeName === updateSheet.getName()) ? activeSheet : (mainSheet || activeSheet);
   const lastRow = targetSheet.getLastRow();
 
   if (lastRow <= 1) {
@@ -598,9 +798,8 @@ function applySheetAlertFilter(mode, label) {
   }
 
   ss.setActiveSheet(targetSheet);
-  targetSheet.showRows(2, lastRow - 1);
+  targetSheet.showRows(1, targetSheet.getMaxRows());
 
-  // Deteksi kolom secara dinamis berdasarkan header di Baris 1
   const headerCols = targetSheet.getRange(1, 1, 1, targetSheet.getLastColumn()).getValues()[0].map(function(h) {
     return String(h || '').trim().toLowerCase();
   });
@@ -616,7 +815,7 @@ function applySheetAlertFilter(mode, label) {
   for (let r = 0; r < dataRange.length; r++) {
     const row = dataRange[r];
     const sku = String(row[skuColIdx] || '').trim();
-    if (!sku) continue; // lewati baris kosong
+    if (!sku) continue;
 
     const remDaysRaw = row[remDaysIdx];
     const remainingDays = (remDaysRaw !== '' && !isNaN(Number(remDaysRaw))) ? Number(remDaysRaw) : NaN;
@@ -656,18 +855,66 @@ function applySheetAlertFilter(mode, label) {
   }
 }
 
-// ── 5. FITUR BACKUP: HASIL EDS KE SHEET "Backup Data" ──
+// ── OPSIONAL: PASANG RUMUS VLOOKUP MAIN LIST EDS ──
+function restoreMainListFormulas() {
+  const ss = getEdsSpreadsheet();
+  const mainSheet = getEdsSheet('MAIN_LIST');
+  const updateSheet = getEdsSheet('DATA_UPDATE');
+
+  if (!mainSheet) return;
+
+  const lastRow = mainSheet.getLastRow();
+  if (lastRow <= 1) {
+    ss.toast('Sheet "' + mainSheet.getName() + '" masih kosong. Silakan gunakan menu "Masukkan SKU Tugas ke Main List" terlebih dahulu.', 'Perhatian', 4);
+    return;
+  }
+
+  const numRows = lastRow - 1;
+  const formulas = [];
+  const srcSheetName = updateSheet ? updateSheet.getName() : EDS_SHEETS.DATA_UPDATE;
+  const srcSheet = "'" + srcSheetName + "'!A:N";
+
+  for (let r = 2; r <= lastRow; r++) {
+    formulas.push([
+      '=IF(B' + r + '=""; ""; IFERROR(VLOOKUP(B' + r + '; ' + srcSheet + '; 2; 0); ""))',   // C: Product Name
+      '=IF(B' + r + '=""; ""; IFERROR(VLOOKUP(B' + r + '; ' + srcSheet + '; 8; 0); ""))',   // D: Lokasi Rack
+      '=IF(B' + r + '=""; ""; IFERROR(VLOOKUP(B' + r + '; ' + srcSheet + '; 7; 0); ""))',   // E: Stock Available
+      0,                                                                                      // F: Stock Bad
+      0,                                                                                      // G: Stock LDP
+      '=IF(B' + r + '=""; ""; IFERROR(VLOOKUP(B' + r + '; ' + srcSheet + '; 3; 0); "MTG - Menteng"))', // H: Hub
+      '=IF(B' + r + '=""; ""; IFERROR(VLOOKUP(B' + r + '; ' + srcSheet + '; 5; 0); ""))',   // I: expiry_date
+      '=IF(B' + r + '=""; ""; IFERROR(VLOOKUP(B' + r + '; ' + srcSheet + '; 6; 0); ""))',   // J: msltc
+      '=IF(B' + r + '=""; ""; IFERROR(VLOOKUP(B' + r + '; ' + srcSheet + '; 7; 0); ""))',   // K: qty_system
+      '=IF(B' + r + '=""; ""; IFERROR(VLOOKUP(B' + r + '; ' + srcSheet + '; 8; 0); ""))',   // L: rack_name
+      '=IF(B' + r + '=""; ""; IFERROR(VLOOKUP(B' + r + '; ' + srcSheet + '; 9; 0); ""))',   // M: l1_category_name
+      '=IF(B' + r + '=""; ""; IFERROR(VLOOKUP(B' + r + '; ' + srcSheet + '; 10; 0); ""))',  // N: l2_category_name
+      '=IF(B' + r + '=""; ""; IFERROR(VLOOKUP(B' + r + '; ' + srcSheet + '; 11; 0); ""))',  // O: MSLTC_date
+      '=IF(B' + r + '=""; ""; IFERROR(VLOOKUP(B' + r + '; ' + srcSheet + '; 12; 0); ""))',  // P: remaining days
+      '=IF(B' + r + '=""; ""; IFERROR(VLOOKUP(B' + r + '; ' + srcSheet + '; 13; 0); ""))'   // Q: alert
+    ]);
+  }
+
+  mainSheet.getRange(2, 3, numRows, 15).setValues(formulas);
+  SpreadsheetApp.flush();
+  ss.toast('✅ Rumus VLOOKUP berhasil dipasang untuk ' + numRows + ' baris di "' + mainSheet.getName() + '"!', 'Rumus Pulih ⚡', 5);
+}
+
+function updateDataManual() {
+  syncDataUpdateToMainList(false);
+}
+
+// ── 6. FITUR BACKUP: HASIL EDS KE SHEET BACKUP & AUTO-RESET MAIN LIST EDS ──
 
 function backupHasilEdsManual() {
   const res = backupHasilEdsToBackupSheet(false);
-  SpreadsheetApp.getUi().alert('Hasil Backup', res.message, SpreadsheetApp.getUi().ButtonSet.OK);
+  SpreadsheetApp.getUi().alert('Hasil Backup EDS', res.message, SpreadsheetApp.getUi().ButtonSet.OK);
 }
 
 function backupAndResetHasilEdsManual() {
   const ui = SpreadsheetApp.getUi();
   const confirm = ui.alert(
-    'Konfirmasi Backup & Reset',
-    'Semua data di "Hasil EDS" akan dibackup ke sheet "Backup Data", lalu baris data pada "Hasil EDS" akan dikosongkan untuk persiapan shift/hari berikutnya.\n\nLanjutkan?',
+    'Konfirmasi Backup & Reset Total ED Sweeper',
+    'Semua data hasil audit EDS akan dibackup, lalu baris data pada Hasil EDS dan Main List SKU akan otomatis dikosongkan kembali untuk persiapan tugas berikutnya.\n\nLanjutkan?',
     ui.ButtonSet.YES_NO
   );
   if (confirm !== ui.Button.YES) return;
@@ -677,17 +924,17 @@ function backupAndResetHasilEdsManual() {
 }
 
 function backupHasilEdsToBackupSheet(autoClear) {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const hasilSheet = ss.getSheetByName('Hasil EDS');
+  const ss = getEdsSpreadsheet();
+  const hasilSheet = getEdsSheet('HASIL');
 
   if (!hasilSheet || hasilSheet.getLastRow() <= 1) {
     return {
       success: false,
-      message: 'Sheet "Hasil EDS" kosong atau belum memiliki data untuk di-backup.'
+      message: 'Sheet Hasil EDS kosong atau belum memiliki data untuk di-backup.'
     };
   }
 
-  let backupSheet = ss.getSheetByName('Backup Data') || ss.getSheetByName('Backup data');
+  let backupSheet = getEdsSheet('BACKUP');
   const headers = [
     "SKU Number", "Nama SKU", "SLOC Existing", "SLOC Actual",
     "Expired Date", "Fisik Good", "Fisik Bad", "Sales (jika ada)",
@@ -697,7 +944,7 @@ function backupHasilEdsToBackupSheet(autoClear) {
   ];
 
   if (!backupSheet) {
-    backupSheet = ss.insertSheet('Backup Data');
+    backupSheet = ss.insertSheet(EDS_SHEETS.BACKUP);
     backupSheet.appendRow(headers);
     backupSheet.getRange(1, 1, 1, headers.length)
       .setBackground('#1e293b')
@@ -714,7 +961,7 @@ function backupHasilEdsToBackupSheet(autoClear) {
   if (dataRows.length === 0) {
     return {
       success: false,
-      message: 'Tidak ada baris data valid di Hasil EDS.'
+      message: 'Tidak ada baris data valid di ' + hasilSheet.getName() + '.'
     };
   }
 
@@ -730,7 +977,7 @@ function backupHasilEdsToBackupSheet(autoClear) {
 
   const now = new Date();
   const waktuBackup = Utilities.formatDate(now, "Asia/Jakarta", "dd/MM/yyyy HH:mm:ss");
-  const batchId = 'BATCH-' + Utilities.formatDate(now, "Asia/Jakarta", "yyyyMMdd-HHmmss");
+  const batchId = 'BATCH-EDS-' + Utilities.formatDate(now, "Asia/Jakarta", "yyyyMMdd-HHmmss");
 
   const rowsToAppend = [];
   let duplicateCount = 0;
@@ -758,29 +1005,39 @@ function backupHasilEdsToBackupSheet(autoClear) {
     backupSheet.getRange(startRow, 1, rowsToAppend.length, headers.length).setValues(rowsToAppend);
   }
 
-  PropertiesService.getScriptProperties().setProperty('LAST_BACKUP_TIMESTAMP', waktuBackup);
+  PropertiesService.getScriptProperties().setProperty('LAST_BACKUP_TIMESTAMP_EDS', waktuBackup);
+
+  // 🧹 OTOMATIS KOSONGKAN MAIN LIST SKU EDS SETELAH BACKUP
+  try {
+    const mainSheet = getEdsSheet('MAIN_LIST');
+    if (mainSheet) {
+      const maxRows = mainSheet.getMaxRows();
+      if (maxRows > 1) {
+        mainSheet.showRows(1, maxRows);
+      }
+      const mRow = mainSheet.getLastRow();
+      if (mRow > 1) {
+        mainSheet.getRange(2, 1, mRow - 1, Math.max(mainSheet.getLastColumn(), 20)).clearContent();
+      }
+    }
+  } catch(eMain) {
+    console.warn('Gagal reset Main List SKU EDS saat backup:', eMain);
+  }
 
   if (autoClear) {
     const lastRow = hasilSheet.getLastRow();
     if (lastRow > 1) {
       hasilSheet.deleteRows(2, lastRow - 1);
     }
-    try {
-      const mainSheet = ss.getSheetByName('Main List SKU');
-      if (mainSheet && mainSheet.getLastRow() > 1) {
-        mainSheet.getRange(2, 18, mainSheet.getLastRow() - 1, 3).clearContent();
-      }
-    } catch(eMain) {
-      console.warn('Gagal reset kolom Done di Main List SKU:', eMain);
-    }
   }
 
-  let msg = 'Berhasil mem-backup ' + rowsToAppend.length + ' baris ke sheet "Backup Data"! (Batch: ' + batchId + ')';
+  let msg = 'Berhasil mem-backup ' + rowsToAppend.length + ' baris ke sheet "' + backupSheet.getName() + '"! (Batch: ' + batchId + ')';
   if (duplicateCount > 0) {
     msg += '\n(' + duplicateCount + ' baris telah ada sebelumnya di backup dan dilewati).';
   }
+  msg += '\n\n✅ Sheet tugas Main List telah otomatis dikosongkan dan siap untuk tugas berikutnya.';
   if (autoClear) {
-    msg += '\nSheet "Hasil EDS" kini telah bersih dan siap digunakan untuk sesi berikutnya.';
+    msg += '\n✅ Sheet Hasil EDS kini telah bersih.';
   }
 
   return {
@@ -792,19 +1049,15 @@ function backupHasilEdsToBackupSheet(autoClear) {
   };
 }
 
-// ── 6. WEB APP ENDPOINT (POST DARI SUPERAPP MTG) ──
+// ── 7. HANDLER POST UNTUK ED SWEEPER ──
 
-function doPost(e) {
+function handleEdsSubmit(payload) {
   try {
-    let payload = {};
-    if (e.postData && e.postData.contents) {
-      payload = JSON.parse(e.postData.contents);
-    } else if (e.parameter) {
-      payload = e.parameter;
+    const ss = getEdsSpreadsheet();
+    let hasilSheet = getEdsSheet('HASIL');
+    if (!hasilSheet) {
+      hasilSheet = ss.insertSheet(EDS_SHEETS.HASIL);
     }
-
-    const ss = SpreadsheetApp.getActiveSpreadsheet();
-    const hasilSheet = ss.getSheetByName('Hasil EDS') || ss.insertSheet('Hasil EDS');
 
     if (hasilSheet.getLastRow() === 0) {
       hasilSheet.appendRow([
@@ -865,7 +1118,7 @@ function doPost(e) {
           evidanceLink2 = file2.getUrl();
         }
       } catch (errUpload) {
-        console.warn('Gagal upload foto:', errUpload);
+        console.warn('Gagal upload foto EDS:', errUpload);
       }
     }
 
@@ -893,7 +1146,6 @@ function doPost(e) {
       timestamp
     ];
 
-    // ── CEK APAKAH SKU SUDAH ADA DI HASIL EDS (MODE UPDATE / EDIT) ──
     let existingRowIdx = -1;
     const lastRowHasil = hasilSheet.getLastRow();
     if (lastRowHasil > 1) {
@@ -908,41 +1160,39 @@ function doPost(e) {
     }
 
     if (existingRowIdx !== -1) {
-      // Update baris yang sudah ada (tidak membuat baris duplikat)
       hasilSheet.getRange(existingRowIdx, 1, 1, rowData.length).setValues([rowData]);
     } else {
-      // Tambah baris baru jika memang SKU baru
       hasilSheet.appendRow(rowData);
     }
 
-    // ── AUTO-UPDATE MAIN LIST SKU (KOLOM R, S, T) ──
+    // Auto-update kolom Done di Main List SKU ED Sweeper
     try {
-      const mainSheet = ss.getSheetByName('Main List SKU');
+      const mainSheet = getEdsSheet('MAIN_LIST');
       if (mainSheet && skuNo) {
         const lastRow = mainSheet.getLastRow();
         if (lastRow > 1) {
-          const skuColValues = mainSheet.getRange(2, 2, lastRow - 1, 1).getValues(); // Col B (SKU)
+          const skuColValues = mainSheet.getRange(2, 2, lastRow - 1, 1).getValues();
           for (let r = 0; r < skuColValues.length; r++) {
             const rawVal = String(skuColValues[r][0] || '').trim();
             if (rawVal && (rawVal.toLowerCase() === skuNo.toLowerCase() || rawVal.includes(skuNo))) {
               const targetRow = r + 2;
-              mainSheet.getRange(targetRow, 18).setValue('Done'); // Col R: Done
+              mainSheet.getRange(targetRow, 18).setValue('Done');
               const remaksVal = reasonBad || reasonSloc || payload.remaks || 'Sesuai';
-              mainSheet.getRange(targetRow, 19).setValue(remaksVal); // Col S: Remaks DCC
+              mainSheet.getRange(targetRow, 19).setValue(remaksVal);
               const qtySys = payload.qty_system || mainSheet.getRange(targetRow, 11).getValue() || 0;
-              mainSheet.getRange(targetRow, 20).setValue(fisikGood + '/' + qtySys); // Col T: Fisik/System
+              mainSheet.getRange(targetRow, 20).setValue(fisikGood + '/' + qtySys);
               break;
             }
           }
         }
       }
     } catch (errSync) {
-      console.warn('Gagal auto-update kolom R/S/T Main List SKU:', errSync);
+      console.warn('Gagal auto-update kolom R/S/T Main List SKU EDS:', errSync);
     }
 
     return ContentService.createTextOutput(JSON.stringify({
       status: 'success',
-      message: 'Data audit SKU ' + skuNo + ' berhasil disimpan ke sheet Hasil EDS.',
+      message: 'Data audit SKU ' + skuNo + ' berhasil disimpan ke sheet ' + hasilSheet.getName() + '.',
       photoUrl1: evidanceLink1,
       photoUrl2: evidanceLink2
     })).setMimeType(ContentService.MimeType.JSON);
@@ -955,9 +1205,67 @@ function doPost(e) {
   }
 }
 
+// Router Fallback doPost jika doPost dipanggil dari file ini
+function doPost(e) {
+  try {
+    let payload = {};
+    if (e.postData && e.postData.contents) {
+      payload = JSON.parse(e.postData.contents);
+    } else if (e.parameter) {
+      payload = e.parameter;
+    }
+
+    // Jika request adalah audit ED Sweeper
+    if (payload.action === 'saveEdsResult' || payload.module === 'eds' || payload.module === 'ed_sweeper') {
+      return handleEdsSubmit(payload);
+    }
+
+    // Jika ada handler DCC
+    if (typeof handleDccSubmit === 'function') {
+      return handleDccSubmit(payload);
+    }
+
+    return handleEdsSubmit(payload);
+  } catch (err) {
+    return ContentService.createTextOutput(JSON.stringify({
+      status: 'error',
+      message: err.toString()
+    })).setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
 function doGet(e) {
-  return ContentService.createTextOutput(JSON.stringify({
-    status: 'success',
-    message: 'ED Sweeper Web App is Active & Ready.'
-  })).setMimeType(ContentService.MimeType.JSON);
+  var ss = getEdsSpreadsheet();
+  var sheetName = (e && e.parameter && e.parameter.sheet) ? e.parameter.sheet : null;
+  var sheet = sheetName ? ss.getSheetByName(sheetName) : getEdsSheet('MAIN_LIST');
+
+  if (!sheet) {
+    return ContentService.createTextOutput(JSON.stringify({
+      status: 'error',
+      message: "Sheet tidak ditemukan.",
+      availableSheets: ss.getSheets().map(function(s) { return s.getName(); })
+    })).setMimeType(ContentService.MimeType.JSON);
+  }
+
+  var values = sheet.getDataRange().getValues();
+  var result = [];
+
+  if (values.length > 0) {
+    var headers = values[0];
+    for (var i = 1; i < values.length; i++) {
+      var row = values[i];
+      if (row.join("").trim() === "") continue;
+
+      var obj = {};
+      for (var j = 0; j < headers.length; j++) {
+        var key = headers[j];
+        if (key && key.toString().trim() !== "") {
+          obj[key] = row[j] !== undefined ? row[j] : "";
+        }
+      }
+      result.push(obj);
+    }
+  }
+
+  return ContentService.createTextOutput(JSON.stringify(result)).setMimeType(ContentService.MimeType.JSON);
 }
