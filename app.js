@@ -7071,6 +7071,13 @@
     }
   }
 
+  // Auto-initialize version text on startup
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', updateHomeVersionDisplay);
+  } else {
+    updateHomeVersionDisplay();
+  }
+
   window.checkForAppUpdates = async function (isManual = false) {
     if (isCheckingUpdate) return;
     isCheckingUpdate = true;
@@ -7091,15 +7098,15 @@
 
       let manifest = null;
 
-      // 1. Coba fetch dari jsDelivr CDN (zero cache latency)
+      // 1. Coba fetch langsung dari live domain resmi (selalu fresh tanpa delay CDN)
       try {
-        const jsdRes = await fetch(`https://cdn.jsdelivr.net/gh/tw1nss/superapp-release@main/version.json?_t=${Date.now()}`, { cache: 'no-store' });
-        if (jsdRes.ok) {
-          manifest = await jsdRes.json();
+        const liveRes = await fetch(`https://superappshub.space/version.json?_t=${Date.now()}`, { cache: 'no-store' });
+        if (liveRes.ok) {
+          manifest = await liveRes.json();
         }
       } catch (e) { }
 
-      // 2. Fallback ke GitHub REST API (realtime commit contents)
+      // 2. Fallback ke GitHub REST API (realtime commit contents langsung dari repo)
       if (!manifest || !manifest.versionCode) {
         try {
           const apiRes = await fetch(`https://api.github.com/repos/tw1nss/superapp-release/contents/version.json?_t=${Date.now()}`, { cache: 'no-store' });
@@ -7118,6 +7125,16 @@
           const res = await fetch(`${UPDATE_MANIFEST_URL}?_t=${Date.now()}`, { cache: 'no-store' });
           if (res.ok) {
             manifest = await res.json();
+          }
+        } catch (e) { }
+      }
+
+      // 4. Fallback ke jsDelivr CDN
+      if (!manifest || !manifest.versionCode) {
+        try {
+          const jsdRes = await fetch(`https://cdn.jsdelivr.net/gh/tw1nss/superapp-release@main/version.json?_t=${Date.now()}`, { cache: 'no-store' });
+          if (jsdRes.ok) {
+            manifest = await jsdRes.json();
           }
         } catch (e) { }
       }
