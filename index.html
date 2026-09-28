@@ -29,7 +29,7 @@
   <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/id.js"></script>
 
   <!-- Stylesheets -->
-  <link rel="stylesheet" href="style.css?v=91">
+  <link rel="stylesheet" href="style.css?v=94">
 
   <!-- QR Code & Barcode Libraries -->
   <script src="qrcode.min.js"></script>
@@ -210,6 +210,17 @@
             </svg>
           </div>
           <div class="menu-card-title">Koli Inbound</div>
+        </div>
+
+        <!-- 9. ED Correction -->
+        <div class="menu-card" onclick="openAppMenu('ed_correction')">
+          <div class="menu-icon-box edc">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" stroke="#c084fc" />
+              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" stroke="#c084fc" fill="rgba(192, 132, 252, 0.2)" />
+            </svg>
+          </div>
+          <div class="menu-card-title">ED Correction</div>
         </div>
       </div>
     </section>
@@ -1200,6 +1211,378 @@
       </div>
     </div>
 
+    <!-- ── ED Correction Workspace (Hidden by Default) ── -->
+    <div id="edCorrectionWorkspace" class="hidden">
+      <!-- EDC Top Action Bar -->
+      <div class="eds-top-bar edc-top-bar">
+        <button type="button" class="eds-top-back-btn edc-top-back-btn" onclick="handleEdcBackPressed()" title="Kembali ke Menu Utama">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+            stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="15 18 9 12 15 6"></polyline>
+          </svg>
+        </button>
+        <div class="eds-title-wrap">
+          <div class="eds-title edc-title">ED Correction</div>
+          <button type="button" class="eds-offline-badge-btn hidden" id="edcOfflineQueueBadge" onclick="syncEdcOfflineQueue(true)" title="Klik untuk sinkronisasi data offline"></button>
+        </div>
+        <div class="eds-top-actions">
+          <button type="button" class="eds-info-btn" onclick="openEdcSetupModal()" title="Pengaturan Spreadsheet & WebApp">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="3"></circle>
+              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+            </svg>
+          </button>
+          <button type="button" class="eds-refresh-btn edc-refresh-btn" onclick="refreshEdcData()" title="Muat Ulang Data dari Sheet">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+              stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="23 4 23 10 17 10"></polyline>
+              <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- EDC Tab Content: Main List SKU -->
+      <div id="edcTabMainList" class="eds-tab-content active">
+        <!-- Search & Filter Bar -->
+        <div class="eds-filter-container edc-filter-container">
+          <div class="eds-filter-input-wrapper">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+              stroke-linecap="round" stroke-linejoin="round" class="eds-filter-icon">
+              <circle cx="11" cy="11" r="8"></circle>
+              <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+            </svg>
+            <input type="text" id="edcFilterInput" class="eds-filter-input"
+              placeholder="Cari SKU, nama produk, atau lokasi rak..." autocomplete="off">
+            <button type="button" id="edcFilterClearBtn" class="eds-filter-clear-btn hidden"
+              onclick="clearEdcFilter()" title="Hapus pencarian">✕</button>
+          </div>
+
+          <div class="eds-status-pills">
+            <button type="button" class="eds-status-btn edc-status-btn active" data-status="all" onclick="setEdcStatusFilter('all')" title="Tampilkan Semua SKU">
+              <span>📋 Semua</span>
+              <span class="eds-status-badge" id="edcStatusCountAll">0</span>
+            </button>
+            <button type="button" class="eds-status-btn btn-submitted" data-status="submitted" onclick="setEdcStatusFilter('submitted')" title="Tampilkan SKU yang Sudah Diinput">
+              <span>✅ Sudah</span>
+              <span class="eds-status-badge badge-submitted" id="edcStatusCountSubmitted">0</span>
+            </button>
+            <button type="button" class="eds-status-btn btn-pending" data-status="pending" onclick="setEdcStatusFilter('pending')" title="Tampilkan SKU yang Belum Diinput">
+              <span>⏳ Belum</span>
+              <span class="eds-status-badge badge-pending" id="edcStatusCountPending">0</span>
+            </button>
+          </div>
+
+          <div class="eds-filter-meta">
+            <div class="eds-progress-bar-wrap">
+              <div class="eds-progress-bar-fill edc-progress-bar-fill" id="edcProgressBarFill" style="width: 0%"></div>
+            </div>
+            <span id="edcListCountBadge" class="eds-count-badge">0 Selesai / 0 SKU (0%)</span>
+          </div>
+        </div>
+
+        <!-- Sort Bar -->
+        <div class="eds-sort-bar">
+          <span class="eds-sort-label">Urutkan:</span>
+          <button type="button" class="eds-sort-btn active" id="edcSortNameAsc" onclick="toggleEdcSort('name_asc')">
+            Nama A-Z
+          </button>
+          <button type="button" class="eds-sort-btn" id="edcSortSlocAsc" onclick="toggleEdcSort('sloc_asc')">
+            Rack A-Z
+          </button>
+          <button type="button" class="eds-sort-btn" id="edcSortStockDesc" onclick="toggleEdcSort('stock_desc')">
+            Stok ↓
+          </button>
+        </div>
+
+        <!-- Card Container -->
+        <div class="eds-card-container" id="edcCardContainer">
+          <div style="text-align:center; padding: 30px; color: var(--text-muted);">Memuat data dari Main List SKU...</div>
+        </div>
+      </div>
+
+      <!-- EDC Tab Content: Scan / Input SKU -->
+      <div id="edcTabScan" class="eds-tab-content">
+        <div class="eds-scan-container">
+          <!-- Active SKU Header Banner -->
+          <div id="edcSelectedBanner" class="eds-selected-banner hidden" style="border-color: rgba(168, 85, 247, 0.4); background: rgba(168, 85, 247, 0.1);">
+            <div class="eds-selected-info">
+              <span class="eds-selected-badge" style="background: rgba(168, 85, 247, 0.25); color: #c084fc;">Mode Koreksi ED</span>
+              <span id="edcSelectedTitle" class="eds-selected-title"></span>
+            </div>
+            <button type="button" class="eds-selected-clear" onclick="clearEdcSelectedSku()" title="Batal pilihan">✕</button>
+          </div>
+
+          <!-- SKU No -->
+          <div class="eds-field-group">
+            <label class="eds-field-label">SKU No <span class="eds-required">*</span></label>
+            <div class="eds-input-row">
+              <input type="text" id="edcSkuInput" class="eds-field-input" placeholder="Scan barcode atau ketik SKU..."
+                inputmode="text" autocomplete="off">
+              <button type="button" class="eds-scan-btn" onclick="startEdcCameraScan()" title="Buka Scanner Barcode">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <rect x="3" y="3" width="7" height="7" />
+                  <rect x="14" y="3" width="7" height="7" />
+                  <rect x="14" y="14" width="7" height="7" />
+                  <rect x="3" y="14" width="7" height="7" />
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          <!-- Nama SKU (auto-fill, readonly) -->
+          <div class="eds-field-group">
+            <label class="eds-field-label">Nama SKU</label>
+            <input type="text" id="edcNamaSku" class="eds-field-input eds-readonly" readonly
+              placeholder="Otomatis terisi dari sistem...">
+          </div>
+
+          <!-- SLOC Existing & Qty System -->
+          <div class="eds-field-row">
+            <div class="eds-field-group" style="flex: 2;">
+              <label class="eds-field-label">SLOC Existing (Rack)</label>
+              <input type="text" id="edcSlocExisting" class="eds-field-input eds-readonly" readonly
+                placeholder="Lokasi rack...">
+            </div>
+            <div class="eds-field-group" style="flex: 1;">
+              <label class="eds-field-label">Stok Sistem</label>
+              <input type="text" id="edcQtySystem" class="eds-field-input eds-readonly" readonly
+                placeholder="0">
+            </div>
+          </div>
+
+          <!-- SLOC Actual (Match / Unmatch) -->
+          <div class="eds-field-group">
+            <label class="eds-field-label">SLOC Actual <span class="eds-required">*</span></label>
+            <div class="eds-toggle-group" id="edcSlocActualGroup">
+              <button type="button" class="eds-toggle-btn active" data-value="Match"
+                onclick="setEdcToggle('edcSlocActualGroup', 'Match')">Match</button>
+              <button type="button" class="eds-toggle-btn" data-value="Unmatch"
+                onclick="setEdcToggle('edcSlocActualGroup', 'Unmatch')">Unmatch</button>
+            </div>
+          </div>
+
+          <!-- ED Sistem (Lama) -->
+          <div class="eds-field-group">
+            <label class="eds-field-label">Tanggal ED di Sistem (Lama)</label>
+            <input type="text" id="edcExpiredDateSystem" class="eds-field-input eds-readonly" readonly
+              placeholder="-">
+          </div>
+
+          <!-- ED Fisik / Koreksi Baru -->
+          <div class="eds-field-group">
+            <div class="eds-field-header-row">
+              <label class="eds-field-label">Tanggal ED Fisik (Koreksi Baru) <span class="eds-required">*</span></label>
+              <span id="edcStatusHelper" class="eds-helper-tag"></span>
+            </div>
+            <input type="text" id="edcExpiredDateNew" class="eds-field-input flatpickr-input" placeholder="Pilih Tanggal ED Fisik Aktual">
+          </div>
+
+          <!-- Fisik Good & Fisik Bad -->
+          <div class="eds-field-row">
+            <div class="eds-field-group" style="flex: 1;">
+              <label class="eds-field-label">Fisik Good <span class="eds-required">*</span></label>
+              <div class="eds-stepper-wrap">
+                <button type="button" class="eds-step-btn" onclick="stepEdcValue('edcFisikGood', -1)">-</button>
+                <input type="number" id="edcFisikGood" class="eds-field-input eds-num-input" value="0" min="0">
+                <button type="button" class="eds-step-btn" onclick="stepEdcValue('edcFisikGood', 1)">+</button>
+              </div>
+            </div>
+            <div class="eds-field-group" style="flex: 1;">
+              <label class="eds-field-label">Fisik Bad</label>
+              <div class="eds-stepper-wrap">
+                <button type="button" class="eds-step-btn" onclick="stepEdcValue('edcFisikBad', -1)">-</button>
+                <input type="number" id="edcFisikBad" class="eds-field-input eds-num-input" value="0" min="0">
+                <button type="button" class="eds-step-btn" onclick="stepEdcValue('edcFisikBad', 1)">+</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Foto Bukti Koreksi -->
+          <div class="eds-field-group">
+            <label class="eds-field-label">Foto Bukti Koreksi ED (Label Kemasan)</label>
+            <div class="eds-photo-actions">
+              <button type="button" class="eds-photo-btn" onclick="captureEdcPhoto('camera')">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+                  <circle cx="12" cy="13" r="4" />
+                </svg>
+                <span>Buka Kamera</span>
+              </button>
+              <button type="button" class="eds-photo-btn btn-gallery" onclick="captureEdcPhoto('gallery')">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                  <circle cx="8.5" cy="8.5" r="1.5" />
+                  <polyline points="21 15 16 10 5 21" />
+                </svg>
+                <span>Pilih Galeri</span>
+              </button>
+              <input type="file" id="edcPhotoCameraInput" accept="image/*" capture="environment" class="hidden" onchange="handleEdcPhotoFile(event)">
+              <input type="file" id="edcPhotoGalleryInput" accept="image/*" class="hidden" onchange="handleEdcPhotoFile(event)">
+            </div>
+            <div id="edcPhotoPreviewList" class="eds-photo-grid"></div>
+          </div>
+
+          <!-- Input By (PIC) -->
+          <div class="eds-field-group">
+            <label class="eds-field-label">Input by (Nama Petugas PIC) <span class="eds-required">*</span></label>
+            <div class="eds-pic-selector-row">
+              <input type="text" id="edcInputBy" class="eds-field-input" placeholder="Masukkan nama Anda (misal: Bintang)...">
+              <button type="button" class="eds-pic-save-btn" onclick="saveEdcDefaultPic()" title="Simpan sebagai default">Ingat Saya</button>
+            </div>
+          </div>
+
+          <!-- Remarks / Catatan -->
+          <div class="eds-field-group">
+            <label class="eds-field-label">Catatan Koreksi (Opsional)</label>
+            <input type="text" id="edcRemaksInput" class="eds-field-input" placeholder="Keterangan kondisi produk...">
+          </div>
+
+          <!-- Submit Button -->
+          <button type="button" id="edcSubmitBtn" class="eds-submit-btn edc-submit-btn" onclick="submitEdcForm()">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+              <polyline points="20 6 9 17 4 12" />
+            </svg>
+            <span>Simpan Hasil Koreksi ED</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- EDC Tab Content: Report -->
+      <div id="edcTabReport" class="eds-tab-content">
+        <div class="eds-report-container">
+          <div class="eds-report-grid">
+            <div class="eds-stat-card">
+              <div class="eds-stat-num" id="edcStatTotal">0</div>
+              <div class="eds-stat-lbl">Total SKU</div>
+            </div>
+            <div class="eds-stat-card card-success">
+              <div class="eds-stat-num" id="edcStatDone">0</div>
+              <div class="eds-stat-lbl">Sudah Diperiksa</div>
+            </div>
+            <div class="eds-stat-card card-pending">
+              <div class="eds-stat-num" id="edcStatPending">0</div>
+              <div class="eds-stat-lbl">Belum Diperiksa</div>
+            </div>
+            <div class="eds-stat-card card-danger">
+              <div class="eds-stat-num" id="edcStatRevisi">0</div>
+              <div class="eds-stat-lbl">Revisi ED Ditemukan</div>
+            </div>
+          </div>
+
+          <div class="eds-export-actions">
+            <button type="button" class="eds-btn-export btn-wa" onclick="shareEdcToWhatsApp()">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/>
+              </svg>
+              <span>Kirim WhatsApp</span>
+            </button>
+            <button type="button" class="eds-btn-export btn-excel" onclick="exportEdcToExcel()">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                <polyline points="14 2 14 8 20 8"/>
+                <line x1="8" y1="13" x2="16" y2="13"/>
+                <line x1="8" y1="17" x2="16" y2="17"/>
+              </svg>
+              <span>Export CSV</span>
+            </button>
+            <button type="button" class="eds-btn-export btn-pdf" onclick="printEdcPdf()">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="6 9 6 2 18 2 18 9"/>
+                <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/>
+                <rect x="6" y="14" width="12" height="8"/>
+              </svg>
+              <span>Cetak / PDF</span>
+            </button>
+          </div>
+
+          <div class="eds-report-section-title">Riwayat Hasil Koreksi (Hari Ini)</div>
+          <div id="edcReportTableContainer" class="eds-report-list">
+            <div style="text-align:center; padding: 25px; color: var(--text-muted);">Belum ada data koreksi hari ini.</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- EDC Bottom Navigation Bar -->
+      <nav class="eds-bottom-nav edc-bottom-nav">
+        <button type="button" class="eds-nav-item" id="navEdcScan" onclick="switchEdcTab('scan')">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="3" width="7" height="7"></rect>
+            <rect x="14" y="3" width="7" height="7"></rect>
+            <rect x="14" y="14" width="7" height="7"></rect>
+            <rect x="3" y="14" width="7" height="7"></rect>
+          </svg>
+          <span>Input / Scan</span>
+        </button>
+        <button type="button" class="eds-nav-item active" id="navEdcMain" onclick="switchEdcTab('main')">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="8" y1="6" x2="21" y2="6"></line>
+            <line x1="8" y1="12" x2="21" y2="12"></line>
+            <line x1="8" y1="18" x2="21" y2="18"></line>
+            <line x1="3" y1="6" x2="3.01" y2="6"></line>
+            <line x1="3" y1="12" x2="3.01" y2="12"></line>
+            <line x1="3" y1="18" x2="3.01" y2="18"></line>
+          </svg>
+          <span>Main List SKU</span>
+        </button>
+        <button type="button" class="eds-nav-item" id="navEdcReport" onclick="switchEdcTab('report')">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+          </svg>
+          <span>Report & Rekap</span>
+        </button>
+      </nav>
+    </div> <!-- End ED Correction Workspace -->
+
+    <!-- EDC Confirm Edit Modal Popup -->
+    <div id="edcConfirmEditModal" class="eds-modal hidden">
+      <div class="eds-modal-backdrop" onclick="closeEdcConfirmEditModal()"></div>
+      <div class="eds-modal-card" style="max-width: 420px; text-align: center; padding: 24px; border-radius: 20px; border: 1px solid rgba(168, 85, 247, 0.35); box-shadow: 0 15px 35px rgba(0,0,0,0.5);">
+        <div style="width: 58px; height: 58px; border-radius: 50%; background: rgba(168, 85, 247, 0.15); border: 2px solid #a855f7; display: flex; align-items: center; justify-content: center; margin: 0 auto 16px; font-size: 1.8rem;">
+          ✏️
+        </div>
+        <h3 style="font-size: 1.2rem; font-weight: 700; color: #fff; margin-bottom: 8px;">Konfirmasi Pembaruan Koreksi ED</h3>
+        <p id="edcConfirmEditDesc" style="font-size: 0.88rem; color: #cbd5e1; line-height: 1.5; margin-bottom: 22px;">
+          SKU ini sudah pernah diinput sebelumnya. Apakah Anda yakin ingin memperbarui data koreksi ED produk ini?
+        </p>
+        <div style="display: flex; gap: 12px; justify-content: center;">
+          <button type="button" class="btn" style="flex: 1; padding: 12px; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.2); border-radius: 12px; color: #fff; font-weight: 600; cursor: pointer;" onclick="closeEdcConfirmEditModal()">
+            Batal
+          </button>
+          <button type="button" id="edcConfirmEditProceedBtn" class="btn" style="flex: 1.2; padding: 12px; background: linear-gradient(135deg, #9333ea, #7c3aed); border: none; border-radius: 12px; color: #fff; font-weight: 700; cursor: pointer; box-shadow: 0 4px 14px rgba(147, 51, 234, 0.4);" onclick="proceedEdcConfirmedSubmit()">
+            Ya, Perbarui Data
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- EDC Setup & Spreadsheet Link Modal -->
+    <div id="edcSetupModal" class="eds-modal hidden">
+      <div class="eds-modal-backdrop" onclick="closeEdcSetupModal()"></div>
+      <div class="eds-modal-card">
+        <div class="eds-modal-header">
+          <div class="eds-modal-title">⚙️ Konfigurasi Spreadsheet ED Correction</div>
+          <button type="button" class="eds-modal-close" onclick="closeEdcSetupModal()">✕</button>
+        </div>
+        <div class="eds-modal-body">
+          <div class="eds-guide-block">
+            <h4>1. Link Spreadsheet / ID Google Sheets</h4>
+            <p>Paste link Google Sheets atau ID Spreadsheet untuk menarik Main List tugas dan membaca hasil:</p>
+            <input type="text" id="edcSpreadsheetUrlInput" class="eds-field-input" placeholder="https://docs.google.com/spreadsheets/d/.../edit">
+            <button type="button" class="eds-submit-btn" style="margin-top: 8px; background: linear-gradient(135deg, #9333ea, #7c3aed);" onclick="saveEdcSpreadsheetUrl()">Simpan Link Spreadsheet</button>
+          </div>
+
+          <div class="eds-guide-block" style="margin-top: 16px;">
+            <h4>2. URL Web App Apps Script (Opsional untuk Submit)</h4>
+            <p>Jika menggunakan deployment Apps Script terpisah untuk menerima form submit & upload foto:</p>
+            <input type="text" id="edcWebappUrlInput" class="eds-field-input" placeholder="https://script.google.com/macros/s/.../exec">
+            <button type="button" class="eds-submit-btn" style="margin-top: 8px; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.2);" onclick="saveEdcWebappUrl()">Simpan WebApp URL</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- ── Slip Gaji / Rekap HK Workspace (Hidden by Default) ── -->
     <div id="slipGajiWorkspace" class="hidden">
       <!-- Slip Gaji / HK Top Action Bar -->
@@ -2030,7 +2413,7 @@
   </div>
 
   <!-- App Logic -->
-  <script src="app.js?v=93"></script>
+  <script src="app.js?v=94"></script>
 </body>
 
 </html>

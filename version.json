@@ -1,13 +1,13 @@
 {
-  "versionCode": 21,
-  "versionName": "1.2.5",
+  "versionCode": 22,
+  "versionName": "1.2.6",
   "apkUrl": "https://github.com/tw1nss/superapp-release/raw/main/app-debug.apk",
   "forceUpdate": false,
-  "title": "Pembaruan Superapp MTG v1.2.5",
+  "title": "Pembaruan Superapp MTG v1.2.6",
   "changelog": [
-    "Perbaikan notifikasi complain & cancel order WhatsApp realtime",
-    "Restriksi task complain resmi dari grup CX <> QA Fresh Discussion (tolak japri foto)",
-    "Pembaruan autentikasi Google Firebase Cloud Messaging (FCM) & badge menu utama"
+    "Pembaruan menu ED Correction (Main List, Input SKU, Auto Lookup)",
+    "Pembaruan formula otomatis dan pembersihan data sinkronisasi Superset",
+    "Peningkatan stabilitas aplikasi dan performa live asset"
   ],
-  "releasedAt": "2026-09-20"
+  "releasedAt": "2026-09-28"
 }

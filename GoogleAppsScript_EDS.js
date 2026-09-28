@@ -92,6 +92,8 @@ function onOpen() {
   if (typeof buildDccMenu === 'function') buildDccMenu(ui);
   // Bangun menu ED Sweeper
   buildEdSweeperMenu(ui);
+  // Bangun menu ED Correction jika ada
+  if (typeof buildEdCorrectionMenu === 'function') buildEdCorrectionMenu(ui);
 }
 
 function buildEdSweeperMenu(ui) {
@@ -122,6 +124,7 @@ function buildEdSweeperMenu(ui) {
     .addItem('📦 Backup Data Hasil EDS & Kosongkan Main List', 'backupHasilEdsManual')
     .addItem('🔄 Backup & Reset Total (Hasil EDS + Main List)', 'backupAndResetHasilEdsManual')
     .addSeparator()
+    .addItem('🔧 Bersihkan Kolom Formula (Cegah #REF!)', 'repairFormulaColumnsManual')
     .addItem('🔑 Set / Ganti Cookie Superset', 'setSupersetCookiePrompt')
     .addItem('🎯 Set ID Chart Superset EDS', 'setSupersetChartIdPrompt')
     .addToUi();
@@ -239,7 +242,7 @@ function pullSupersetDataToSheet(sheetName, isSilent) {
 
   if (!cookie) {
     if (!isSilent) {
-      SpreadsheetApp.getUi().alert('❌ Cookie Belum Diset', 'Silakan klik menu:\n⚡ ED Sweeper Control ➔ 🔑 Set / Ganti Cookie Superset\nlalu paste cookie browser Anda dari dash.astronauts.id.', SpreadsheetApp.getUi().ButtonSet.OK);
+      safeEdsAlert('❌ Cookie Belum Diset', 'Silakan klik menu:\n⚡ ED Sweeper Control ➔ 🔑 Set / Ganti Cookie Superset\nlalu paste cookie browser Anda dari dash.astronauts.id.');
     }
     return false;
   }
@@ -280,7 +283,7 @@ function pullSupersetDataToSheet(sheetName, isSilent) {
         const code = response.getResponseCode();
         if (code === 401) {
           if (!isSilent) {
-            SpreadsheetApp.getUi().alert('❌ Cookie Kadaluarsa', 'Cookie Superset Anda sudah expired (401 Unauthorized).\nSilakan ambil cookie terbaru dari browser dan simpan via menu:\n⚡ ED Sweeper Control ➔ 🔑 Set / Ganti Cookie Superset.', SpreadsheetApp.getUi().ButtonSet.OK);
+            safeEdsAlert('❌ Cookie Kadaluarsa', 'Cookie Superset Anda sudah expired (401 Unauthorized).\nSilakan ambil cookie terbaru dari browser dan simpan via menu:\n⚡ ED Sweeper Control ➔ 🔑 Set / Ganti Cookie Superset.');
           }
           return false;
         }
@@ -323,12 +326,14 @@ function pullSupersetDataToSheet(sheetName, isSilent) {
 
   if (success) {
     if (!isSilent) {
-      getEdsSpreadsheet().toast('✅ Berhasil menarik ' + data.length + ' data terbaru dari AstroDash Superset ke "' + sheetName + '"!', 'Update Sukses ⚡', 5);
+      try {
+        getEdsSpreadsheet().toast('✅ Berhasil menarik ' + data.length + ' data terbaru dari AstroDash Superset ke "' + sheetName + '"!', 'Update Sukses ⚡', 5);
+      } catch (errToast) {}
     }
     return true;
   } else {
     if (!isSilent) {
-      SpreadsheetApp.getUi().alert('Gagal Menarik Data', '❌ Gagal tarik data Superset (' + sheetName + ')\nDetail: ' + lastError + '\n\nCek apakah ID Chart (' + chartId + ') atau Cookie valid.', SpreadsheetApp.getUi().ButtonSet.OK);
+      safeEdsAlert('Gagal Menarik Data', '❌ Gagal tarik data Superset (' + sheetName + ')\nDetail: ' + lastError + '\n\nCek apakah ID Chart (' + chartId + ') atau Cookie valid.');
     }
     return false;
   }
@@ -1049,6 +1054,107 @@ function backupHasilEdsToBackupSheet(autoClear) {
   };
 }
 
+// ── HELPER: Menulis ke baris kosong pertama yang sebenarnya ──
+// Mencegah data terlempar ke baris 200+ jika baris atas pernah diedit/dihapus isinya saja
+// Serta AMAN terhadap Header ARRAYFORMULA (seperti Fisik/System di P1 Hasil DCC) agar tidak memicu #REF!
+function appendToFirstEmptyRow(sheet, rowData) {
+  var maxRows = sheet.getLastRow();
+  var targetRow = -1;
+
+  if (maxRows > 1) {
+    // Cek kolom 1 dan 2 dari baris 2 sampai lastRow
+    var checkData = sheet.getRange(2, 1, maxRows - 1, 2).getValues();
+    for (var i = 0; i < checkData.length; i++) {
+      var val1 = String(checkData[i][0] || '').trim();
+      var val2 = String(checkData[i][1] || '').trim();
+      if (val1 === '' && val2 === '') {
+        targetRow = i + 2;
+        break;
+      }
+    }
+  }
+
+  if (targetRow === -1) {
+    targetRow = Math.max(maxRows + 1, 2);
+  }
+
+  // Cek apakah ada formula di Header (Baris 1), misalnya ArrayFormula di P1 {"Fisik/System"; ARRAYFORMULA(...)}
+  var lastCol = Math.max(rowData.length, sheet.getLastColumn());
+  var headerFormulas = sheet.getRange(1, 1, 1, lastCol).getFormulas()[0];
+
+  // Bersihkan nilai lama di kolom yang memiliki ARRAYFORMULA di Baris 1 agar ekspansi rumus tidak terhalang (#REF!)
+  for (var c = 0; c < rowData.length; c++) {
+    var formula = String(headerFormulas[c] || '').toUpperCase();
+    if (formula.indexOf('ARRAYFORMULA') !== -1 || formula.indexOf('=MAP(') !== -1 || formula.indexOf('={') === 0) {
+      var colNum = c + 1;
+      var totalRowsBelowHeader = Math.max(maxRows, targetRow) - 1;
+      if (totalRowsBelowHeader > 0) {
+        sheet.getRange(2, colNum, totalRowsBelowHeader, 1).clearContent();
+      }
+    }
+  }
+
+  // Tulis data baris baru:
+  // Kolom dengan formula di Baris 1 dilewati (dibiarkan kosong murni)
+  var startCol = -1;
+  var chunk = [];
+  for (var c = 0; c < rowData.length; c++) {
+    var colNum = c + 1;
+    var f = String(headerFormulas[c] || '').trim();
+    var isHeaderFormula = f !== '';
+
+    if (isHeaderFormula) {
+      if (chunk.length > 0) {
+        sheet.getRange(targetRow, startCol, 1, chunk.length).setValues([chunk]);
+        chunk = [];
+        startCol = -1;
+      }
+      sheet.getRange(targetRow, colNum).clearContent();
+    } else {
+      if (startCol === -1) {
+        startCol = colNum;
+      }
+      chunk.push(rowData[c]);
+    }
+  }
+  if (chunk.length > 0) {
+    sheet.getRange(targetRow, startCol, 1, chunk.length).setValues([chunk]);
+  }
+}
+
+// Helper menu untuk memperbaiki kolom formula yang tertimpa data manual
+function repairFormulaColumnsManual() {
+  var ss = getEdsSpreadsheet();
+  var sheets = [ss.getSheetByName('Hasil DCC'), ss.getSheetByName('Hasil EDS ED Sweeper')].filter(Boolean);
+  var report = [];
+
+  sheets.forEach(function(sh) {
+    var lastRow = sh.getLastRow();
+    var lastCol = sh.getLastColumn();
+    if (lastRow > 1 && lastCol > 0) {
+      var formulas = sh.getRange(1, 1, 1, lastCol).getFormulas()[0];
+      var fixed = [];
+      for (var c = 0; c < formulas.length; c++) {
+        var f = String(formulas[c] || '').toUpperCase();
+        if (f.indexOf('ARRAYFORMULA') !== -1 || f.indexOf('=MAP(') !== -1 || f.indexOf('={') === 0) {
+          sh.getRange(2, c + 1, lastRow - 1, 1).clearContent();
+          fixed.push(sh.getRange(1, c + 1).getA1Notation().replace(/\d+/, ''));
+        }
+      }
+      if (fixed.length > 0) {
+        report.push(sh.getName() + ': Kolom ' + fixed.join(', '));
+      }
+    }
+  });
+
+  var ui = SpreadsheetApp.getUi();
+  if (report.length > 0) {
+    ui.alert('✅ Perbaikan Rumus Selesai', 'Data menimpa berhasil dibersihkan pada:\n' + report.join('\n') + '\n\nRumus header (seperti Fisik/System) sekarang aktif normal!', ui.ButtonSet.OK);
+  } else {
+    ui.alert('ℹ️ Info', 'Semua kolom formula sudah bersih dan tidak terhalang data.', ui.ButtonSet.OK);
+  }
+}
+
 // ── 7. HANDLER POST UNTUK ED SWEEPER ──
 
 function handleEdsSubmit(payload) {
@@ -1103,6 +1209,9 @@ function handleEdsSubmit(payload) {
         evidance1Name = 'EDS_' + skuNo + '_1_' + dateStr + '.jpg';
         const cleanBase64_1 = payload.imageBase64.replace(/^data:image\/(png|jpeg|jpg);base64,/, "");
         const decoded1 = Utilities.base64Decode(cleanBase64_1);
+        const blob1 = Utilities.newBlob(decoded1, 'image/jpeg', evidance1Name);
+        const file1 = folder.createFile(blob1);
+        file1.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
         const fileId1 = file1.getId();
         evidanceLink1 = file1.getUrl();
         evidance1Name = '=HYPERLINK("' + evidanceLink1 + '", IMAGE("https://drive.google.com/uc?export=view&id=' + fileId1 + '"))';
@@ -1163,7 +1272,7 @@ function handleEdsSubmit(payload) {
     if (existingRowIdx !== -1) {
       hasilSheet.getRange(existingRowIdx, 1, 1, rowData.length).setValues([rowData]);
     } else {
-      hasilSheet.appendRow(rowData);
+      appendToFirstEmptyRow(hasilSheet, rowData);
     }
 
     // Auto-update kolom Done di Main List SKU ED Sweeper
@@ -1293,7 +1402,7 @@ function handleDccSubmit(payload) {
       labelProduct, labelSloc
     ];
 
-    hasilDccSheet.appendRow(dccRowData);
+    appendToFirstEmptyRow(hasilDccSheet, dccRowData);
 
     // CATATAN: Sheet "Mainlist SKU" menggunakan rumus otomatis =MAP(...) di H2
     // yang otomatis membaca dari 'Hasil DCC'. JANGAN menulis setValue manual ke Mainlist SKU
@@ -1372,4 +1481,21 @@ function doGet(e) {
   }
 
   return ContentService.createTextOutput(JSON.stringify(result)).setMimeType(ContentService.MimeType.JSON);
+}
+
+// ============================================================
+// 🔔 UTILITAS SAFE ALERT (AMAN UNTUK PEMICU WAKTU / BACKGROUND)
+// ============================================================
+function safeEdsAlert(title, message) {
+  try {
+    SpreadsheetApp.getUi().alert(title, message, SpreadsheetApp.getUi().ButtonSet.OK);
+  } catch (e) {
+    console.log('[EDS AUTO-TRIGGER] ' + title + ': ' + message);
+    try {
+      var ss = getEdsSpreadsheet();
+      if (ss && typeof ss.toast === 'function') {
+        ss.toast(String(message).split('\n')[0], title, 5);
+      }
+    } catch (errToast) {}
+  }
 }

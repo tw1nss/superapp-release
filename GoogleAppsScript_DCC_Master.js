@@ -48,7 +48,8 @@ var CHARTS = [
   { id: 11860, sheet: "STOCK UPDATE" },
   { id: 11861, sheet: "BAD & LOST" },
   { id: 11815, sheet: "MSLTC" },
-  { id: 12422, sheet: "RACK UPDATE" }
+  { id: 12422, sheet: "RACK UPDATE" },
+  { id: 12077, sheet: "Mainlist Sku ED Corection" }
 ];
 
 // Helper: Ambil spreadsheet target (Bisa bound atau standalone ID)
@@ -73,6 +74,9 @@ function onOpen() {
   if (typeof buildEdSweeperMenu === 'function') {
     buildEdSweeperMenu(ui);
   }
+  if (typeof buildEdCorrectionMenu === 'function') {
+    buildEdCorrectionMenu(ui);
+  }
 }
 
 function buildSupersetMenu(ui) {
@@ -84,8 +88,12 @@ function buildSupersetMenu(ui) {
     .addItem('2. BAD & LOST', 'menu_bad_lost')
     .addItem('3. MSLTC', 'menu_msltc')
     .addItem('4. RACK UPDATE', 'Menu_rack_update')
+    .addItem('5. ED CORRECTION (Chart 12077)', 'menu_ed_correction')
     .addSeparator()
     .addItem('🔑 Set / Ganti Cookie Superset', 'setSupersetCookiePrompt')
+    .addSeparator()
+    .addItem('⏰ Aktifkan Pemicu Auto-Sync (Setiap Jam)', 'setupSupersetHourlyTrigger')
+    .addItem('🛑 Matikan Pemicu Auto-Sync', 'removeSupersetAutoSyncTriggerPrompt')
     .addToUi();
 }
 
@@ -102,6 +110,7 @@ function buildDccMenu(ui) {
     .addItem('📸 Generate Link Bukti Foto Drive', 'generateEvidenceLinksDCC')
     .addItem('📦 Backup DCC ke Historical', 'copyDccToHistorical')
     .addItem('🧹 Bersihkan Baris Kosong Historical', 'bersihkanBarisKosong')
+    .addItem('🔧 Bersihkan Kolom Formula (Cegah #REF!)', 'repairDccFormulaColumnsManual')
     .addItem('🗑️ Clear Kolom Sheet "Hasil DCC"', 'hapus')
     .addItem('🔄 Kosongkan / Reset "Mainlist SKU"', 'resetMainlistSkuPrompt')
     .addToUi();
@@ -126,16 +135,55 @@ function menu_msltc() {
   update_single(11815, "MSLTC");
 }
 
+function menu_ed_correction() {
+  update_single(12077, "Mainlist Sku ED Corection");
+}
+
 function update_all() {
+  console.log("🚀 [AUTO-SYNC] Memulai penarikan data Superset...");
   CHARTS.forEach(function(c) {
     update_single(c.id, c.sheet);
   });
 
   alertUser("✅ Semua data Superset berhasil diperbarui!");
+  console.log("✅ [AUTO-SYNC] Semua data Superset berhasil diperbarui.");
 }
 
 function update_single(chartId, sheetName) {
   pullSupersetData(chartId, sheetName);
+}
+
+// ============================================================
+// ⏰ TRIGGER MANAGEMENT (AUTO-SYNC PEMICU WAKTU)
+// ============================================================
+function setupSupersetHourlyTrigger() {
+  removeSupersetAutoSyncTrigger();
+  ScriptApp.newTrigger('update_all')
+    .timeBased()
+    .everyHours(1)
+    .create();
+  alertUser("✅ Pemicu Waktu Auto-Sync Superset berhasil diaktifkan!\nData Superset akan di-update otomatis setiap 1 jam sekali.");
+}
+
+function removeSupersetAutoSyncTrigger() {
+  var triggers = ScriptApp.getProjectTriggers();
+  var count = 0;
+  for (var i = 0; i < triggers.length; i++) {
+    if (triggers[i].getHandlerFunction() === 'update_all') {
+      ScriptApp.deleteTrigger(triggers[i]);
+      count++;
+    }
+  }
+  return count;
+}
+
+function removeSupersetAutoSyncTriggerPrompt() {
+  var deleted = removeSupersetAutoSyncTrigger();
+  if (deleted > 0) {
+    alertUser("🛑 Auto-sync Superset telah dinonaktifkan (" + deleted + " pemicu dihapus).");
+  } else {
+    alertUser("ℹ️ Tidak ada pemicu auto-sync Superset yang aktif.");
+  }
 }
 
 // ============================================================
@@ -187,6 +235,106 @@ function doGet(e) {
                        .setMimeType(ContentService.MimeType.JSON);
 }
 
+// ── HELPER: Menulis ke baris kosong pertama yang sebenarnya ──
+// Mencegah data terlempar ke baris 200+ jika baris atas pernah diedit/dihapus isinya saja
+// Serta AMAN terhadap Header ARRAYFORMULA (seperti Fisik/System di P1 Hasil DCC) agar tidak memicu #REF!
+function appendToFirstEmptyRow(sheet, rowData) {
+  var maxRows = sheet.getLastRow();
+  var targetRow = -1;
+
+  if (maxRows > 1) {
+    // Cek kolom 1 dan 2 dari baris 2 sampai lastRow
+    var checkData = sheet.getRange(2, 1, maxRows - 1, 2).getValues();
+    for (var i = 0; i < checkData.length; i++) {
+      var val1 = String(checkData[i][0] || '').trim();
+      var val2 = String(checkData[i][1] || '').trim();
+      if (val1 === '' && val2 === '') {
+        targetRow = i + 2;
+        break;
+      }
+    }
+  }
+
+  if (targetRow === -1) {
+    targetRow = Math.max(maxRows + 1, 2);
+  }
+
+  // Cek apakah ada formula di Header (Baris 1), misalnya ArrayFormula di P1 {"Fisik/System"; ARRAYFORMULA(...)}
+  var lastCol = Math.max(rowData.length, sheet.getLastColumn());
+  var headerFormulas = sheet.getRange(1, 1, 1, lastCol).getFormulas()[0];
+
+  // Bersihkan nilai lama di kolom yang memiliki ARRAYFORMULA di Baris 1 agar ekspansi rumus tidak terhalang (#REF!)
+  for (var c = 0; c < rowData.length; c++) {
+    var formula = String(headerFormulas[c] || '').toUpperCase();
+    if (formula.indexOf('ARRAYFORMULA') !== -1 || formula.indexOf('=MAP(') !== -1 || formula.indexOf('={') === 0) {
+      var colNum = c + 1;
+      var totalRowsBelowHeader = Math.max(maxRows, targetRow) - 1;
+      if (totalRowsBelowHeader > 0) {
+        sheet.getRange(2, colNum, totalRowsBelowHeader, 1).clearContent();
+      }
+    }
+  }
+
+  // Tulis data baris baru:
+  // Kolom dengan formula di Baris 1 dilewati (dibiarkan kosong murni)
+  var startCol = -1;
+  var chunk = [];
+  for (var c = 0; c < rowData.length; c++) {
+    var colNum = c + 1;
+    var f = String(headerFormulas[c] || '').trim();
+    var isHeaderFormula = f !== '';
+
+    if (isHeaderFormula) {
+      if (chunk.length > 0) {
+        sheet.getRange(targetRow, startCol, 1, chunk.length).setValues([chunk]);
+        chunk = [];
+        startCol = -1;
+      }
+      sheet.getRange(targetRow, colNum).clearContent();
+    } else {
+      if (startCol === -1) {
+        startCol = colNum;
+      }
+      chunk.push(rowData[c]);
+    }
+  }
+  if (chunk.length > 0) {
+    sheet.getRange(targetRow, startCol, 1, chunk.length).setValues([chunk]);
+  }
+}
+
+// Helper menu DCC untuk memperbaiki kolom formula yang tertimpa data manual
+function repairDccFormulaColumnsManual() {
+  var ss = getSpreadsheet();
+  var sheet = ss.getSheetByName('Hasil DCC') || ss.getSheetByName('MTG');
+  if (!sheet) {
+    alertUser('❌ Sheet Hasil DCC tidak ditemukan.');
+    return;
+  }
+  var lastRow = sheet.getLastRow();
+  var lastCol = sheet.getLastColumn();
+  if (lastRow <= 1) {
+    alertUser('ℹ️ Sheet Hasil DCC masih kosong.');
+    return;
+  }
+
+  var formulas = sheet.getRange(1, 1, 1, lastCol).getFormulas()[0];
+  var fixedCols = [];
+  for (var c = 0; c < formulas.length; c++) {
+    var f = String(formulas[c] || '').toUpperCase();
+    if (f.indexOf('ARRAYFORMULA') !== -1 || f.indexOf('=MAP(') !== -1 || f.indexOf('={') === 0) {
+      sheet.getRange(2, c + 1, lastRow - 1, 1).clearContent();
+      fixedCols.push(sheet.getRange(1, c + 1).getA1Notation().replace(/\d+/, ''));
+    }
+  }
+
+  if (fixedCols.length > 0) {
+    alertUser('✅ Perbaikan Rumus Selesai\n\nData menimpa berhasil dibersihkan pada Kolom ' + fixedCols.join(', ') + '.\n\nRumus header (seperti Fisik/System di P1) sekarang aktif normal!');
+  } else {
+    alertUser('ℹ️ Info\n\nSemua kolom formula di Hasil DCC sudah bersih dan aktif normal.');
+  }
+}
+
 // ============================================================
 // 📡 API POST: PENERIMA AUDIT DARI SUPERAPP MTG (HP / SCANNER)
 // ============================================================
@@ -204,6 +352,14 @@ function doPost(e) {
       if (typeof handleEdsSubmit === 'function') {
         return handleEdsSubmit(payload);
       }
+    }
+
+    // Router jika request adalah audit ED Correction
+    if (payload.action === 'saveEdCorrectionResult' || payload.module === 'ed_correction' || payload.module === 'edc') {
+      if (typeof handleEdCorrectionSubmit === 'function') {
+        return handleEdCorrectionSubmit(payload);
+      }
+      return handleEdCorrectionSubmitDccFallback(payload);
     }
 
     var ss = getSpreadsheet();
@@ -314,8 +470,8 @@ function doPost(e) {
       labelSloc
     ];
 
-    // Simpan baris transaksi audit mentah (Raw Log)
-    hasilDccSheet.appendRow(dccRowData);
+    // Simpan baris transaksi audit mentah (Raw Log) ke baris kosong pertama
+    appendToFirstEmptyRow(hasilDccSheet, dccRowData);
 
     // ── 3. AUTO-UPDATE SHEET "Mainlist SKU" (KOLOM H - P) JIKA ADA ──
     try {
@@ -323,29 +479,33 @@ function doPost(e) {
       if (mainlistSheet && skuNo) {
         var lastMRow = mainlistSheet.getLastRow();
         if (lastMRow > 1) {
-          var mSkuValues = mainlistSheet.getRange(2, 3, lastMRow - 1, 1).getValues(); // Col C (SKU)
-          for (var r = 0; r < mSkuValues.length; r++) {
-            var rawVal = String(mSkuValues[r][0] || '').trim();
-            if (rawVal && (rawVal.toLowerCase() === skuNo.toLowerCase() || rawVal.includes(skuNo))) {
-              var targetRow = r + 2;
-              var fg = Number(fisikGood) || 0;
-              var fb = Number(fisikBad) || 0;
-              var tot = fg + fb;
-              var sysQty = Number(mainlistSheet.getRange(targetRow, 6).getValue()) || 0;
-              var diff = tot - sysQty;
-              var slocMatch = (slocActual.toLowerCase() === 'match') ? 'MATCH' : 'UNMATCH';
-              var remaksVal = reasonBad || reasonSloc || payload.remaks || 'Sesuai';
+          // JANGAN menimpa jika kolom H menggunakan formula otomatis (misal =MAP(...))
+          var h2Formula = mainlistSheet.getRange(2, 8).getFormula();
+          if (!h2Formula || h2Formula.trim() === '') {
+            var mSkuValues = mainlistSheet.getRange(2, 3, lastMRow - 1, 1).getValues(); // Col C (SKU)
+            for (var r = 0; r < mSkuValues.length; r++) {
+              var rawVal = String(mSkuValues[r][0] || '').trim();
+              if (rawVal && (rawVal.toLowerCase() === skuNo.toLowerCase() || rawVal.includes(skuNo))) {
+                var targetRow = r + 2;
+                var fg = Number(fisikGood) || 0;
+                var fb = Number(fisikBad) || 0;
+                var tot = fg + fb;
+                var sysQty = Number(mainlistSheet.getRange(targetRow, 6).getValue()) || 0;
+                var diff = tot - sysQty;
+                var slocMatch = (slocActual.toLowerCase() === 'match') ? 'MATCH' : 'UNMATCH';
+                var remaksVal = reasonBad || reasonSloc || payload.remaks || 'Sesuai';
 
-              mainlistSheet.getRange(targetRow, 8).setValue(fg);          // Col H: FISIK GOOD
-              mainlistSheet.getRange(targetRow, 9).setValue(fb);          // Col I: FISIK BAD
-              mainlistSheet.getRange(targetRow, 10).setValue(tot);        // Col J: TOTAL FISIK
-              mainlistSheet.getRange(targetRow, 11).setValue(diff);       // Col K: SELISIH
-              mainlistSheet.getRange(targetRow, 12).setValue(slocActual);  // Col L: SLOC ACTUAL
-              mainlistSheet.getRange(targetRow, 13).setValue(slocMatch);   // Col M: SLOC MATCH?
-              mainlistSheet.getRange(targetRow, 14).setValue(inputBy);     // Col N: PETUGAS
-              mainlistSheet.getRange(targetRow, 15).setValue('DONE');      // Col O: STATUS
-              mainlistSheet.getRange(targetRow, 16).setValue(remaksVal);   // Col P: REMARKS
-              break;
+                mainlistSheet.getRange(targetRow, 8).setValue(fg);          // Col H: FISIK GOOD
+                mainlistSheet.getRange(targetRow, 9).setValue(fb);          // Col I: FISIK BAD
+                mainlistSheet.getRange(targetRow, 10).setValue(tot);        // Col J: TOTAL FISIK
+                mainlistSheet.getRange(targetRow, 11).setValue(diff);       // Col K: SELISIH
+                mainlistSheet.getRange(targetRow, 12).setValue(slocActual);  // Col L: SLOC ACTUAL
+                mainlistSheet.getRange(targetRow, 13).setValue(slocMatch);   // Col M: SLOC MATCH?
+                mainlistSheet.getRange(targetRow, 14).setValue(inputBy);     // Col N: PETUGAS
+                mainlistSheet.getRange(targetRow, 15).setValue('DONE');      // Col O: STATUS
+                mainlistSheet.getRange(targetRow, 16).setValue(remaksVal);   // Col P: REMARKS
+                break;
+              }
             }
           }
         }
@@ -383,10 +543,18 @@ function pullSupersetData(chartId, sheetName) {
 
   var timestamp = new Date().getTime();
 
-  var urlVariants = [
-    CONFIG.BASE_URL + "api/v1/chart/" + chartId + "/data?force=true&_t=" + timestamp,
-    CONFIG.BASE_URL + "superset/explore_json/?form_data={\"slice_id\":" + chartId + "}&force=true&_t=" + timestamp
-  ];
+  var formDataKey = (chartId === 12077) ? "FGnMPSQjzn-IkTT_ZdewtmeAw3D7uPCz56ErrkOHEZT-KyQ5BLwbb8-QXzzmQpaL" : "";
+  var pageId = (chartId === 12077) ? "OuCI-jVWZVevhI7VLi-Uh" : "";
+
+  var urlVariants = [];
+  if (formDataKey) {
+    urlVariants.push(CONFIG.BASE_URL + "superset/explore_json/?form_data_key=" + encodeURIComponent(formDataKey) + "&slice_id=" + chartId + "&force=true&_t=" + timestamp);
+  }
+  urlVariants.push(CONFIG.BASE_URL + "api/v1/chart/" + chartId + "/data?force=true&_t=" + timestamp);
+  if (pageId) {
+    urlVariants.push(CONFIG.BASE_URL + "superset/explore_json/?form_data=" + encodeURIComponent(JSON.stringify({ slice_id: Number(chartId), dashboard_page_id: pageId })) + "&force=true&_t=" + timestamp);
+  }
+  urlVariants.push(CONFIG.BASE_URL + "superset/explore_json/?form_data={\"slice_id\":" + chartId + "}&force=true&_t=" + timestamp);
 
   var response;
   var data;
@@ -1057,12 +1225,13 @@ function assignDccTaskPrompt() {
     return;
   }
 
-  // Cari baris kosong berikutnya di Kolom C (SKU)
+  // Cari baris kosong pertama di Kolom C (SKU)
   var data = sheet.getRange('C2:C1000').getValues();
   var nextRow = 2;
   for (var i = 0; i < data.length; i++) {
-    if (data[i][0] && data[i][0].toString().trim() !== '') {
-      nextRow = i + 3;
+    if (!data[i][0] || data[i][0].toString().trim() === '') {
+      nextRow = i + 2;
+      break;
     }
   }
 
@@ -1199,5 +1368,100 @@ function onEdit(e) {
 // 🔔 UTIL
 // =============================
 function alertUser(msg) {
-  SpreadsheetApp.getUi().alert(msg);
+  try {
+    SpreadsheetApp.getUi().alert(msg);
+  } catch (e) {
+    // Aman saat dipanggil dari Pemicu Waktu (Time-driven Trigger / Background tanpa UI)
+    Logger.log("[AUTO-SYNC / TRIGGER] " + msg);
+    console.log("[AUTO-SYNC / TRIGGER] " + msg);
+    try {
+      var ss = getSpreadsheet();
+      if (ss && typeof ss.toast === "function") {
+        ss.toast(String(msg).split("\n")[0], "DCC / Superset Auto-Sync", 5);
+      }
+    } catch (errToast) {}
+  }
 }
+
+/**
+ * Fallback handler untuk ED Correction submit ke Backup ED Corection
+ */
+function handleEdCorrectionSubmitDccFallback(payload) {
+  try {
+    var ss = getSpreadsheet();
+    var sheet = ss.getSheetByName('Hasil ED Correction') || 
+                ss.getSheetByName('Hasil ED Corection') || 
+                ss.getSheetByName('Hasil EDC') || 
+                ss.getSheetByName('Backup ED Corection') || 
+                ss.getSheetByName('Backup Data ED Correction');
+
+    if (!sheet) {
+      sheet = ss.insertSheet('Hasil ED Correction');
+    }
+
+    if (sheet && (sheet.getLastRow() === 0 || (sheet.getLastRow() === 1 && !sheet.getRange(1, 1).getValue()))) {
+      var headerRow = [
+        [
+          'TIMESTAMP', 'SKU', 'NAMA PRODUK', 'LOKASI RAK (SLOC)', 'SLOC ACTUAL', 
+          'SLOC MATCH?', 'ED SISTEM (LAMA)', 'ED FISIK / KOREKSI', 'STATUS ED', 
+          'FISIK GOOD', 'FISIK BAD', 'TOTAL FISIK', 'SELISIH', 'PETUGAS', 'SHIFT', 
+          'BUKTI FOTO (DRIVE)', 'REMARKS'
+        ]
+      ];
+      sheet.getRange(1, 1, 1, 17).setValues(headerRow);
+      sheet.getRange(1, 1, 1, 17)
+        .setBackground('#581C87')
+        .setFontColor('#FFFFFF')
+        .setFontWeight('bold')
+        .setHorizontalAlignment('center');
+      sheet.setRowHeight(1, 35);
+    }
+
+    var now = new Date();
+    var timestamp = Utilities.formatDate(now, CONFIG.TIMEZONE || "Asia/Jakarta", "dd/MM/yyyy HH:mm:ss");
+
+    var sku = String(payload.sku || payload.skuNo || '').trim();
+    var productName = String(payload.productName || payload.namaSku || '').trim();
+    var rackSystem = String(payload.rackSystem || payload.slocExisting || '').trim();
+    var rackActual = String(payload.rackActual || payload.slocActual || rackSystem).trim();
+    var rackMatch = (rackSystem.toUpperCase() === rackActual.toUpperCase()) ? "MATCH" : "UNMATCH";
+
+    var edSystem = String(payload.edSystem || payload.edLama || payload.expiredDateSystem || '-').trim();
+    var edActual = String(payload.edActual || payload.edBaru || payload.expiredDateActual || payload.expiredDate || '').trim();
+    var edStatus = String(payload.edStatus || (edSystem === edActual ? "MATCH" : "REVISI")).trim();
+
+    var fisikGood = Number(payload.fisikGood || 0);
+    var fisikBad = Number(payload.fisikBad || 0);
+    var totalFisik = fisikGood + fisikBad;
+    var qtySystem = Number(payload.qtySystem || 0);
+    var selisih = totalFisik - qtySystem;
+
+    var petugas = String(payload.petugas || payload.pic || payload.inputBy || '').trim();
+    var shift = String(payload.shift || '').trim();
+    var photoUrl = String(payload.photoUrl || payload.evidenceUrl || '').trim();
+    var remarks = String(payload.remarks || payload.keterangan || '').trim();
+
+    var rowData = [
+      timestamp, sku, productName, rackSystem, rackActual,
+      rackMatch, edSystem, edActual, edStatus,
+      fisikGood, fisikBad, totalFisik, selisih, petugas, shift,
+      photoUrl, remarks
+    ];
+
+    sheet.appendRow(rowData);
+
+    return ContentService.createTextOutput(JSON.stringify({
+      status: "success",
+      message: "Data koreksi ED berhasil disimpan di Backup ED Corection!",
+      sku: sku,
+      timestamp: timestamp
+    })).setMimeType(ContentService.MimeType.JSON);
+
+  } catch (err) {
+    return ContentService.createTextOutput(JSON.stringify({
+      status: "error",
+      message: "Gagal menyimpan data EDC: " + err.toString()
+    })).setMimeType(ContentService.MimeType.JSON);
+  }
+}
+

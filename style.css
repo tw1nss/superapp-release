@@ -559,6 +559,11 @@ body::after {
   border: 1px solid rgba(6, 182, 212, 0.25);
 }
 
+.menu-icon-box.edc {
+  background: rgba(168, 85, 247, 0.12);
+  border: 1px solid rgba(168, 85, 247, 0.25);
+}
+
 .menu-card-title {
   font-size: clamp(0.74rem, 2.5vw, 0.84rem);
   font-weight: 600;
@@ -10417,4 +10422,82 @@ select.dcc-field-input option {
     max-width: 180px;
   }
 }
+
+/* ═══════════════════════════════════════════════════════════════════
+   ED CORRECTION MODULE STYLES (PURPLE / VIOLET THEME ACCENTS)
+   ═══════════════════════════════════════════════════════════════════ */
+.edc-top-bar {
+  border-bottom: 1px solid rgba(168, 85, 247, 0.3) !important;
+}
+
+.edc-title {
+  background: linear-gradient(135deg, #c084fc 0%, #a855f7 50%, #7c3aed 100%) !important;
+  -webkit-background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+  filter: drop-shadow(0 2px 8px rgba(168, 85, 247, 0.25)) !important;
+}
+
+.edc-refresh-btn:hover,
+.edc-top-back-btn:hover {
+  background: rgba(168, 85, 247, 0.2) !important;
+  border-color: #a855f7 !important;
+  color: #c084fc !important;
+  box-shadow: 0 0 12px rgba(168, 85, 247, 0.3) !important;
+}
+
+.edc-filter-container {
+  border-color: rgba(168, 85, 247, 0.25) !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35), 0 0 20px rgba(168, 85, 247, 0.08) !important;
+}
+
+.edc-status-btn.active {
+  background: rgba(168, 85, 247, 0.2) !important;
+  border-color: #a855f7 !important;
+  color: #e9d5ff !important;
+}
+
+.edc-progress-bar-fill {
+  background: linear-gradient(90deg, #a855f7 0%, #c084fc 100%) !important;
+}
+
+.edc-card {
+  border-left: 4px solid #a855f7 !important;
+}
+
+.edc-card.status-done {
+  border-left-color: #10b981 !important;
+}
+
+.edc-card.status-pending {
+  border-left-color: #f59e0b !important;
+}
+
+.edc-submit-btn {
+  background: linear-gradient(135deg, #9333ea, #7c3aed) !important;
+  box-shadow: 0 4px 16px rgba(147, 51, 234, 0.35) !important;
+}
+
+.edc-submit-btn:hover {
+  box-shadow: 0 6px 20px rgba(147, 51, 234, 0.5) !important;
+  transform: translateY(-1px);
+}
+
+.edc-badge-match {
+  background: rgba(16, 185, 129, 0.15);
+  color: #34d399;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.edc-badge-revisi {
+  background: rgba(245, 158, 11, 0.15);
+  color: #fbbf24;
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.edc-badge-expired {
+  background: rgba(239, 68, 68, 0.15);
+  color: #f87171;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
 

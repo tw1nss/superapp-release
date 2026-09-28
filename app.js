@@ -2805,6 +2805,8 @@
       document.getElementById('dccWorkspace').classList.add('hidden');
       const edsWs = document.getElementById('edSweeperWorkspace');
       if (edsWs) edsWs.classList.add('hidden');
+      const edcWs = document.getElementById('edCorrectionWorkspace');
+      if (edcWs) edcWs.classList.add('hidden');
       document.getElementById('slipGajiWorkspace').classList.add('hidden');
       document.getElementById('mpScheduleWorkspace').classList.add('hidden');
       document.getElementById('complainWorkspace').classList.add('hidden');
@@ -2817,6 +2819,27 @@
       if (typeof window.fetchKoliInboundData === 'function') {
         window.fetchKoliInboundData();
       }
+    } else if (menu === 'ed_correction' || menu === 'edc') {
+      document.getElementById('homeMenuSection').classList.add('hidden');
+      document.getElementById('appWorkspace').classList.add('hidden');
+      document.getElementById('dccWorkspace').classList.add('hidden');
+      const edsWs = document.getElementById('edSweeperWorkspace');
+      if (edsWs) edsWs.classList.add('hidden');
+      const edcWs = document.getElementById('edCorrectionWorkspace');
+      if (edcWs) {
+        edcWs.classList.remove('hidden');
+        edcWs.scrollTop = 0;
+      }
+      document.getElementById('slipGajiWorkspace').classList.add('hidden');
+      document.getElementById('mpScheduleWorkspace').classList.add('hidden');
+      document.getElementById('complainWorkspace').classList.add('hidden');
+      const koliWs = document.getElementById('koliInboundWorkspace');
+      if (koliWs) koliWs.classList.add('hidden');
+      document.getElementById('backToMenuBtn').classList.remove('hidden');
+
+      if (typeof window.switchEdcTab === 'function') window.switchEdcTab('main');
+      if (typeof window.initEdcFlatpickr === 'function') window.initEdcFlatpickr();
+      if (typeof window.fetchEdCorrectionData === 'function') window.fetchEdCorrectionData(true);
     } else {
       alert('Fitur ini akan di-develop menyusul.');
     }
@@ -2834,6 +2857,8 @@
     document.getElementById('dccWorkspace').classList.add('hidden');
     const edsWs = document.getElementById('edSweeperWorkspace');
     if (edsWs) edsWs.classList.add('hidden');
+    const edcWs = document.getElementById('edCorrectionWorkspace');
+    if (edcWs) edcWs.classList.add('hidden');
     document.getElementById('slipGajiWorkspace').classList.add('hidden');
     document.getElementById('mpScheduleWorkspace').classList.add('hidden');
     document.getElementById('complainWorkspace').classList.add('hidden');
@@ -2957,6 +2982,27 @@
     if (edsWorkspace && !edsWorkspace.classList.contains('hidden')) {
       if (typeof currentEdsTab !== 'undefined' && currentEdsTab !== 'main') {
         if (typeof switchEdsTab === 'function') switchEdsTab('main');
+        return true;
+      }
+      goBackToMenu();
+      return true;
+    }
+
+    // 3.6 Khusus ED Correction Workspace: Jika sedang di tab Scan atau Report, kembali ke Main List!
+    const edcConfirmModal = document.getElementById('edcConfirmEditModal');
+    if (edcConfirmModal && !edcConfirmModal.classList.contains('hidden')) {
+      closeEdcConfirmEditModal();
+      return true;
+    }
+    const edcSetupModal = document.getElementById('edcSetupModal');
+    if (edcSetupModal && !edcSetupModal.classList.contains('hidden')) {
+      closeEdcSetupModal();
+      return true;
+    }
+    const edcWorkspace = document.getElementById('edCorrectionWorkspace');
+    if (edcWorkspace && !edcWorkspace.classList.contains('hidden')) {
+      if (typeof currentEdcTab !== 'undefined' && currentEdcTab !== 'main') {
+        if (typeof switchEdcTab === 'function') switchEdcTab('main');
         return true;
       }
       goBackToMenu();
@@ -9222,6 +9268,1193 @@
     setTimeout(() => {
       triggerNativePrint('print-mode-eds', `Laporan_ED_Sweeper_MTG_${todayStr}`);
     }, 120);
+  };
+
+  // ══════════════════════════════════════════════
+  //  ED CORRECTION (EDC) MODULE ENGINE
+  // ══════════════════════════════════════════════
+
+  const EDC_SPREADSHEET_ID_DEFAULT = '1fVQwSOoIU9pT5RHWi6-m8qCf_T0rQPZxEf_WuhlaD2g';
+  const EDC_WEBAPP_KEY = 'EDC_CUSTOM_WEBAPP_URL_V1';
+  const EDC_SPREADSHEET_KEY = 'EDC_CUSTOM_SPREADSHEET_URL_V1';
+  const EDC_MAIN_CACHE_KEY = 'EDC_MAIN_CACHE_MTG_V1';
+  const EDC_SUBMITTED_CACHE_KEY = 'EDC_SUBMITTED_CACHE_MTG_V1';
+  const EDC_PIC_KEY = 'EDC_DEFAULT_PIC_V1';
+  const EDC_OFFLINE_KEY = 'EDC_OFFLINE_QUEUE_LOCAL';
+
+  let currentEdcTab = 'main'; // 'main' | 'scan' | 'report'
+  let currentEdcStatusFilter = 'all'; // 'all' | 'submitted' | 'pending'
+  let currentEdcSort = 'name_asc'; // 'name_asc' | 'sloc_asc' | 'stock_desc'
+  let isEdcFetching = false;
+
+  let edcMainListData = [];
+  let edcSubmittedSkuSet = new Set();
+  let edcAuditResultsMap = new Map(); // sku -> audit object
+  let edcHasilRows = [];
+  let edcPhotoList = [];
+  let selectedEdcSku = null;
+  let edcFlatpickrInstance = null;
+  let pendingEdcSubmitPayload = null;
+
+  function getEdcSpreadsheetId() {
+    try {
+      const custom = localStorage.getItem(EDC_SPREADSHEET_KEY) || '';
+      if (custom) {
+        const m = custom.match(/\/d\/([a-zA-Z0-9_-]+)/);
+        if (m && m[1]) return m[1].trim();
+        if (!custom.includes('/') && custom.length > 20) return custom.trim();
+      }
+    } catch(e) {}
+    return EDC_SPREADSHEET_ID_DEFAULT;
+  }
+
+  function getEdcBaseSheetUrl() {
+    const id = getEdcSpreadsheetId();
+    return `https://docs.google.com/spreadsheets/d/${id}/gviz/tq?tqx=out:csv`;
+  }
+
+  function getEdcWebappUrl() {
+    try {
+      const custom = localStorage.getItem(EDC_WEBAPP_KEY);
+      if (custom && custom.trim().startsWith('http')) return custom.trim();
+    } catch(e) {}
+    return EDS_DEFAULT_WEBAPP_URL;
+  }
+
+  // ── Modal Setup & Config Spreadsheet ──
+  window.openEdcSetupModal = function() {
+    const modal = document.getElementById('edcSetupModal');
+    if (!modal) return;
+    const urlInput = document.getElementById('edcSpreadsheetUrlInput');
+    if (urlInput) {
+      urlInput.value = localStorage.getItem(EDC_SPREADSHEET_KEY) || `https://docs.google.com/spreadsheets/d/${getEdcSpreadsheetId()}/edit`;
+    }
+    const webappInput = document.getElementById('edcWebappUrlInput');
+    if (webappInput) {
+      webappInput.value = localStorage.getItem(EDC_WEBAPP_KEY) || getEdcWebappUrl();
+    }
+    modal.classList.remove('hidden');
+  };
+
+  window.closeEdcSetupModal = function() {
+    const modal = document.getElementById('edcSetupModal');
+    if (modal) modal.classList.add('hidden');
+  };
+
+  window.saveEdcSpreadsheetUrl = function() {
+    const input = document.getElementById('edcSpreadsheetUrlInput');
+    if (!input) return;
+    const val = input.value.trim();
+    if (!val) {
+      showDccToast('warning', 'Input Kosong', 'Silakan masukkan Link atau ID Google Sheets.');
+      return;
+    }
+    localStorage.setItem(EDC_SPREADSHEET_KEY, val);
+    showDccToast('success', 'Tersimpan', 'Link Spreadsheet ED Correction berhasil diperbarui!');
+    closeEdcSetupModal();
+    fetchEdCorrectionData(true);
+  };
+
+  window.saveEdcWebappUrl = function() {
+    const input = document.getElementById('edcWebappUrlInput');
+    if (!input) return;
+    const val = input.value.trim();
+    if (!val) {
+      showDccToast('warning', 'Input Kosong', 'Silakan masukkan URL WebApp Apps Script.');
+      return;
+    }
+    localStorage.setItem(EDC_WEBAPP_KEY, val);
+    showDccToast('success', 'Tersimpan', 'WebApp URL ED Correction berhasil diperbarui!');
+    closeEdcSetupModal();
+  };
+
+  // ── Tab Switcher ──
+  window.switchEdcTab = function (tabName) {
+    currentEdcTab = tabName;
+    const ws = document.getElementById('edCorrectionWorkspace');
+    if (!ws) return;
+
+    ws.querySelectorAll('.eds-tab-content').forEach(tab => {
+      tab.classList.remove('active');
+    });
+    ws.querySelectorAll('.eds-nav-item').forEach(nav => nav.classList.remove('active'));
+
+    if (tabName === 'main') {
+      const el = document.getElementById('edcTabMainList');
+      if (el) el.classList.add('active');
+      const nav = document.getElementById('navEdcMain');
+      if (nav) nav.classList.add('active');
+    } else if (tabName === 'scan') {
+      const el = document.getElementById('edcTabScan');
+      if (el) {
+        el.classList.add('active');
+        el.scrollTop = 0;
+      }
+      const nav = document.getElementById('navEdcScan');
+      if (nav) nav.classList.add('active');
+      initEdcFlatpickr();
+      loadEdcSavedPic();
+      ws.scrollTop = 0;
+    } else if (tabName === 'report') {
+      const el = document.getElementById('edcTabReport');
+      if (el) el.classList.add('active');
+      const nav = document.getElementById('navEdcReport');
+      if (nav) nav.classList.add('active');
+      renderEdcReport();
+    }
+  };
+
+  window.handleEdcBackPressed = function () {
+    if (currentEdcTab !== 'main') {
+      switchEdcTab('main');
+    } else {
+      goBackToMenu();
+    }
+  };
+
+  // ── Fetch & Sync Data ED Correction ──
+  window.refreshEdcData = async function () {
+    const btn = document.querySelector('.edc-refresh-btn');
+    if (btn) btn.classList.add('spinning');
+    try {
+      await fetchEdCorrectionData(true);
+      showDccToast('success', 'Data Diperbarui', 'Data ED Correction berhasil disinkronkan!');
+    } catch (e) {
+      showDccToast('error', 'Gagal Sinkron', e.message || 'Periksa koneksi internet Anda.');
+    } finally {
+      if (btn) btn.classList.remove('spinning');
+    }
+  };
+
+  window.fetchEdCorrectionData = async function (forceRefresh = false) {
+    if (isEdcFetching) return;
+    isEdcFetching = true;
+
+    // Load from cache first for fast render
+    if (!forceRefresh) {
+      try {
+        const cached = localStorage.getItem(EDC_MAIN_CACHE_KEY);
+        const subCached = localStorage.getItem(EDC_SUBMITTED_CACHE_KEY);
+        if (subCached) edcSubmittedSkuSet = new Set(safeJsonParse(subCached, []));
+        if (cached) {
+          edcMainListData = safeJsonParse(cached, []);
+          filterEdCorrectionList();
+          renderEdcReport();
+        }
+      } catch (e) {}
+    }
+
+    const container = document.getElementById('edcCardContainer');
+    if (edcMainListData.length === 0 && container) {
+      container.innerHTML = '<div style="text-align:center; padding: 35px; color: #c084fc;">⚡ Menghubungkan ke Spreadsheet ED Correction...</div>';
+    }
+
+    try {
+      const baseUrl = getEdcBaseSheetUrl();
+      const t = Date.now();
+      const nonce = Math.floor(Math.random() * 1000000);
+      const fetchOpts = {
+        cache: 'no-store',
+        headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate', 'Pragma': 'no-cache' }
+      };
+
+      const mainSheetName = 'Mainlist Sku ED Corection';
+      const hasilCandidates = ['Hasil ED Correction', 'Hasil ED Corection', 'Backup ED Corection'];
+      const mainUrl = `${baseUrl}&sheet=${encodeURIComponent(mainSheetName)}&_t=${t}&_r=${nonce}`;
+
+      // Ambil Mainlist dan coba ambil Hasil ED Correction dengan fallback kandidat nama sheet
+      const [mainRes, hasilRes] = await Promise.all([
+        fetch(mainUrl, fetchOpts).then(r => r.ok ? r.text() : '').catch(() => ''),
+        (async () => {
+          for (const cand of hasilCandidates) {
+            try {
+              const candUrl = `${baseUrl}&sheet=${encodeURIComponent(cand)}&_t=${t}&_r=${nonce}`;
+              const r = await fetch(candUrl, fetchOpts);
+              if (r.ok) {
+                const txt = await r.text();
+                if (txt && !txt.includes('<!DOCTYPE html>') && txt.trim().length > 10) {
+                  return txt;
+                }
+              }
+            } catch (err) {}
+          }
+          return '';
+        })()
+      ]);
+
+      // 1. Parse Hasil ED Correction (Hasil Audit Sebelumnya)
+      edcAuditResultsMap.clear();
+      edcHasilRows = [];
+      edcSubmittedSkuSet.clear();
+
+      if (hasilRes) {
+        const hasilLines = parseCSV(hasilRes);
+        if (hasilLines && hasilLines.length > 1) {
+          const hHeaders = hasilLines[0].map(h => String(h || '').trim().toLowerCase());
+          const hSkuIdx = hHeaders.findIndex(h => h === 'sku' || h === 'sku_number' || h === 'sku no');
+          const hNameIdx = hHeaders.findIndex(h => h.includes('nama'));
+          const hRackSysIdx = hHeaders.findIndex(h => h.includes('rack') && h.includes('sloc') || h === 'lokasi rak (sloc)');
+          const hRackActIdx = hHeaders.findIndex(h => h.includes('actual') || h === 'sloc actual');
+          const hEdSysIdx = hHeaders.findIndex(h => h.includes('sistem') && h.includes('ed'));
+          const hEdActIdx = hHeaders.findIndex(h => (h.includes('fisik') || h.includes('koreksi')) && h.includes('ed'));
+          const hStatusEdIdx = hHeaders.findIndex(h => h.includes('status ed'));
+          const hGoodIdx = hHeaders.findIndex(h => h.includes('good'));
+          const hBadIdx = hHeaders.findIndex(h => h.includes('bad'));
+          const hPetugasIdx = hHeaders.findIndex(h => h.includes('petugas') || h.includes('pic'));
+          const hRemarksIdx = hHeaders.findIndex(h => h.includes('remarks') || h.includes('catatan') || h.includes('keterangan'));
+
+          const actualSkuIdx = hSkuIdx >= 0 ? hSkuIdx : 1;
+
+          for (let i = 1; i < hasilLines.length; i++) {
+            const row = hasilLines[i];
+            if (!row || row.length === 0) continue;
+            const sku = String(row[actualSkuIdx] || '').trim();
+            if (!sku) continue;
+
+            const auditObj = {
+              timestamp: row[0] || '',
+              sku: sku,
+              productName: hNameIdx >= 0 ? (row[hNameIdx] || '') : (row[2] || ''),
+              rackSystem: hRackSysIdx >= 0 ? (row[hRackSysIdx] || '') : (row[3] || ''),
+              rackActual: hRackActIdx >= 0 ? (row[hRackActIdx] || 'Match') : (row[4] || 'Match'),
+              rackMatch: row[5] || 'MATCH',
+              edSystem: excelDateToDateStr(hEdSysIdx >= 0 ? row[hEdSysIdx] : row[6]),
+              edActual: excelDateToDateStr(hEdActIdx >= 0 ? row[hEdActIdx] : row[7]),
+              edStatus: hStatusEdIdx >= 0 ? (row[hStatusEdIdx] || 'MATCH') : (row[8] || 'MATCH'),
+              fisikGood: Number(hGoodIdx >= 0 ? row[hGoodIdx] : row[9]) || 0,
+              fisikBad: Number(hBadIdx >= 0 ? row[hBadIdx] : row[10]) || 0,
+              totalFisik: Number(row[11]) || 0,
+              selisih: Number(row[12]) || 0,
+              petugas: hPetugasIdx >= 0 ? (row[hPetugasIdx] || '') : (row[13] || ''),
+              shift: row[14] || '',
+              photoUrl: row[15] || '',
+              remarks: hRemarksIdx >= 0 ? (row[hRemarksIdx] || '') : (row[16] || '')
+            };
+
+            const key = sku.toLowerCase();
+            edcAuditResultsMap.set(key, auditObj);
+            edcSubmittedSkuSet.add(key);
+            edcHasilRows.push(auditObj);
+          }
+        }
+      }
+
+      // 2. Parse Mainlist Sku ED Corection
+      if (mainRes) {
+        const mainLines = parseCSV(mainRes);
+        if (mainLines && mainLines.length > 1) {
+          const mHeaders = mainLines[0].map(h => String(h || '').trim().toLowerCase());
+          
+          // Deteksi dinamis kolom berdasarkan sheet Mainlist Sku ED Corection
+          let skuIdx = mHeaders.findIndex(h => h === 'sku_number' || h === 'sku' || h === 'barcode' || h === 'sku no');
+          let nameIdx = mHeaders.findIndex(h => h === 'product_name' || h === 'nama produk' || h === 'nama sku' || h === 'nama');
+          let rackIdx = mHeaders.findIndex(h => h === 'rack_name' || h === 'sloc' || h === 'rack' || h === 'lokasi');
+          let typeIdx = mHeaders.findIndex(h => h === 'product type' || h === 'kategori' || h === 'type');
+          let msltcIdx = mHeaders.findIndex(h => h === 'msltc' || h === 'masa ed' || h === 'sisa hari');
+          let locIdx = mHeaders.findIndex(h => h === 'location_name' || h === 'hub');
+          let qtyIdx = mHeaders.findIndex(h => h.includes('qty') || h.includes('stok') || h.includes('stock'));
+          let edSysIdx = mHeaders.findIndex(h => h.includes('ed') && (h.includes('system') || h.includes('sistem') || h.includes('lama')));
+          let shiftIdx = mHeaders.findIndex(h => h.includes('shift'));
+          let dateIdx = mHeaders.findIndex(h => h.includes('tanggal') || h.includes('date'));
+
+          // Fallback sesuai struktur default sheet: [loc_id, loc_name, prod_id, sku_number, prod_name, rack_name, prod_type, msltc]
+          if (skuIdx === -1) skuIdx = 3;
+          if (nameIdx === -1) nameIdx = 4;
+          if (rackIdx === -1) rackIdx = 5;
+          if (typeIdx === -1) typeIdx = 6;
+          if (msltcIdx === -1) msltcIdx = 7;
+
+          const list = [];
+          for (let m = 1; m < mainLines.length; m++) {
+            const row = mainLines[m];
+            if (!row || row.length === 0) continue;
+            const sku = String(row[skuIdx] || '').trim();
+            if (!sku) continue;
+
+            const skuKey = sku.toLowerCase();
+            const audit = edcAuditResultsMap.get(skuKey);
+            const isDone = !!audit;
+
+            const item = {
+              sku: sku,
+              productName: String(row[nameIdx] || (audit ? audit.productName : '')).trim(),
+              rack: String(row[rackIdx] || (audit ? audit.rackSystem : '')).trim(),
+              productType: typeIdx >= 0 ? String(row[typeIdx] || '').trim() : '',
+              msltc: msltcIdx >= 0 ? (Number(row[msltcIdx]) || 0) : 0,
+              locationName: locIdx >= 0 ? String(row[locIdx] || '').trim() : '',
+              qtySystem: qtyIdx >= 0 ? (Number(row[qtyIdx]) || 0) : 0,
+              edSystem: edSysIdx >= 0 ? excelDateToDateStr(row[edSysIdx]) : (audit ? audit.edSystem : '-'),
+              shift: shiftIdx >= 0 ? String(row[shiftIdx] || '').trim() : (audit ? audit.shift : ''),
+              date: dateIdx >= 0 ? String(row[dateIdx] || '').trim() : '',
+              edActual: audit ? audit.edActual : '',
+              edStatus: audit ? audit.edStatus : '',
+              fisikGood: audit ? audit.fisikGood : 0,
+              fisikBad: audit ? audit.fisikBad : 0,
+              totalFisik: audit ? audit.totalFisik : 0,
+              selisih: audit ? audit.selisih : 0,
+              petugas: audit ? audit.petugas : '',
+              status: isDone ? 'DONE' : 'PENDING',
+              remarks: audit ? audit.remarks : ''
+            };
+
+            if (isDone) edcSubmittedSkuSet.add(skuKey);
+            list.push(item);
+          }
+
+          edcMainListData = list;
+          try {
+            localStorage.setItem(EDC_MAIN_CACHE_KEY, JSON.stringify(list));
+            localStorage.setItem(EDC_SUBMITTED_CACHE_KEY, JSON.stringify(Array.from(edcSubmittedSkuSet)));
+          } catch(e) {}
+        }
+      }
+
+      filterEdCorrectionList();
+      renderEdcReport();
+
+    } catch(err) {
+      console.error('Fetch ED Correction error:', err);
+      if (container && edcMainListData.length === 0) {
+        container.innerHTML = `
+          <div style="text-align:center; padding: 35px 20px;">
+            <div style="font-size:2rem; margin-bottom:10px;">⚠️</div>
+            <div style="font-weight:700; color:#f87171; margin-bottom:8px;">Gagal Menghubungkan ke Spreadsheet</div>
+            <div style="font-size:0.85rem; color:#94a3b8; line-height:1.5; margin-bottom:16px;">
+              Pastikan sheet <b>"Mainlist Sku ED Corection"</b> sudah ada dan link spreadsheet valid.
+            </div>
+            <button type="button" class="btn" style="background: linear-gradient(135deg, #a855f7, #7c3aed); color:#fff; padding:10px 18px; border-radius:12px; border:none; cursor:pointer;" onclick="openEdcSetupModal()">
+              ⚙️ Pengaturan Spreadsheet
+            </button>
+          </div>
+        `;
+      }
+    } finally {
+      isEdcFetching = false;
+    }
+  };
+
+  // ── Filter & Sort Main List ──
+  window.setEdcStatusFilter = function (status) {
+    currentEdcStatusFilter = status;
+    const ws = document.getElementById('edCorrectionWorkspace');
+    if (!ws) return;
+    ws.querySelectorAll('.edc-status-btn, .eds-status-btn').forEach(btn => {
+      if (btn.getAttribute('data-status') === status) {
+        btn.classList.add('active');
+      } else {
+        btn.classList.remove('active');
+      }
+    });
+    filterEdCorrectionList();
+  };
+
+  window.toggleEdcSort = function (sortType) {
+    currentEdcSort = sortType;
+    const ws = document.getElementById('edCorrectionWorkspace');
+    if (!ws) return;
+    ws.querySelectorAll('.eds-sort-btn').forEach(btn => btn.classList.remove('active'));
+    if (sortType === 'name_asc') {
+      const b = document.getElementById('edcSortNameAsc');
+      if (b) b.classList.add('active');
+    } else if (sortType === 'sloc_asc') {
+      const b = document.getElementById('edcSortSlocAsc');
+      if (b) b.classList.add('active');
+    } else if (sortType === 'stock_desc') {
+      const b = document.getElementById('edcSortStockDesc');
+      if (b) b.classList.add('active');
+    }
+    filterEdCorrectionList();
+  };
+
+  window.clearEdcFilter = function () {
+    const input = document.getElementById('edcFilterInput');
+    if (input) {
+      input.value = '';
+      input.focus();
+    }
+    const clearBtn = document.getElementById('edcFilterClearBtn');
+    if (clearBtn) clearBtn.classList.add('hidden');
+    filterEdCorrectionList();
+  };
+
+  let currentEdcRenderLimit = 50;
+  let currentEdcListCache = [];
+
+  function filterEdCorrectionList() {
+    const searchInput = document.getElementById('edcFilterInput');
+    const q = (searchInput ? searchInput.value : '').toLowerCase().trim();
+    const clearBtn = document.getElementById('edcFilterClearBtn');
+    if (clearBtn) {
+      if (q) clearBtn.classList.remove('hidden');
+      else clearBtn.classList.add('hidden');
+    }
+
+    let totalDone = 0;
+    let totalPending = 0;
+
+    for (let i = 0; i < edcMainListData.length; i++) {
+      const item = edcMainListData[i];
+      const isDone = item.status === 'DONE' || edcSubmittedSkuSet.has(item.sku.toLowerCase());
+      if (isDone) totalDone++;
+      else totalPending++;
+    }
+
+    // Update counts
+    const countAll = document.getElementById('edcStatusCountAll');
+    if (countAll) countAll.textContent = edcMainListData.length;
+    const countSub = document.getElementById('edcStatusCountSubmitted');
+    if (countSub) countSub.textContent = totalDone;
+    const countPen = document.getElementById('edcStatusCountPending');
+    if (countPen) countPen.textContent = totalPending;
+
+    // Progress bar
+    const pct = edcMainListData.length > 0 ? Math.round((totalDone / edcMainListData.length) * 100) : 0;
+    const pFill = document.getElementById('edcProgressBarFill');
+    if (pFill) pFill.style.width = `${pct}%`;
+    const pBadge = document.getElementById('edcListCountBadge');
+    if (pBadge) pBadge.textContent = `${totalDone} Selesai / ${edcMainListData.length} SKU (${pct}%)`;
+
+    // Filter items
+    let filtered = edcMainListData.filter(item => {
+      const isDone = item.status === 'DONE' || edcSubmittedSkuSet.has(item.sku.toLowerCase());
+      if (currentEdcStatusFilter === 'submitted' && !isDone) return false;
+      if (currentEdcStatusFilter === 'pending' && isDone) return false;
+
+      if (q) {
+        const text = `${item.sku} ${item.productName} ${item.rack} ${item.productType} ${item.locationName}`.toLowerCase();
+        if (!text.includes(q)) return false;
+      }
+      return true;
+    });
+
+    // Sorting
+    filtered.sort((a, b) => {
+      if (currentEdcSort === 'name_asc') {
+        return (a.productName || '').localeCompare(b.productName || '');
+      } else if (currentEdcSort === 'sloc_asc') {
+        return (a.rack || '').localeCompare(b.rack || '');
+      } else if (currentEdcSort === 'stock_desc') {
+        return (b.msltc || b.qtySystem || 0) - (a.msltc || a.qtySystem || 0);
+      }
+      return 0;
+    });
+
+    renderEdcMainListCards(filtered, false);
+  }
+
+  function renderEdcMainListCards(items, isLoadMore = false) {
+    const container = document.getElementById('edcCardContainer');
+    if (!container) return;
+
+    if (!isLoadMore) {
+      currentEdcListCache = items || [];
+      currentEdcRenderLimit = 50;
+    }
+
+    if (!currentEdcListCache || currentEdcListCache.length === 0) {
+      container.innerHTML = `
+        <div style="text-align:center; padding: 45px 20px; color: var(--text-muted); background: rgba(15,23,42,0.6); border-radius: 16px; border: 1px dashed rgba(255,255,255,0.15);">
+          <div style="font-size:2rem; margin-bottom:10px;">📋</div>
+          <div style="font-weight:600; color:#e2e8f0; margin-bottom:6px;">Tidak ada SKU tugas yang cocok</div>
+          <div style="font-size:0.82rem; color:#94a3b8;">Coba ubah kata kunci pencarian atau sesuaikan filter status di atas.</div>
+        </div>
+      `;
+      return;
+    }
+
+    const itemsToRender = currentEdcListCache.slice(0, currentEdcRenderLimit);
+    let html = '';
+
+    for (let i = 0; i < itemsToRender.length; i++) {
+      const item = itemsToRender[i];
+      const isDone = item.status === 'DONE' || edcSubmittedSkuSet.has(item.sku.toLowerCase());
+      const audit = edcAuditResultsMap.get(item.sku.toLowerCase());
+
+      const statusBadge = isDone
+        ? '<span style="background:rgba(16,185,129,0.18); color:#34d399; border:1px solid rgba(16,185,129,0.35); padding:3px 9px; border-radius:6px; font-weight:700; font-size:0.75rem;">✅ DONE</span>'
+        : '<span style="background:rgba(245,158,11,0.18); color:#fbbf24; border:1px solid rgba(245,158,11,0.35); padding:3px 9px; border-radius:6px; font-weight:700; font-size:0.75rem;">⏳ PENDING</span>';
+
+      let edBadge = '';
+      if (item.edActual) {
+        const isMatch = item.edStatus === 'MATCH' || item.edActual === item.edSystem;
+        edBadge = isMatch
+          ? `<span class="edc-badge-match" style="padding:2px 7px; border-radius:5px; font-size:0.72rem; font-weight:700;">Koreksi: ${formatEdsDateDisplay(item.edActual)} (MATCH)</span>`
+          : `<span class="edc-badge-revisi" style="padding:2px 7px; border-radius:5px; font-size:0.72rem; font-weight:700;">Koreksi: ${formatEdsDateDisplay(item.edActual)} (REVISI)</span>`;
+      }
+
+      html += `
+        <div class="eds-card edc-card ${isDone ? 'status-done' : 'status-pending'}" onclick="selectEdcSkuForScan('${escapeHtml(item.sku)}')">
+          <div class="eds-card-header">
+            <span class="eds-card-sku">${escapeHtml(item.sku)}</span>
+            <div style="display:flex; gap:6px; align-items:center;">
+              ${statusBadge}
+            </div>
+          </div>
+          <div class="eds-card-title">${escapeHtml(item.productName || 'Nama produk belum disinkron')}</div>
+          <div class="eds-card-meta">
+            <span>📍 Rak: <b>${escapeHtml(item.rack || '-')}</b></span>
+            ${item.productType ? `<span>🏷️ Tipe: <b>${escapeHtml(item.productType)}</b></span>` : ''}
+            ${item.msltc ? `<span>⏱️ MSLTC: <b>${item.msltc} Hari</b></span>` : ''}
+            ${item.qtySystem ? `<span>📦 Stok: <b>${item.qtySystem}</b></span>` : ''}
+            ${item.edSystem && item.edSystem !== '-' ? `<span>📅 ED Sistem: <b>${formatEdsDateDisplay(item.edSystem)}</b></span>` : ''}
+          </div>
+          ${edBadge ? `<div style="margin-top:8px;">${edBadge}</div>` : ''}
+          ${audit && audit.remarks ? `<div style="font-size:0.75rem; color:#94a3b8; margin-top:6px; font-style:italic;">💬 "${escapeHtml(audit.remarks)}"</div>` : ''}
+        </div>
+      `;
+    }
+
+    const remaining = currentEdcListCache.length - currentEdcRenderLimit;
+    let loadMoreBtn = '';
+    if (remaining > 0) {
+      const nextBatch = Math.min(remaining, 50);
+      loadMoreBtn = `
+        <div style="text-align:center; padding: 18px 0;" id="edcLoadMoreBox">
+          <button type="button" class="btn-load-more" onclick="loadMoreEdcCards()" style="background: rgba(192, 132, 252, 0.15); border: 1px solid rgba(192, 132, 252, 0.4); color: #c084fc; padding: 12px 24px; border-radius: 12px; font-weight: 700; font-size: 0.9rem; cursor: pointer; width: 100%; max-width: 340px; box-shadow: 0 4px 12px rgba(0,0,0,0.2);">
+            ⚡ Tampilkan ${nextBatch} SKU Lagi (${remaining} tersisa)
+          </button>
+        </div>
+      `;
+    }
+
+    container.innerHTML = html + loadMoreBtn;
+  }
+
+  window.loadMoreEdcCards = function () {
+    currentEdcRenderLimit += 50;
+    renderEdcMainListCards(currentEdcListCache, true);
+  };
+
+  // ── Input & Scanning Logic ──
+  window.selectEdcSkuForScan = function(sku) {
+    if (!sku) return;
+    const cleanSku = String(sku).trim();
+    selectedEdcSku = cleanSku;
+
+    const banner = document.getElementById('edcSelectedBanner');
+    const title = document.getElementById('edcSelectedTitle');
+    if (banner && title) {
+      banner.classList.remove('hidden');
+      title.textContent = `SKU: ${cleanSku}`;
+    }
+
+    const skuInput = document.getElementById('edcSkuInput');
+    if (skuInput) skuInput.value = cleanSku;
+
+    lookupEdcSku(cleanSku);
+    switchEdcTab('scan');
+  };
+
+  window.clearEdcSelectedSku = function() {
+    selectedEdcSku = null;
+    const banner = document.getElementById('edcSelectedBanner');
+    if (banner) banner.classList.add('hidden');
+    resetEdcForm();
+  };
+
+  window.startEdcCameraScan = function() {
+    openUniversalScanner((decodedText) => {
+      let raw = (decodedText || '').trim();
+      let sku = raw;
+      if (raw.includes(';')) sku = raw.split(';')[0].trim();
+
+      const skuInput = document.getElementById('edcSkuInput');
+      if (skuInput) skuInput.value = sku;
+      lookupEdcSku(sku);
+      playBarcodeBeep();
+      showDccToast('success', 'Barcode Terbaca', `SKU: ${sku}`);
+    });
+  };
+
+  function lookupEdcSku(sku) {
+    if (!sku) return;
+    const cleanSku = String(sku).trim().toLowerCase();
+    const item = edcMainListData.find(i => i.sku.toLowerCase() === cleanSku);
+
+    const nameInput = document.getElementById('edcNamaSku');
+    const slocInput = document.getElementById('edcSlocExisting');
+    const qtyInput = document.getElementById('edcQtySystem');
+    const edSysInput = document.getElementById('edcExpiredDateSystem');
+
+    if (item) {
+      if (nameInput) nameInput.value = item.productName || '';
+      if (slocInput) slocInput.value = item.rack || '';
+      if (qtyInput) qtyInput.value = item.qtySystem || 0;
+      if (edSysInput) edSysInput.value = formatEdsDateDisplay(item.edSystem) || '-';
+
+      // If already audited, pre-fill
+      const audit = edcAuditResultsMap.get(cleanSku);
+      if (audit) {
+        if (edcFlatpickrInstance && audit.edActual) {
+          edcFlatpickrInstance.setDate(audit.edActual);
+        }
+        const goodInput = document.getElementById('edcFisikGood');
+        if (goodInput) goodInput.value = audit.fisikGood || 0;
+        const badInput = document.getElementById('edcFisikBad');
+        if (badInput) badInput.value = audit.fisikBad || 0;
+        const remInput = document.getElementById('edcRemaksInput');
+        if (remInput) remInput.value = audit.remarks || '';
+      }
+    } else {
+      if (nameInput) nameInput.value = '';
+      if (slocInput) slocInput.value = '';
+      if (qtyInput) qtyInput.value = '0';
+      if (edSysInput) edSysInput.value = '-';
+    }
+
+    updateEdcStatusHelper();
+  }
+
+  window.stepEdcValue = function(id, delta) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    let val = parseInt(el.value, 10) || 0;
+    val = Math.max(0, val + delta);
+    el.value = val;
+  };
+
+  window.setEdcToggle = function(groupId, val) {
+    const group = document.getElementById(groupId);
+    if (!group) return;
+    group.querySelectorAll('.eds-toggle-btn').forEach(btn => {
+      if (btn.getAttribute('data-value') === val) btn.classList.add('active');
+      else btn.classList.remove('active');
+    });
+  };
+
+  function initEdcFlatpickr() {
+    const input = document.getElementById('edcExpiredDateNew');
+    if (!input) return;
+
+    if (!edcFlatpickrInstance && typeof flatpickr !== 'undefined') {
+      try {
+        edcFlatpickrInstance = flatpickr(input, {
+          dateFormat: 'Y-m-d',
+          altInput: true,
+          altFormat: 'd/m/Y',
+          allowInput: true,
+          locale: typeof flatpickr.l10ns !== 'undefined' && flatpickr.l10ns.id ? flatpickr.l10ns.id : 'default',
+          onChange: function() {
+            updateEdcStatusHelper();
+          }
+        });
+      } catch(e) {}
+    }
+
+    input.removeEventListener('change', updateEdcStatusHelper);
+    input.removeEventListener('input', updateEdcStatusHelper);
+    input.addEventListener('change', updateEdcStatusHelper);
+    input.addEventListener('input', updateEdcStatusHelper);
+  }
+
+  function updateEdcStatusHelper() {
+    const helper = document.getElementById('edcStatusHelper');
+    const dateInput = document.getElementById('edcExpiredDateNew');
+    const sysInput = document.getElementById('edcExpiredDateSystem');
+    if (!helper || !dateInput) return;
+
+    const actualDate = dateInput.value.trim();
+    if (!actualDate) {
+      helper.innerHTML = '';
+      return;
+    }
+
+    const sysDateStr = sysInput ? sysInput.value.trim() : '';
+    const stdActual = excelDateToDateStr(actualDate);
+    const stdSys = excelDateToDateStr(sysDateStr);
+
+    const todayStr = new Date().toISOString().split('T')[0];
+    const isExpired = stdActual < todayStr;
+
+    if (isExpired) {
+      helper.innerHTML = '<span class="edc-badge-expired" style="padding:2px 8px; border-radius:5px; font-weight:700;">⚠️ EXPIRED (Lewat Tanggal)</span>';
+    } else if (stdSys && stdActual === stdSys) {
+      helper.innerHTML = '<span class="edc-badge-match" style="padding:2px 8px; border-radius:5px; font-weight:700;">✅ MATCH (Sama dengan Sistem)</span>';
+    } else {
+      helper.innerHTML = '<span class="edc-badge-revisi" style="padding:2px 8px; border-radius:5px; font-weight:700;">⚡ REVISI (Berbeda dengan Sistem)</span>';
+    }
+  }
+
+  // ── Photo Upload Logic ──
+  window.captureEdcPhoto = function(type) {
+    if (type === 'camera') {
+      const el = document.getElementById('edcPhotoCameraInput');
+      if (el) el.click();
+    } else {
+      const el = document.getElementById('edcPhotoGalleryInput');
+      if (el) el.click();
+    }
+  };
+
+  window.handleEdcPhotoFile = function(e) {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    const file = files[0];
+
+    const reader = new FileReader();
+    reader.onload = function(evt) {
+      const dataUrl = evt.target.result;
+      compressImage(dataUrl, 800, 0.75, (compressed) => {
+        edcPhotoList = [compressed];
+        renderEdcPhotoPreviews();
+      });
+    };
+    reader.readAsDataURL(file);
+    e.target.value = '';
+  };
+
+  function renderEdcPhotoPreviews() {
+    const container = document.getElementById('edcPhotoPreviewList');
+    if (!container) return;
+    if (edcPhotoList.length === 0) {
+      container.innerHTML = '';
+      return;
+    }
+
+    container.innerHTML = `
+      <div style="position:relative; display:inline-block; margin-top:8px;">
+        <img src="${edcPhotoList[0]}" style="width:110px; height:110px; object-fit:cover; border-radius:12px; border:2px solid #a855f7;">
+        <button type="button" onclick="removeEdcPhoto(0)" style="position:absolute; top:-6px; right:-6px; background:#ef4444; color:#fff; border:none; border-radius:50%; width:24px; height:24px; cursor:pointer; font-weight:bold; display:flex; align-items:center; justify-content:center;">✕</button>
+      </div>
+    `;
+  }
+
+  window.removeEdcPhoto = function(idx) {
+    edcPhotoList.splice(idx, 1);
+    renderEdcPhotoPreviews();
+  };
+
+  window.saveEdcDefaultPic = function() {
+    const input = document.getElementById('edcInputBy');
+    if (!input || !input.value.trim()) {
+      showDccToast('warning', 'Input Kosong', 'Ketik nama Anda terlebih dahulu.');
+      return;
+    }
+    localStorage.setItem(EDC_PIC_KEY, input.value.trim());
+    showDccToast('success', 'PIC Disimpan', `Nama "${input.value.trim()}" akan selalu otomatis terisi.`);
+  };
+
+  function loadEdcSavedPic() {
+    const saved = localStorage.getItem(EDC_PIC_KEY);
+    const input = document.getElementById('edcInputBy');
+    if (saved && input && !input.value) {
+      input.value = saved;
+    }
+  }
+
+  // ── Form Submission ──
+  window.submitEdcForm = function() {
+    const skuInput = document.getElementById('edcSkuInput');
+    const sku = skuInput ? skuInput.value.trim() : '';
+    if (!sku) {
+      showDccToast('warning', 'SKU Wajib Diisi', 'Silakan scan atau ketik nomor SKU.');
+      return;
+    }
+
+    const edInput = document.getElementById('edcExpiredDateNew');
+    const edActual = edInput ? edInput.value.trim() : '';
+    if (!edActual) {
+      showDccToast('warning', 'Tanggal ED Wajib Diisi', 'Silakan pilih tanggal Expired Date fisik produk.');
+      return;
+    }
+
+    const picInput = document.getElementById('edcInputBy');
+    const pic = picInput ? picInput.value.trim() : '';
+    if (!pic) {
+      showDccToast('warning', 'Nama PIC Wajib Diisi', 'Silakan masukkan nama petugas pemeriksa.');
+      return;
+    }
+
+    const skuKey = sku.toLowerCase();
+    if (edcSubmittedSkuSet.has(skuKey)) {
+      pendingEdcSubmitPayload = buildEdcPayload();
+      const modal = document.getElementById('edcConfirmEditModal');
+      const desc = document.getElementById('edcConfirmEditDesc');
+      if (desc) desc.textContent = `SKU ${sku} sudah pernah diinput sebelumnya. Apakah Anda ingin memperbarui data koreksi ED produk ini?`;
+      if (modal) modal.classList.remove('hidden');
+      return;
+    }
+
+    executeEdcSubmit(buildEdcPayload());
+  };
+
+  window.closeEdcConfirmEditModal = function() {
+    const modal = document.getElementById('edcConfirmEditModal');
+    if (modal) modal.classList.add('hidden');
+    pendingEdcSubmitPayload = null;
+  };
+
+  window.proceedEdcConfirmedSubmit = function() {
+    closeEdcConfirmEditModal();
+    if (pendingEdcSubmitPayload) {
+      executeEdcSubmit(pendingEdcSubmitPayload);
+      pendingEdcSubmitPayload = null;
+    }
+  };
+
+  function buildEdcPayload() {
+    const sku = (document.getElementById('edcSkuInput')?.value || '').trim();
+    const productName = (document.getElementById('edcNamaSku')?.value || '').trim();
+    const rackSystem = (document.getElementById('edcSlocExisting')?.value || '').trim();
+    const qtySystem = Number(document.getElementById('edcQtySystem')?.value) || 0;
+    const edSystem = (document.getElementById('edcExpiredDateSystem')?.value || '-').trim();
+
+    let rackActual = 'Match';
+    const activeToggle = document.querySelector('#edcSlocActualGroup .eds-toggle-btn.active');
+    if (activeToggle) rackActual = activeToggle.getAttribute('data-value') || 'Match';
+
+    const edActual = (document.getElementById('edcExpiredDateNew')?.value || '').trim();
+    const fisikGood = Number(document.getElementById('edcFisikGood')?.value) || 0;
+    const fisikBad = Number(document.getElementById('edcFisikBad')?.value) || 0;
+    const pic = (document.getElementById('edcInputBy')?.value || '').trim();
+    const remarks = (document.getElementById('edcRemaksInput')?.value || '').trim();
+
+    const stdActual = excelDateToDateStr(edActual);
+    const stdSys = excelDateToDateStr(edSystem);
+    let edStatus = 'MATCH';
+    if (stdActual < new Date().toISOString().split('T')[0]) {
+      edStatus = 'EXPIRED';
+    } else if (stdSys && stdActual !== stdSys) {
+      edStatus = 'REVISI';
+    }
+
+    return {
+      action: 'saveEdCorrectionResult',
+      module: 'ed_correction',
+      sku: sku,
+      productName: productName,
+      rackSystem: rackSystem,
+      rackActual: rackActual,
+      qtySystem: qtySystem,
+      edSystem: edSystem,
+      edActual: edActual,
+      edStatus: edStatus,
+      fisikGood: fisikGood,
+      fisikBad: fisikBad,
+      totalFisik: fisikGood + fisikBad,
+      selisih: (fisikGood + fisikBad) - qtySystem,
+      petugas: pic,
+      remarks: remarks,
+      photoBase64: edcPhotoList.length > 0 ? edcPhotoList[0] : '',
+      timestamp: new Date().toLocaleString('id-ID')
+    };
+  }
+
+  async function executeEdcSubmit(payload) {
+    const submitBtn = document.getElementById('edcSubmitBtn');
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      submitBtn.innerHTML = '<span>Mengirim Data... ⏳</span>';
+    }
+
+    const skuKey = payload.sku.toLowerCase();
+
+    // Update local state immediately
+    edcSubmittedSkuSet.add(skuKey);
+    edcAuditResultsMap.set(skuKey, payload);
+    edcHasilRows.unshift(payload);
+
+    // Update main list item if present
+    const item = edcMainListData.find(i => i.sku.toLowerCase() === skuKey);
+    if (item) {
+      item.status = 'DONE';
+      item.edActual = payload.edActual;
+      item.edStatus = payload.edStatus;
+      item.fisikGood = payload.fisikGood;
+      item.fisikBad = payload.fisikBad;
+      item.totalFisik = payload.totalFisik;
+      item.selisih = payload.selisih;
+      item.petugas = payload.petugas;
+      item.remarks = payload.remarks;
+    }
+
+    // Try sending to WebApp
+    const webappUrl = getEdcWebappUrl();
+    let sentOnline = false;
+
+    if (navigator.onLine && webappUrl) {
+      try {
+        await fetch(webappUrl, {
+          method: 'POST',
+          mode: 'no-cors',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        sentOnline = true;
+      } catch (err) {
+        console.warn('Gagal POST online EDC, simpan offline:', err);
+      }
+    }
+
+    if (!sentOnline) {
+      queueEdcOffline(payload);
+    }
+
+    playBarcodeBeep();
+    showDccToast('success', 'Koreksi Disimpan!', `SKU ${payload.sku} berhasil disimpan (${sentOnline ? 'Online' : 'Tersimpan Offline'}).`);
+
+    resetEdcForm();
+    filterEdCorrectionList();
+    renderEdcReport();
+    switchEdcTab('main');
+
+    if (submitBtn) {
+      submitBtn.disabled = false;
+      submitBtn.innerHTML = `
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+          <polyline points="20 6 9 17 4 12" />
+        </svg>
+        <span>Simpan Hasil Koreksi ED</span>
+      `;
+    }
+  }
+
+  function queueEdcOffline(payload) {
+    try {
+      const q = safeJsonParse(localStorage.getItem(EDC_OFFLINE_KEY), []);
+      q.push(payload);
+      localStorage.setItem(EDC_OFFLINE_KEY, JSON.stringify(q));
+      updateEdcOfflineBadge();
+    } catch(e) {}
+  }
+
+  function updateEdcOfflineBadge() {
+    const q = safeJsonParse(localStorage.getItem(EDC_OFFLINE_KEY), []);
+    const badge = document.getElementById('edcOfflineQueueBadge');
+    if (!badge) return;
+    if (q.length > 0) {
+      badge.textContent = `⚡ ${q.length} Antrean Offline`;
+      badge.classList.remove('hidden');
+    } else {
+      badge.classList.add('hidden');
+    }
+  }
+
+  window.syncEdcOfflineQueue = async function(manual = false) {
+    if (!navigator.onLine) {
+      if (manual) showDccToast('warning', 'Masih Offline', 'Koneksi internet belum tersedia.');
+      return;
+    }
+    const q = safeJsonParse(localStorage.getItem(EDC_OFFLINE_KEY), []);
+    if (q.length === 0) {
+      if (manual) showDccToast('info', 'Antrean Bersih', 'Tidak ada data antrean offline.');
+      return;
+    }
+
+    const webappUrl = getEdcWebappUrl();
+    if (!webappUrl) return;
+
+    let synced = 0;
+    const remaining = [];
+
+    for (let i = 0; i < q.length; i++) {
+      try {
+        await fetch(webappUrl, {
+          method: 'POST',
+          mode: 'no-cors',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(q[i])
+        });
+        synced++;
+      } catch (e) {
+        remaining.push(q[i]);
+      }
+    }
+
+    localStorage.setItem(EDC_OFFLINE_KEY, JSON.stringify(remaining));
+    updateEdcOfflineBadge();
+    if (synced > 0) {
+      showDccToast('success', 'Sinkronisasi Sukses', `${synced} data antrean offline berhasil terkirim!`);
+      fetchEdCorrectionData(true);
+    }
+  };
+
+  function resetEdcForm() {
+    const sku = document.getElementById('edcSkuInput');
+    if (sku) sku.value = '';
+    const name = document.getElementById('edcNamaSku');
+    if (name) name.value = '';
+    const sloc = document.getElementById('edcSlocExisting');
+    if (sloc) sloc.value = '';
+    const qty = document.getElementById('edcQtySystem');
+    if (qty) qty.value = '0';
+    const sysEd = document.getElementById('edcExpiredDateSystem');
+    if (sysEd) sysEd.value = '-';
+    if (edcFlatpickrInstance) edcFlatpickrInstance.clear();
+    const good = document.getElementById('edcFisikGood');
+    if (good) good.value = '0';
+    const bad = document.getElementById('edcFisikBad');
+    if (bad) bad.value = '0';
+    const rem = document.getElementById('edcRemaksInput');
+    if (rem) rem.value = '';
+    edcPhotoList = [];
+    renderEdcPhotoPreviews();
+    const helper = document.getElementById('edcStatusHelper');
+    if (helper) helper.innerHTML = '';
+    const banner = document.getElementById('edcSelectedBanner');
+    if (banner) banner.classList.add('hidden');
+    selectedEdcSku = null;
+  }
+
+  // ── Report & Export Logic ──
+  function renderEdcReport() {
+    let totalDone = 0;
+    let totalPending = 0;
+    let totalRevisi = 0;
+
+    for (let i = 0; i < edcMainListData.length; i++) {
+      const item = edcMainListData[i];
+      const isDone = item.status === 'DONE' || edcSubmittedSkuSet.has(item.sku.toLowerCase());
+      if (isDone) {
+        totalDone++;
+        if (item.edStatus === 'REVISI' || (item.edActual && item.edSystem && item.edActual !== item.edSystem)) {
+          totalRevisi++;
+        }
+      } else {
+        totalPending++;
+      }
+    }
+
+    const elTotal = document.getElementById('edcStatTotal');
+    if (elTotal) elTotal.textContent = edcMainListData.length;
+    const elDone = document.getElementById('edcStatDone');
+    if (elDone) elDone.textContent = totalDone;
+    const elPending = document.getElementById('edcStatPending');
+    if (elPending) elPending.textContent = totalPending;
+    const elRevisi = document.getElementById('edcStatRevisi');
+    if (elRevisi) elRevisi.textContent = totalRevisi;
+
+    // Render list
+    const container = document.getElementById('edcReportTableContainer');
+    if (!container) return;
+
+    if (edcHasilRows.length === 0) {
+      container.innerHTML = '<div style="text-align:center; padding: 30px; color: var(--text-muted);">Belum ada riwayat koreksi hari ini.</div>';
+      return;
+    }
+
+    let html = '';
+    for (let i = 0; i < edcHasilRows.length; i++) {
+      const h = edcHasilRows[i];
+      const isMatch = h.edStatus === 'MATCH' || h.edActual === h.edSystem;
+      html += `
+        <div class="eds-report-item" style="border-left: 4px solid ${isMatch ? '#10b981' : '#f59e0b'}; margin-bottom:10px; padding:12px 14px; background:rgba(15,23,42,0.6); border-radius:12px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+            <span style="font-weight:700; color:#c084fc;">${escapeHtml(h.sku)}</span>
+            <span style="font-size:0.75rem; color:#94a3b8;">${escapeHtml(h.timestamp || '')}</span>
+          </div>
+          <div style="font-size:0.88rem; font-weight:600; color:#f1f5f9; margin-bottom:6px;">${escapeHtml(h.productName || 'Produk')}</div>
+          <div style="font-size:0.78rem; color:#cbd5e1; display:flex; flex-wrap:wrap; gap:10px;">
+            <span>ED Sistem: <b>${formatEdsDateDisplay(h.edSystem)}</b></span>
+            <span>ED Baru: <b style="color:${isMatch ? '#34d399' : '#fbbf24'};">${formatEdsDateDisplay(h.edActual)} (${escapeHtml(h.edStatus)})</b></span>
+            <span>Fisik Good: <b>${h.fisikGood}</b></span>
+            <span>Petugas: <b>${escapeHtml(h.petugas || '-')}</b></span>
+          </div>
+        </div>
+      `;
+    }
+    container.innerHTML = html;
+  }
+
+  window.shareEdcToWhatsApp = function() {
+    if (edcMainListData.length === 0) {
+      showDccToast('warning', 'Data Kosong', 'Belum ada data tugas untuk dibagikan.');
+      return;
+    }
+
+    let totalDone = 0;
+    let totalPending = 0;
+    let totalRevisi = 0;
+    const revisiList = [];
+
+    for (let i = 0; i < edcMainListData.length; i++) {
+      const item = edcMainListData[i];
+      const isDone = item.status === 'DONE' || edcSubmittedSkuSet.has(item.sku.toLowerCase());
+      if (isDone) {
+        totalDone++;
+        if (item.edStatus === 'REVISI' || (item.edActual && item.edSystem && item.edActual !== item.edSystem)) {
+          totalRevisi++;
+          revisiList.push(item);
+        }
+      } else {
+        totalPending++;
+      }
+    }
+
+    const todayDate = new Date().toLocaleDateString('id-ID', {
+      weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'
+    });
+
+    let msg = `*LAPORAN HASIL AUDIT ED CORRECTION (MTG)*\n`;
+    msg += `📅 ${todayDate}\n\n`;
+    msg += `📊 *Ringkasan Operasional:*\n`;
+    msg += `• Total SKU Tugas: ${edcMainListData.length}\n`;
+    msg += `• Sudah Diperiksa: ${totalDone} SKU (${Math.round((totalDone/edcMainListData.length)*100)}%)\n`;
+    msg += `• Belum Diperiksa: ${totalPending} SKU\n`;
+    msg += `• Revisi ED Ditemukan: ${totalRevisi} SKU\n\n`;
+
+    if (revisiList.length > 0) {
+      msg += `⚠️ *Daftar Produk Revisi ED:*\n`;
+      revisiList.slice(0, 15).forEach((r, idx) => {
+        msg += `${idx + 1}. *[${r.sku}]* ${r.productName}\n`;
+        msg += `   - ED Sistem: ${formatEdsDateDisplay(r.edSystem)} ➔ *ED Aktual: ${formatEdsDateDisplay(r.edActual)}*\n`;
+        msg += `   - Rak: ${r.rack} | Good: ${r.fisikGood} | PIC: ${r.petugas}\n`;
+      });
+      if (revisiList.length > 15) {
+        msg += `   _...dan ${revisiList.length - 15} produk lainnya._\n`;
+      }
+    }
+
+    msg += `\n_Dikirim melalui SuperApp MTG - ED Correction System_`;
+    window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank');
+  };
+
+  window.exportEdcToExcel = function() {
+    if (edcMainListData.length === 0) {
+      showDccToast('warning', 'Data Kosong', 'Tidak ada data untuk diexport.');
+      return;
+    }
+
+    const headers = ['SKU', 'Nama Produk', 'Lokasi Rak', 'Stok Sistem', 'ED Sistem', 'ED Fisik Koreksi', 'Status ED', 'Fisik Good', 'Fisik Bad', 'Total Fisik', 'Selisih', 'Status Audit', 'Petugas', 'Remarks'];
+    const rows = [headers];
+
+    for (let i = 0; i < edcMainListData.length; i++) {
+      const item = edcMainListData[i];
+      const isDone = item.status === 'DONE' || edcSubmittedSkuSet.has(item.sku.toLowerCase());
+      rows.push([
+        `'${item.sku}`,
+        `"${(item.productName || '').replace(/"/g, '""')}"`,
+        `"${(item.rack || '').replace(/"/g, '""')}"`,
+        item.qtySystem,
+        formatEdsDateDisplay(item.edSystem),
+        formatEdsDateDisplay(item.edActual),
+        item.edStatus || (isDone ? 'MATCH' : '-'),
+        item.fisikGood,
+        item.fisikBad,
+        item.totalFisik,
+        item.selisih,
+        isDone ? 'DONE' : 'PENDING',
+        `"${(item.petugas || '').replace(/"/g, '""')}"`,
+        `"${(item.remarks || '').replace(/"/g, '""')}"`
+      ]);
+    }
+
+    const csvContent = rows.map(r => r.join(',')).join('\r\n');
+    const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    const todayStr = new Date().toISOString().split('T')[0];
+    link.href = url;
+    link.setAttribute('download', `Laporan_ED_Correction_MTG_${todayStr}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    showDccToast('success', 'File Terunduh', 'Laporan CSV ED Correction berhasil diunduh.');
+  };
+
+  window.printEdcPdf = function() {
+    window.print();
   };
 
   // ── Init
