@@ -2839,6 +2839,7 @@
 
       if (typeof window.switchEdcTab === 'function') window.switchEdcTab('main');
       if (typeof window.initEdcFlatpickr === 'function') window.initEdcFlatpickr();
+      if (typeof window.initEdcInputListeners === 'function') window.initEdcInputListeners();
       if (typeof window.fetchEdCorrectionData === 'function') window.fetchEdCorrectionData(true);
     } else {
       alert('Fitur ini akan di-develop menyusul.');
@@ -7042,8 +7043,8 @@
   //  IN-APP UPDATE & VERSION CHECKING ENGINE
   // ══════════════════════════════════════════════
 
-  const APP_VERSION_CODE = 21; // Local current version code (v1.2.5 Master OTA)
-  const APP_VERSION_NAME = '1.2.5';
+  const APP_VERSION_CODE = 23; // Local current version code (v1.2.7 Master OTA)
+  const APP_VERSION_NAME = '1.2.7';
   const UPDATE_MANIFEST_URL = 'https://raw.githubusercontent.com/tw1nss/superapp-release/main/version.json';
 
   let currentUpdateData = null;
@@ -7163,9 +7164,13 @@
     }
     const badge = document.getElementById('alreadyLatestBadge');
     const sub = document.getElementById('alreadyLatestSubtitle');
+    const liveTitle = document.getElementById('alreadyLatestLiveTitle');
+    const dlBtn = document.getElementById('alreadyLatestDownloadBtn');
     const changelog = document.getElementById('alreadyLatestChangelog');
     if (badge) badge.textContent = `Versi Aktif: v${local.versionName} (Build ${local.versionCode})`;
-    if (sub) sub.textContent = manifest.title || 'Super App MTG v1.2.5 sudah aktif';
+    if (sub) sub.textContent = manifest.title || `Super App MTG v${local.versionName} sudah aktif`;
+    if (liveTitle) liveTitle.textContent = `🚀 Pembaruan Sistem v${local.versionName} Sudah Aktif (Live OTA)`;
+    if (dlBtn) dlBtn.textContent = `📥 Unduh & Pasang APK v${manifest.versionName || local.versionName} Terbaru`;
     if (changelog && Array.isArray(manifest.changelog) && manifest.changelog.length > 0) {
       changelog.innerHTML = manifest.changelog.map(c => `<li>${escapeHtml(c)}</li>`).join('');
     }
@@ -9277,24 +9282,144 @@
   const EDC_SPREADSHEET_ID_DEFAULT = '1fVQwSOoIU9pT5RHWi6-m8qCf_T0rQPZxEf_WuhlaD2g';
   const EDC_WEBAPP_KEY = 'EDC_CUSTOM_WEBAPP_URL_V1';
   const EDC_SPREADSHEET_KEY = 'EDC_CUSTOM_SPREADSHEET_URL_V1';
-  const EDC_MAIN_CACHE_KEY = 'EDC_MAIN_CACHE_MTG_V1';
-  const EDC_SUBMITTED_CACHE_KEY = 'EDC_SUBMITTED_CACHE_MTG_V1';
+  const EDC_MAIN_CACHE_KEY = 'EDC_MAIN_CACHE_MTG_V3';
+  const EDC_SUBMITTED_CACHE_KEY = 'EDC_SUBMITTED_CACHE_MTG_V3';
   const EDC_PIC_KEY = 'EDC_DEFAULT_PIC_V1';
   const EDC_OFFLINE_KEY = 'EDC_OFFLINE_QUEUE_LOCAL';
 
+  try {
+    localStorage.removeItem('EDC_MAIN_CACHE_MTG_V1');
+    localStorage.removeItem('EDC_SUBMITTED_CACHE_MTG_V1');
+    localStorage.removeItem('EDC_MAIN_CACHE_MTG_V2');
+    localStorage.removeItem('EDC_SUBMITTED_CACHE_MTG_V2');
+  } catch(e) {}
+
   let currentEdcTab = 'main'; // 'main' | 'scan' | 'report'
   let currentEdcStatusFilter = 'all'; // 'all' | 'submitted' | 'pending'
-  let currentEdcSort = 'name_asc'; // 'name_asc' | 'sloc_asc' | 'stock_desc'
+  let currentEdcSort = 'default'; // 'default' | 'name_asc' | 'sloc_asc' | 'stock_desc'
   let isEdcFetching = false;
 
   let edcMainListData = [];
   let edcSubmittedSkuSet = new Set();
   let edcAuditResultsMap = new Map(); // sku -> audit object
+  let edcCatalogMap = new Map(); // sku -> { productName, rack, productType, msltc } (auxiliary lookup)
   let edcHasilRows = [];
   let edcPhotoList = [];
   let selectedEdcSku = null;
   let edcFlatpickrInstance = null;
   let pendingEdcSubmitPayload = null;
+  let edcInputListenersAttached = false;
+
+  function resolveEdcProductInfo(sku, fallbackName = '', fallbackRack = '') {
+    let name = String(fallbackName || '').trim();
+    let rack = String(fallbackRack || '').trim();
+    let type = '';
+    let msltc = 0;
+
+    const clean = String(sku || '').trim();
+    if (!clean) return { name: name || 'Nama produk belum disinkron', rack: rack || '-', type, msltc };
+    const cleanLower = clean.toLowerCase();
+    const noZero = clean.replace(/^0+/, '');
+
+    // 1. Auxiliary catalog from Superset/Hasil dump if present
+    if (edcCatalogMap && (edcCatalogMap.has(cleanLower) || (noZero && edcCatalogMap.has(noZero.toLowerCase())))) {
+      const c = edcCatalogMap.get(cleanLower) || edcCatalogMap.get(noZero.toLowerCase());
+      if (c) {
+        if (!name && c.productName) name = c.productName;
+        if ((!rack || rack === '-') && c.rack) rack = c.rack;
+        if (c.productType) type = c.productType;
+        if (c.msltc) msltc = c.msltc;
+      }
+    }
+
+    // 2. dataMap (Master Rack SKU)
+    if ((!name || !rack || rack === '-') && typeof dataMap !== 'undefined' && dataMap) {
+      const d = dataMap.get(clean) || (noZero ? dataMap.get(noZero) : null);
+      if (d && d.length > 0) {
+        if (!name && d[0].productName) name = d[0].productName;
+        if ((!rack || rack === '-') && (d[0].sloc || d[0].masterSloc)) rack = d[0].sloc || d[0].masterSloc;
+        if (!type && d[0].type) type = d[0].type;
+      }
+    }
+
+    // 3. msltcMap (Master MSLTC)
+    if ((!name || !rack || rack === '-') && typeof msltcMap !== 'undefined' && msltcMap) {
+      const m = msltcMap.get(clean) || (noZero ? msltcMap.get(noZero) : null);
+      if (m && m.length > 0) {
+        if (!name && m[0].productName) name = m[0].productName;
+        if ((!rack || rack === '-') && m[0].rackName) rack = m[0].rackName;
+        if (!type && m[0].type) type = m[0].type;
+        if (!msltc && m[0].msltcDays) msltc = m[0].msltcDays;
+      }
+    }
+
+    // 4. getMsltcInfo
+    if ((!name || !rack || rack === '-') && typeof getMsltcInfo === 'function') {
+      const info = getMsltcInfo(clean);
+      if (info) {
+        if (!name && info.productName) name = info.productName;
+        if ((!rack || rack === '-') && info.rackName) rack = info.rackName;
+        if (!type && info.type) type = info.type;
+        if (!msltc && info.msltcDays) msltc = info.msltcDays;
+      }
+    }
+
+    // 5. edsUpdateDataMap
+    if ((!name || !rack || rack === '-') && typeof edsUpdateDataMap !== 'undefined' && edsUpdateDataMap && (edsUpdateDataMap.has(cleanLower) || (noZero && edsUpdateDataMap.has(noZero.toLowerCase())))) {
+      const u = edsUpdateDataMap.get(cleanLower) || edsUpdateDataMap.get(noZero.toLowerCase());
+      if (u) {
+        if (!name && u.productName) name = u.productName;
+        if ((!rack || rack === '-') && u.rackName) rack = u.rackName;
+        if (!msltc && u.msltcDays) msltc = u.msltcDays;
+      }
+    }
+
+    return { name: name || 'Nama produk belum disinkron', rack: rack || '-', type, msltc };
+  }
+
+  window.initEdcInputListeners = function() {
+    const skuInput = document.getElementById('edcSkuInput');
+    if (!skuInput) return;
+    if (edcInputListenersAttached) return;
+    edcInputListenersAttached = true;
+
+    const debouncedLookup = debounce((val) => {
+      let raw = String(val || '').trim();
+      if (!raw) return;
+      let sku = raw;
+      let scannedDate = null;
+      if (raw.includes(';')) {
+        const parts = raw.split(';');
+        sku = parts[0].trim();
+        if (parts[1]) {
+          scannedDate = parseFlexibleDate(parts[1].trim());
+        }
+        skuInput.value = sku;
+      }
+      const formatted = scannedDate ? formatDateToYMD(scannedDate) : null;
+      lookupEdcSku(sku, formatted);
+      if (formatted && edcFlatpickrInstance) {
+        edcFlatpickrInstance.setDate(formatted);
+        updateEdcStatusHelper();
+      }
+    }, 180);
+
+    skuInput.addEventListener('input', function(e) {
+      debouncedLookup(e.target.value);
+    });
+
+    skuInput.addEventListener('change', function(e) {
+      debouncedLookup(e.target.value);
+    });
+
+    skuInput.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        debouncedLookup(e.target.value);
+        skuInput.blur();
+      }
+    });
+  };
 
   function getEdcSpreadsheetId() {
     try {
@@ -9394,6 +9519,7 @@
       if (nav) nav.classList.add('active');
       initEdcFlatpickr();
       loadEdcSavedPic();
+      if (typeof window.initEdcInputListeners === 'function') window.initEdcInputListeners();
       ws.scrollTop = 0;
     } else if (tabName === 'report') {
       const el = document.getElementById('edcTabReport');
@@ -9484,6 +9610,7 @@
 
       // 1. Parse Hasil ED Correction (Hasil Audit Sebelumnya)
       edcAuditResultsMap.clear();
+      edcCatalogMap.clear();
       edcHasilRows = [];
       edcSubmittedSkuSet.clear();
 
@@ -9491,50 +9618,90 @@
         const hasilLines = parseCSV(hasilRes);
         if (hasilLines && hasilLines.length > 1) {
           const hHeaders = hasilLines[0].map(h => String(h || '').trim().toLowerCase());
-          const hSkuIdx = hHeaders.findIndex(h => h === 'sku' || h === 'sku_number' || h === 'sku no');
-          const hNameIdx = hHeaders.findIndex(h => h.includes('nama'));
-          const hRackSysIdx = hHeaders.findIndex(h => h.includes('rack') && h.includes('sloc') || h === 'lokasi rak (sloc)');
-          const hRackActIdx = hHeaders.findIndex(h => h.includes('actual') || h === 'sloc actual');
-          const hEdSysIdx = hHeaders.findIndex(h => h.includes('sistem') && h.includes('ed'));
-          const hEdActIdx = hHeaders.findIndex(h => (h.includes('fisik') || h.includes('koreksi')) && h.includes('ed'));
-          const hStatusEdIdx = hHeaders.findIndex(h => h.includes('status ed'));
-          const hGoodIdx = hHeaders.findIndex(h => h.includes('good'));
-          const hBadIdx = hHeaders.findIndex(h => h.includes('bad'));
-          const hPetugasIdx = hHeaders.findIndex(h => h.includes('petugas') || h.includes('pic'));
-          const hRemarksIdx = hHeaders.findIndex(h => h.includes('remarks') || h.includes('catatan') || h.includes('keterangan'));
+          const isRawSuperset = hHeaders.includes('location_id') || hHeaders.includes('product_id') || hHeaders.includes('product type');
+          const hasAuditColumns = hHeaders.some(h => (h.includes('koreksi') || h.includes('fisik')) && h.includes('ed')) ||
+                                  hHeaders.some(h => h.includes('petugas') || h.includes('pic')) ||
+                                  hHeaders.some(h => h === 'status ed');
 
-          const actualSkuIdx = hSkuIdx >= 0 ? hSkuIdx : 1;
+          if (isRawSuperset || !hasAuditColumns) {
+            // Sheet Hasil berisi dump data katalog produk / Superset.
+            // Gunakan hanya sebagai kamus metadata katalog bantu, BUKAN sebagai hasil audit.
+            const cSkuIdx = hHeaders.findIndex(h => h === 'sku_number' || h === 'sku' || h === 'barcode');
+            const cNameIdx = hHeaders.findIndex(h => h === 'product_name' || h === 'nama produk' || h === 'nama');
+            const cRackIdx = hHeaders.findIndex(h => h === 'rack_name' || h.includes('rak') || h.includes('sloc'));
+            const cTypeIdx = hHeaders.findIndex(h => h === 'product type' || h === 'kategori' || h === 'type');
+            const cMsltcIdx = hHeaders.findIndex(h => h === 'msltc' || h === 'masa ed');
 
-          for (let i = 1; i < hasilLines.length; i++) {
-            const row = hasilLines[i];
-            if (!row || row.length === 0) continue;
-            const sku = String(row[actualSkuIdx] || '').trim();
-            if (!sku) continue;
+            const actualSkuIdx = cSkuIdx >= 0 ? cSkuIdx : 3;
+            for (let i = 1; i < hasilLines.length; i++) {
+              const row = hasilLines[i];
+              if (!row || row.length === 0) continue;
+              const sku = String(row[actualSkuIdx] || '').trim();
+              if (!sku) continue;
+              edcCatalogMap.set(sku.toLowerCase(), {
+                productName: cNameIdx >= 0 ? String(row[cNameIdx] || '').trim() : '',
+                rack: cRackIdx >= 0 ? String(row[cRackIdx] || '').trim() : '',
+                productType: cTypeIdx >= 0 ? String(row[cTypeIdx] || '').trim() : '',
+                msltc: cMsltcIdx >= 0 ? (Number(row[cMsltcIdx]) || 0) : 0
+              });
+            }
+          } else {
+            // Sheet Hasil berisi data audit otentik (17 kolom standar)
+            const hSkuIdx = hHeaders.findIndex(h => h === 'sku' || h === 'sku_number' || h === 'sku no');
+            const hNameIdx = hHeaders.findIndex(h => h.includes('nama'));
+            const hRackSysIdx = hHeaders.findIndex(h => (h.includes('rack') || h.includes('sloc')) && !h.includes('actual'));
+            const hRackActIdx = hHeaders.findIndex(h => h.includes('actual') || h === 'sloc actual');
+            const hEdSysIdx = hHeaders.findIndex(h => h.includes('sistem') && h.includes('ed'));
+            const hEdActIdx = hHeaders.findIndex(h => (h.includes('fisik') || h.includes('koreksi')) && h.includes('ed'));
+            const hStatusEdIdx = hHeaders.findIndex(h => h.includes('status ed'));
+            const hGoodIdx = hHeaders.findIndex(h => h.includes('good'));
+            const hBadIdx = hHeaders.findIndex(h => h.includes('bad'));
+            const hPetugasIdx = hHeaders.findIndex(h => h.includes('petugas') || h.includes('pic'));
+            const hRemarksIdx = hHeaders.findIndex(h => h.includes('remarks') || h.includes('catatan') || h.includes('keterangan'));
 
-            const auditObj = {
-              timestamp: row[0] || '',
-              sku: sku,
-              productName: hNameIdx >= 0 ? (row[hNameIdx] || '') : (row[2] || ''),
-              rackSystem: hRackSysIdx >= 0 ? (row[hRackSysIdx] || '') : (row[3] || ''),
-              rackActual: hRackActIdx >= 0 ? (row[hRackActIdx] || 'Match') : (row[4] || 'Match'),
-              rackMatch: row[5] || 'MATCH',
-              edSystem: excelDateToDateStr(hEdSysIdx >= 0 ? row[hEdSysIdx] : row[6]),
-              edActual: excelDateToDateStr(hEdActIdx >= 0 ? row[hEdActIdx] : row[7]),
-              edStatus: hStatusEdIdx >= 0 ? (row[hStatusEdIdx] || 'MATCH') : (row[8] || 'MATCH'),
-              fisikGood: Number(hGoodIdx >= 0 ? row[hGoodIdx] : row[9]) || 0,
-              fisikBad: Number(hBadIdx >= 0 ? row[hBadIdx] : row[10]) || 0,
-              totalFisik: Number(row[11]) || 0,
-              selisih: Number(row[12]) || 0,
-              petugas: hPetugasIdx >= 0 ? (row[hPetugasIdx] || '') : (row[13] || ''),
-              shift: row[14] || '',
-              photoUrl: row[15] || '',
-              remarks: hRemarksIdx >= 0 ? (row[hRemarksIdx] || '') : (row[16] || '')
-            };
+            const actualSkuIdx = hSkuIdx >= 0 ? hSkuIdx : 1;
 
-            const key = sku.toLowerCase();
-            edcAuditResultsMap.set(key, auditObj);
-            edcSubmittedSkuSet.add(key);
-            edcHasilRows.push(auditObj);
+            for (let i = 1; i < hasilLines.length; i++) {
+              const row = hasilLines[i];
+              if (!row || row.length === 0) continue;
+              const sku = String(row[actualSkuIdx] || '').trim();
+              if (!sku) continue;
+
+              const edActualRaw = hEdActIdx >= 0 ? row[hEdActIdx] : row[7];
+              const edActualClean = edActualRaw ? excelDateToDateStr(edActualRaw) : '';
+              const petugasClean = hPetugasIdx >= 0 ? String(row[hPetugasIdx] || '').trim() : String(row[13] || '').trim();
+              const goodQty = Number(hGoodIdx >= 0 ? row[hGoodIdx] : row[9]) || 0;
+              const badQty = Number(hBadIdx >= 0 ? row[hBadIdx] : row[10]) || 0;
+
+              // Hanya baris yang benar-benar ada data audit (ED aktual terisi atau ada nama petugas / fisik)
+              const hasAuditData = edActualClean.length > 3 || petugasClean.length > 0 || (goodQty + badQty) > 0;
+              if (!hasAuditData) continue;
+
+              const auditObj = {
+                timestamp: row[0] || '',
+                sku: sku,
+                productName: hNameIdx >= 0 ? (row[hNameIdx] || '') : (row[2] || ''),
+                rackSystem: hRackSysIdx >= 0 ? (row[hRackSysIdx] || '') : (row[3] || ''),
+                rackActual: hRackActIdx >= 0 ? (row[hRackActIdx] || 'Match') : (row[4] || 'Match'),
+                rackMatch: row[5] || 'MATCH',
+                edSystem: excelDateToDateStr(hEdSysIdx >= 0 ? row[hEdSysIdx] : row[6]),
+                edActual: edActualClean,
+                edStatus: hStatusEdIdx >= 0 ? (row[hStatusEdIdx] || 'MATCH') : (row[8] || 'MATCH'),
+                fisikGood: goodQty,
+                fisikBad: badQty,
+                totalFisik: Number(row[11]) || (goodQty + badQty),
+                selisih: Number(row[12]) || 0,
+                petugas: petugasClean,
+                shift: row[14] || '',
+                photoUrl: row[15] || '',
+                remarks: hRemarksIdx >= 0 ? (row[hRemarksIdx] || '') : (row[16] || '')
+              };
+
+              const key = sku.toLowerCase();
+              edcAuditResultsMap.set(key, auditObj);
+              edcSubmittedSkuSet.add(key);
+              edcHasilRows.push(auditObj);
+            }
           }
         }
       }
@@ -9546,55 +9713,137 @@
           const mHeaders = mainLines[0].map(h => String(h || '').trim().toLowerCase());
           
           // Deteksi dinamis kolom berdasarkan sheet Mainlist Sku ED Corection
-          let skuIdx = mHeaders.findIndex(h => h === 'sku_number' || h === 'sku' || h === 'barcode' || h === 'sku no');
-          let nameIdx = mHeaders.findIndex(h => h === 'product_name' || h === 'nama produk' || h === 'nama sku' || h === 'nama');
-          let rackIdx = mHeaders.findIndex(h => h === 'rack_name' || h === 'sloc' || h === 'rack' || h === 'lokasi');
-          let typeIdx = mHeaders.findIndex(h => h === 'product type' || h === 'kategori' || h === 'type');
+          let qrCodeIdx = mHeaders.findIndex(h => h === 'qr_code' || h === 'qrcode' || h === 'qr code');
+          let skuIdx = mHeaders.findIndex(h => h === 'sku' || h === 'sku_number' || h === 'barcode' || h === 'sku no' || h === 'sku_code' || h === 'sku_id');
+          let prodIdIdx = mHeaders.findIndex(h => h === 'product_id' || h === 'item_id' || h === 'product id');
+          let nameIdx = mHeaders.findIndex(h => h === 'nama produk' || h === 'product_name' || h === 'nama sku' || h === 'nama');
+          let rackIdx = mHeaders.findIndex(h => h.includes('rak') || h.includes('sloc') || h === 'rack' || h === 'rack_name' || h === 'lokasi');
+          let qtyIdx = mHeaders.findIndex(h => h === 'qty_system' || h === 'qty sistem' || h.includes('qty') || h.includes('stok') || h.includes('stock'));
+          let edSysIdx = mHeaders.findIndex(h => h === 'expiry_date' || h === 'expired_date' || h.includes('expiry') || h.includes('expired') || h.includes('ed sistem') || (h.includes('ed') && (h.includes('lama') || h.includes('sistem') || h.includes('system'))));
+          let edActIdx = mHeaders.findIndex(h => (h.includes('fisik') || h.includes('koreksi')) && h.includes('ed'));
+          let edStatusIdx = mHeaders.findIndex(h => h.includes('status ed'));
+          let goodIdx = mHeaders.findIndex(h => h.includes('good'));
+          let badIdx = mHeaders.findIndex(h => h.includes('bad'));
+          let totalIdx = mHeaders.findIndex(h => h.includes('total'));
+          let selisihIdx = mHeaders.findIndex(h => h.includes('selisih'));
+          let petugasIdx = mHeaders.findIndex(h => h.includes('petugas') || h.includes('pic'));
+          let statusIdx = mHeaders.findIndex(h => h === 'status' || h === 'status tugas' || h === 'status_tugas' || h === 'status audit');
+          let remarksIdx = mHeaders.findIndex(h => h.includes('remarks') || h.includes('catatan') || h.includes('keterangan'));
+          let typeIdx = mHeaders.findIndex(h => h === 'product type' || h === 'product_type' || h === 'kategori' || h === 'type');
           let msltcIdx = mHeaders.findIndex(h => h === 'msltc' || h === 'masa ed' || h === 'sisa hari');
           let locIdx = mHeaders.findIndex(h => h === 'location_name' || h === 'hub');
-          let qtyIdx = mHeaders.findIndex(h => h.includes('qty') || h.includes('stok') || h.includes('stock'));
-          let edSysIdx = mHeaders.findIndex(h => h.includes('ed') && (h.includes('system') || h.includes('sistem') || h.includes('lama')));
           let shiftIdx = mHeaders.findIndex(h => h.includes('shift'));
-          let dateIdx = mHeaders.findIndex(h => h.includes('tanggal') || h.includes('date'));
-
-          // Fallback sesuai struktur default sheet: [loc_id, loc_name, prod_id, sku_number, prod_name, rack_name, prod_type, msltc]
-          if (skuIdx === -1) skuIdx = 3;
-          if (nameIdx === -1) nameIdx = 4;
-          if (rackIdx === -1) rackIdx = 5;
-          if (typeIdx === -1) typeIdx = 6;
-          if (msltcIdx === -1) msltcIdx = 7;
+          let dateIdx = mHeaders.findIndex(h => h.includes('tanggal') || h.includes('date') || h === 'datenow');
 
           const list = [];
           for (let m = 1; m < mainLines.length; m++) {
             const row = mainLines[m];
             if (!row || row.length === 0) continue;
-            const sku = String(row[skuIdx] || '').trim();
+
+            let sku = '';
+            let rowScannedEd = '';
+
+            // Prioritas 1: Format QR Code (SKU;DDMMYYYY) dari kolom qr_code
+            if (qrCodeIdx >= 0 && row[qrCodeIdx]) {
+              const rawQr = String(row[qrCodeIdx]).trim();
+              if (rawQr.includes(';')) {
+                const parts = rawQr.split(';');
+                sku = parts[0].trim();
+                if (parts[1]) rowScannedEd = parseFlexibleDate(parts[1].trim());
+              } else {
+                sku = rawQr;
+              }
+            }
+
+            // Prioritas 2: Kolom SKU / Barcode khusus
+            if (!sku && skuIdx >= 0 && row[skuIdx]) {
+              const raw = String(row[skuIdx]).trim();
+              if (raw.includes(';')) {
+                const parts = raw.split(';');
+                sku = parts[0].trim();
+                if (parts[1] && !rowScannedEd) rowScannedEd = parseFlexibleDate(parts[1].trim());
+              } else {
+                sku = raw;
+              }
+            }
+
+            // Prioritas 3: Kolom product_id
+            if (!sku && prodIdIdx >= 0 && row[prodIdIdx]) {
+              sku = String(row[prodIdIdx]).trim();
+            }
+
+            // Prioritas 4: Kolom C pada format sheet manual jika bukan nama lokasi
+            if (!sku && row[2]) {
+              const col2Val = String(row[2]).trim();
+              if (!col2Val.toLowerCase().includes('menteng') && !col2Val.toLowerCase().includes('hub')) {
+                sku = col2Val;
+              }
+            }
+
             if (!sku) continue;
+
+            // Proteksi khusus: Cegah string 'MTG - Menteng' atau nama hub menjadi SKU
+            if (sku.toLowerCase().includes('menteng') || sku.toLowerCase().includes('hub')) {
+              continue;
+            }
 
             const skuKey = sku.toLowerCase();
             const audit = edcAuditResultsMap.get(skuKey);
-            const isDone = !!audit;
+
+            // Validasi akurat status pengerjaan tugas
+            let sheetStatus = '';
+            if (statusIdx >= 0 && row[statusIdx]) {
+              const sVal = String(row[statusIdx]).trim().toUpperCase();
+              if (sVal === 'DONE' || sVal === 'SELESAI') {
+                sheetStatus = sVal;
+              }
+            }
+
+            const rawEdActual = edActIdx >= 0 ? String(row[edActIdx] || '').trim() : '';
+            const sheetEdActual = rawEdActual ? excelDateToDateStr(rawEdActual) : '';
+            const sheetPetugas = petugasIdx >= 0 ? String(row[petugasIdx] || '').trim() : '';
+
+            const hasValidAudit = audit && (audit.edActual || audit.petugas || audit.totalFisik > 0);
+            const isDone = sheetStatus === 'DONE' || 
+                           sheetStatus === 'SELESAI' || 
+                           sheetEdActual.length > 3 || 
+                           !!hasValidAudit;
+
+            // Resolusi nama & rak produk jika di sheet kosong
+            let rawName = nameIdx >= 0 ? String(row[nameIdx] || '').trim() : '';
+            let rawRack = rackIdx >= 0 ? String(row[rackIdx] || '').trim() : '';
+            const resolved = resolveEdcProductInfo(sku, rawName, rawRack);
+
+            // Resolusi ED sistem
+            let edSystem = '';
+            if (edSysIdx >= 0 && row[edSysIdx]) {
+              edSystem = excelDateToDateStr(row[edSysIdx]);
+            }
+            if (!edSystem && rowScannedEd) {
+              edSystem = rowScannedEd;
+            }
+            if (!edSystem) edSystem = '-';
 
             const item = {
               sku: sku,
-              productName: String(row[nameIdx] || (audit ? audit.productName : '')).trim(),
-              rack: String(row[rackIdx] || (audit ? audit.rackSystem : '')).trim(),
-              productType: typeIdx >= 0 ? String(row[typeIdx] || '').trim() : '',
-              msltc: msltcIdx >= 0 ? (Number(row[msltcIdx]) || 0) : 0,
+              productName: resolved.name,
+              rack: resolved.rack,
+              productType: typeIdx >= 0 && row[typeIdx] ? String(row[typeIdx]).trim() : resolved.type,
+              msltc: msltcIdx >= 0 && row[msltcIdx] ? (Number(row[msltcIdx]) || 0) : resolved.msltc,
               locationName: locIdx >= 0 ? String(row[locIdx] || '').trim() : '',
               qtySystem: qtyIdx >= 0 ? (Number(row[qtyIdx]) || 0) : 0,
-              edSystem: edSysIdx >= 0 ? excelDateToDateStr(row[edSysIdx]) : (audit ? audit.edSystem : '-'),
-              shift: shiftIdx >= 0 ? String(row[shiftIdx] || '').trim() : (audit ? audit.shift : ''),
+              edSystem: edSystem,
+              shift: shiftIdx >= 0 ? String(row[shiftIdx] || '').trim() : '',
               date: dateIdx >= 0 ? String(row[dateIdx] || '').trim() : '',
-              edActual: audit ? audit.edActual : '',
-              edStatus: audit ? audit.edStatus : '',
-              fisikGood: audit ? audit.fisikGood : 0,
-              fisikBad: audit ? audit.fisikBad : 0,
-              totalFisik: audit ? audit.totalFisik : 0,
-              selisih: audit ? audit.selisih : 0,
-              petugas: audit ? audit.petugas : '',
+              edActual: sheetEdActual || (audit ? audit.edActual : ''),
+              edStatus: edStatusIdx >= 0 && row[edStatusIdx] ? String(row[edStatusIdx]).trim() : (audit ? audit.edStatus : ''),
+              fisikGood: goodIdx >= 0 && row[goodIdx] !== '' ? (Number(row[goodIdx]) || 0) : (audit ? audit.fisikGood : 0),
+              fisikBad: badIdx >= 0 && row[badIdx] !== '' ? (Number(row[badIdx]) || 0) : (audit ? audit.fisikBad : 0),
+              totalFisik: totalIdx >= 0 && row[totalIdx] !== '' ? (Number(row[totalIdx]) || 0) : (audit ? audit.totalFisik : 0),
+              selisih: selisihIdx >= 0 && row[selisihIdx] !== '' ? (Number(row[selisihIdx]) || 0) : (audit ? audit.selisih : 0),
+              petugas: sheetPetugas || (audit ? audit.petugas : ''),
               status: isDone ? 'DONE' : 'PENDING',
-              remarks: audit ? audit.remarks : ''
+              remarks: remarksIdx >= 0 ? String(row[remarksIdx] || '').trim() : (audit ? audit.remarks : '')
             };
 
             if (isDone) edcSubmittedSkuSet.add(skuKey);
@@ -9622,8 +9871,8 @@
             <div style="font-size:0.85rem; color:#94a3b8; line-height:1.5; margin-bottom:16px;">
               Pastikan sheet <b>"Mainlist Sku ED Corection"</b> sudah ada dan link spreadsheet valid.
             </div>
-            <button type="button" class="btn" style="background: linear-gradient(135deg, #a855f7, #7c3aed); color:#fff; padding:10px 18px; border-radius:12px; border:none; cursor:pointer;" onclick="openEdcSetupModal()">
-              ⚙️ Pengaturan Spreadsheet
+            <button type="button" class="btn" style="background: linear-gradient(135deg, #a855f7, #7c3aed); color:#fff; padding:10px 18px; border-radius:12px; border:none; cursor:pointer;" onclick="fetchEdCorrectionData(true)">
+              🔄 Coba Muat Ulang
             </button>
           </div>
         `;
@@ -9653,7 +9902,10 @@
     const ws = document.getElementById('edCorrectionWorkspace');
     if (!ws) return;
     ws.querySelectorAll('.eds-sort-btn').forEach(btn => btn.classList.remove('active'));
-    if (sortType === 'name_asc') {
+    if (sortType === 'default') {
+      const b = document.getElementById('edcSortDefault');
+      if (b) b.classList.add('active');
+    } else if (sortType === 'name_asc') {
       const b = document.getElementById('edcSortNameAsc');
       if (b) b.classList.add('active');
     } else if (sortType === 'sloc_asc') {
@@ -9783,7 +10035,7 @@
       }
 
       html += `
-        <div class="eds-card edc-card ${isDone ? 'status-done' : 'status-pending'}" onclick="selectEdcSkuForScan('${escapeHtml(item.sku)}')">
+        <div class="eds-card edc-card ${isDone ? 'status-done' : 'status-pending'}" onclick="selectEdcSkuForScan('${escapeHtml(item.sku)}', '${escapeHtml(item.edSystem)}')">
           <div class="eds-card-header">
             <span class="eds-card-sku">${escapeHtml(item.sku)}</span>
             <div style="display:flex; gap:6px; align-items:center;">
@@ -9826,7 +10078,7 @@
   };
 
   // ── Input & Scanning Logic ──
-  window.selectEdcSkuForScan = function(sku) {
+  window.selectEdcSkuForScan = function(sku, edSystem = null) {
     if (!sku) return;
     const cleanSku = String(sku).trim();
     selectedEdcSku = cleanSku;
@@ -9835,13 +10087,13 @@
     const title = document.getElementById('edcSelectedTitle');
     if (banner && title) {
       banner.classList.remove('hidden');
-      title.textContent = `SKU: ${cleanSku}`;
+      title.textContent = `SKU: ${cleanSku}${edSystem && edSystem !== '-' ? ' • ' + formatEdsDateDisplay(edSystem) : ''}`;
     }
 
     const skuInput = document.getElementById('edcSkuInput');
     if (skuInput) skuInput.value = cleanSku;
 
-    lookupEdcSku(cleanSku);
+    lookupEdcSku(cleanSku, edSystem);
     switchEdcTab('scan');
   };
 
@@ -9856,20 +10108,72 @@
     openUniversalScanner((decodedText) => {
       let raw = (decodedText || '').trim();
       let sku = raw;
-      if (raw.includes(';')) sku = raw.split(';')[0].trim();
+      let scannedDate = null;
+      if (raw.includes(';')) {
+        const parts = raw.split(';');
+        sku = parts[0].trim();
+        if (parts[1]) {
+          scannedDate = parseFlexibleDate(parts[1].trim());
+        }
+      }
 
       const skuInput = document.getElementById('edcSkuInput');
       if (skuInput) skuInput.value = sku;
-      lookupEdcSku(sku);
+      
+      const formattedDate = scannedDate ? formatDateToYMD(scannedDate) : null;
+      lookupEdcSku(sku, formattedDate);
+
+      if (formattedDate && edcFlatpickrInstance) {
+        edcFlatpickrInstance.setDate(formattedDate);
+        updateEdcStatusHelper();
+      }
+
       playBarcodeBeep();
       showDccToast('success', 'Barcode Terbaca', `SKU: ${sku}`);
     });
   };
 
-  function lookupEdcSku(sku) {
+  function lookupEdcSku(sku, targetDate = null) {
     if (!sku) return;
     const cleanSku = String(sku).trim().toLowerCase();
-    const item = edcMainListData.find(i => i.sku.toLowerCase() === cleanSku);
+    const noZero = cleanSku.replace(/^0+/, '');
+    
+    // Cari semua item di main list yang cocok dengan nomor SKU ini
+    const matchingItems = edcMainListData.filter(i => {
+      const s = String(i.sku || '').trim().toLowerCase();
+      return s === cleanSku || (noZero && s === noZero);
+    });
+
+    let item = null;
+    if (matchingItems.length > 0) {
+      if (targetDate) {
+        const stdTarget = excelDateToDateStr(targetDate);
+        item = matchingItems.find(i => {
+          const sys = excelDateToDateStr(i.edSystem);
+          return sys === stdTarget || i.edSystem === targetDate;
+        });
+      }
+      if (!item) {
+        item = matchingItems.find(i => i.status !== 'DONE' && !edcSubmittedSkuSet.has(i.sku.toLowerCase()));
+      }
+      if (!item) {
+        item = matchingItems[0];
+      }
+    }
+
+    if (!item) {
+      const resolved = resolveEdcProductInfo(sku);
+      if (resolved && resolved.name && resolved.name !== 'Nama produk belum disinkron') {
+        item = {
+          sku: String(sku).trim(),
+          productName: resolved.name,
+          rack: resolved.rack,
+          qtySystem: 0,
+          edSystem: targetDate || '-',
+          status: 'PENDING'
+        };
+      }
+    }
 
     const nameInput = document.getElementById('edcNamaSku');
     const slocInput = document.getElementById('edcSlocExisting');
@@ -9880,11 +10184,11 @@
       if (nameInput) nameInput.value = item.productName || '';
       if (slocInput) slocInput.value = item.rack || '';
       if (qtyInput) qtyInput.value = item.qtySystem || 0;
-      if (edSysInput) edSysInput.value = formatEdsDateDisplay(item.edSystem) || '-';
+      if (edSysInput) edSysInput.value = (item.edSystem && item.edSystem !== '-') ? formatEdsDateDisplay(item.edSystem) : '-';
 
       // If already audited, pre-fill
-      const audit = edcAuditResultsMap.get(cleanSku);
-      if (audit) {
+      const audit = edcAuditResultsMap.get(cleanSku) || (noZero ? edcAuditResultsMap.get(noZero) : null);
+      if (audit && (audit.edActual || audit.petugas || audit.totalFisik > 0)) {
         if (edcFlatpickrInstance && audit.edActual) {
           edcFlatpickrInstance.setDate(audit.edActual);
         }

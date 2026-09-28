@@ -1,13 +1,13 @@
 {
-  "versionCode": 22,
-  "versionName": "1.2.6",
+  "versionCode": 23,
+  "versionName": "1.2.7",
   "apkUrl": "https://github.com/tw1nss/superapp-release/raw/main/app-debug.apk",
   "forceUpdate": false,
-  "title": "Pembaruan Superapp MTG v1.2.6",
+  "title": "Pembaruan Superapp MTG v1.2.7",
   "changelog": [
-    "Pembaruan menu ED Correction (Main List, Input SKU, Auto Lookup)",
-    "Pembaruan formula otomatis dan pembersihan data sinkronisasi Superset",
-    "Peningkatan stabilitas aplikasi dan performa live asset"
+    "Perbaikan pembacaan SKU ED Correction dari chart Superset & barcode scanner",
+    "Perbaikan akurasi status tugas PENDING dan report live audit",
+    "Peningkatan multi-SKU paste modal dan auto-split format QR & EAN-13"
   ],
   "releasedAt": "2026-09-28"
 }

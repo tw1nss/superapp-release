@@ -102,7 +102,8 @@ function buildDccMenu(ui) {
   ui.createMenu('📊 DCC Control')
     .addItem('🎨 Rapikan & Format Tampilan "Mainlist SKU"', 'formatMainlistSkuDcc')
     .addSeparator()
-    .addItem('📥 Assign Tugas Baru (Paste SKU)', 'assignDccTaskPrompt')
+    .addItem('📥 Assign Tugas Baru (Multi-SKU Modal)', 'assignDccTaskPrompt')
+    .addItem('💬 Assign Tugas (Input Box Cepat)', 'assignDccTaskQuickPrompt')
     .addItem('🔧 Pecah / Perbaiki SKU Menumpuk di Cell C', 'fixClumpedSkuRows')
     .addItem('⚡ Pasang Rumus Otomatis "Mainlist SKU"', 'installDccMainlistFormulas')
     .addItem('📋 Tarik Detail SKU dari "STOCK UPDATE"', 'syncDetailSkuMainlist')
@@ -637,8 +638,20 @@ function processToSheet(data, sheetName) {
 
   var headers = Object.keys(data[0]);
 
+  // FIX KHUSUS ED CORRECTION / SUPERSET: Jika ada qr_code (SKU;DDMMYYYY) dan belum ada kolom sku_number, buat kolom sku_number otomatis
+  var qrIdx = headers.indexOf('qr_code');
+  var hasSku = headers.some(function(h) { return h.toLowerCase().includes("sku"); });
+  var addSkuCol = (!hasSku && qrIdx !== -1);
+  if (addSkuCol) {
+    headers.push('sku_number');
+  }
+
   var rows = data.map(function(item) {
     return headers.map(function(key) {
+      if (key === 'sku_number' && addSkuCol) {
+        var qr = String(item['qr_code'] || '');
+        return qr.split(';')[0].trim();
+      }
       var value = item[key];
 
       // FIX 1: SKU wajib format teks murni
@@ -1173,56 +1186,174 @@ function setSupersetCookiePrompt() {
 // ==============================================================================
 // 📥 ASSIGN TUGAS BARU (POPUP DIALOG PASTE SKU UNTUK SUPERVISOR)
 // ==============================================================================
-function assignDccTaskPrompt() {
-  var ui = SpreadsheetApp.getUi();
+/**
+ * Parsing cerdas list SKU untuk DCC:
+ * - Mendukung paste vertikal (enter), koma, spasi, titik koma
+ * - Mendukung copas tabel multi-kolom dari Excel/Google Sheets
+ * - Mendukung format QR Code (SKU;DDMMYYYY)
+ * - Menyaring header dan format tanggal
+ * - Menjaga leading zeros dan mencegah duplikasi
+ */
+function parseDccSkuInput(rawText) {
+  if (!rawText || typeof rawText !== 'string') return [];
 
-  // 1. Pilih Shift
-  var shiftResp = ui.alert(
-    'Pilih Shift Penugasan DCC',
-    'Apakah tugas ini untuk SHIFT 1 (Pagi)?\n\n- Klik YES = Shift 1 (Pagi)\n- Klik NO = Shift 2 (Siang)',
-    ui.ButtonSet.YES_NO_CANCEL
-  );
+  var lines = rawText.split(/\r?\n/);
+  var skuList = [];
+  var seen = {};
 
-  if (shiftResp === ui.Button.CANCEL) return;
-  var shiftLabel = (shiftResp === ui.Button.YES) ? 'Shift 1 (Pagi)' : 'Shift 2 (Siang)';
-
-  // 2. Input Box untuk Paste Daftar SKU
-  var skuPrompt = ui.prompt(
-    '📥 Assign Tugas DCC (' + shiftLabel + ')',
-    'Silakan Paste daftar nomor SKU di bawah ini:\n(Bisa copas dari Excel/kolom, pisahkan baris/enter/koma):',
-    ui.ButtonSet.OK_CANCEL
-  );
-
-  if (skuPrompt.getSelectedButton() !== ui.Button.OK) return;
-
-  var skuText = skuPrompt.getResponseText();
-  if (!skuText || !skuText.trim()) {
-    ui.alert('⚠️ Peringatan', 'Tidak ada SKU yang dimasukkan!', ui.ButtonSet.OK);
-    return;
+  function isDateToken(tok) {
+    if (!tok) return false;
+    if (/^\d{4}[-\/]\d{1,2}[-\/]\d{1,2}$/.test(tok)) return true;
+    if (/^\d{1,2}[-\/]\d{1,2}[-\/]\d{2,4}$/.test(tok)) return true;
+    if (/^\d{8}$/.test(tok)) {
+      var d = parseInt(tok.substring(0, 2), 10);
+      var m = parseInt(tok.substring(2, 4), 10);
+      var y = parseInt(tok.substring(4, 8), 10);
+      if (d >= 1 && d <= 31 && m >= 1 && m <= 12 && y >= 2024 && y <= 2035) return true;
+      var y2 = parseInt(tok.substring(0, 4), 10);
+      var m2 = parseInt(tok.substring(4, 6), 10);
+      var d2 = parseInt(tok.substring(6, 8), 10);
+      if (y2 >= 2024 && y2 <= 2035 && m2 >= 1 && m2 <= 12 && d2 >= 1 && d2 <= 31) return true;
+    }
+    return false;
   }
 
-  // Parsing SKU: split berdasarkan spasi, newline, tab, koma, titik-koma, atau pipe
-  var rawSkus = skuText.trim().split(/[\s,;|]+/).map(function(s) { return s.trim(); }).filter(function(s) { return s.length > 0; });
-  var skus = [];
-  var seen = {};
-  for (var k = 0; k < rawSkus.length; k++) {
-    var sk = rawSkus[k];
-    if (!seen[sk]) {
-      seen[sk] = true;
-      skus.push(sk);
+  function isHeaderToken(tok) {
+    var upper = tok.toUpperCase();
+    var headers = ['SKU', 'NO', 'NAMA', 'PRODUK', 'PRODUCT', 'SLOC', 'RAK', 'QTY', 'ED', 'EXPIRY', 'DATE', 'TANGGAL', 'STATUS', 'GOOD', 'BAD', 'TOTAL', 'SELISIH', 'KOREKSI', 'FISIK'];
+    return headers.indexOf(upper) !== -1;
+  }
+
+  function isRackOrLocation(tok) {
+    return /^[A-Za-z0-9]+-[A-Za-z0-9]+-[A-Za-z0-9]+/.test(tok);
+  }
+
+  function addSku(cleanSku) {
+    if (!cleanSku) return;
+    cleanSku = String(cleanSku).trim();
+    if (cleanSku.length >= 3 && cleanSku.length <= 30 && !seen[cleanSku] && !isHeaderToken(cleanSku) && !isDateToken(cleanSku) && !isRackOrLocation(cleanSku)) {
+      seen[cleanSku] = true;
+      skuList.push(cleanSku);
     }
   }
 
-  if (skus.length === 0) {
-    ui.alert('⚠️ Peringatan', 'Format SKU tidak valid!', ui.ButtonSet.OK);
-    return;
+  for (var i = 0; i < lines.length; i++) {
+    var line = lines[i].trim();
+    if (!line) continue;
+
+    // Case 1: Tab-separated (copas multi-kolom Excel / Google Sheets)
+    if (line.indexOf('\t') !== -1) {
+      var cols = line.split('\t').map(function(c) { return c.trim(); }).filter(function(c) { return c.length > 0; });
+      var foundInCols = false;
+
+      // Prioritas 1: Format QR (SKU;DDMMYYYY) di kolom manapun
+      for (var c = 0; c < cols.length; c++) {
+        var colVal = cols[c];
+        if (colVal.indexOf(';') !== -1) {
+          var part = colVal.split(';')[0].replace(/[^\w-]/g, '').trim();
+          if (part.length >= 3 && part.length <= 25 && !isDateToken(part) && !isHeaderToken(part) && !isRackOrLocation(part)) {
+            addSku(part);
+            foundInCols = true;
+            break;
+          }
+        }
+      }
+
+      // Prioritas 2: Kolom numerik 3-18 digit (SKU / Barcode EAN)
+      if (!foundInCols) {
+        for (var c = 0; c < cols.length; c++) {
+          var cleanCol = cols[c].replace(/[^\w-]/g, '').trim();
+          if (/^\d{3,18}$/.test(cleanCol) && !isDateToken(cleanCol)) {
+            if (/^\d{1,2}$/.test(cleanCol) && cols.length > 1) continue;
+            addSku(cleanCol);
+            foundInCols = true;
+            break;
+          }
+        }
+      }
+
+      // Prioritas 3: Kolom kode SKU alphanumeric (hindari nomor urut 1, 2)
+      if (!foundInCols) {
+        for (var c2 = 0; c2 < cols.length; c2++) {
+          var cleanCol2 = cols[c2].replace(/[^\w-]/g, '').trim();
+          if (cleanCol2.length >= 3 && !isDateToken(cleanCol2) && !isHeaderToken(cleanCol2) && !isRackOrLocation(cleanCol2)) {
+            if (/^\d{1,2}$/.test(cleanCol2) && cols.length > 1) continue;
+            addSku(cleanCol2);
+            foundInCols = true;
+            break;
+          }
+        }
+      }
+
+      if (foundInCols) continue;
+    }
+
+    // Case 2: Multi-SKU pada baris yang sama
+    var tokens = line.split(/[\s,\|]+/).map(function(t) { return t.trim(); }).filter(function(t) { return t.length > 0; });
+    for (var t = 0; t < tokens.length; t++) {
+      var tok = tokens[t];
+      if (tok.indexOf(';') !== -1) {
+        var parts = tok.split(';').map(function(p) { return p.trim(); }).filter(function(p) { return p.length > 0; });
+        var cleanPart = parts[0].replace(/[^\w-]/g, '').trim();
+        if (cleanPart.length >= 3 && !isDateToken(cleanPart) && !isHeaderToken(cleanPart) && !isRackOrLocation(cleanPart)) {
+          addSku(cleanPart);
+        }
+        continue;
+      }
+
+      var cleanTok = tok.replace(/[^\w-]/g, '').trim();
+      if (cleanTok.length >= 3 && !isDateToken(cleanTok) && !isHeaderToken(cleanTok) && !isRackOrLocation(cleanTok)) {
+        addSku(cleanTok);
+      }
+    }
+  }
+
+  return skuList;
+}
+
+/**
+ * Dialog interaktif utama: Membuka Modal Dialog Multi-SKU dengan Textarea
+ */
+function assignDccTaskPrompt() {
+  try {
+    showAssignDccTaskDialog();
+  } catch (err) {
+    Logger.log('Gagal membuka modal dialog DCC, beralih ke prompt cepat: ' + err);
+    assignDccTaskQuickPrompt();
+  }
+}
+
+/**
+ * Menampilkan Modal Dialog HTML Multi-SKU untuk DCC
+ */
+function showAssignDccTaskDialog() {
+  var html = HtmlService.createHtmlOutput(getAssignTaskDialogHtmlDcc())
+    .setWidth(520)
+    .setHeight(570)
+    .setTitle('📥 Assign Tugas DCC');
+  SpreadsheetApp.getUi().showModalDialog(html, '📥 Assign Tugas DCC');
+}
+
+/**
+ * Eksekutor backend penugasan SKU DCC
+ */
+function executeAssignDccTask(shiftLabel, assignDate, rawSkuText) {
+  var skus = parseDccSkuInput(rawSkuText);
+
+  if (!skus || skus.length === 0) {
+    return {
+      success: false,
+      message: 'Tidak ada SKU valid yang ditemukan.'
+    };
   }
 
   var ss = getSpreadsheet();
   var sheet = ss.getSheetByName('Mainlist SKU') || ss.getSheetByName('Mainlist Sku');
   if (!sheet) {
-    ui.alert('❌ Error', 'Sheet "Mainlist SKU" tidak ditemukan!', ui.ButtonSet.OK);
-    return;
+    return {
+      success: false,
+      message: 'Sheet "Mainlist SKU" tidak ditemukan!'
+    };
   }
 
   // Cari baris kosong pertama di Kolom C (SKU)
@@ -1235,10 +1366,11 @@ function assignDccTaskPrompt() {
     }
   }
 
-  var todayStr = Utilities.formatDate(new Date(), CONFIG.TIMEZONE, 'dd/MM/yyyy');
+  var todayStr = assignDate || Utilities.formatDate(new Date(), CONFIG.TIMEZONE, 'dd/MM/yyyy');
+  var shiftText = shiftLabel || 'Shift 1 (Pagi)';
   var rowsToAdd = [];
   for (var j = 0; j < skus.length; j++) {
-    rowsToAdd.push([todayStr, shiftLabel, String(skus[j]).trim()]);
+    rowsToAdd.push([todayStr, shiftText, String(skus[j]).trim()]);
   }
 
   // Tulis Tanggal (Col A), Shift (Col B), SKU (Col C)
@@ -1253,11 +1385,564 @@ function assignDccTaskPrompt() {
   // Pastikan rumus otomatis terpasang
   installDccMainlistFormulas(true);
 
+  return {
+    success: true,
+    count: skus.length,
+    startRow: nextRow,
+    sheetName: sheet.getName(),
+    shift: shiftText,
+    date: todayStr,
+    skus: skus
+  };
+}
+
+/**
+ * Prompt fallback cepat jika supervisor berada di perangkat tanpa modal dialog
+ */
+function assignDccTaskQuickPrompt() {
+  var ui = SpreadsheetApp.getUi();
+
+  var shiftResp = ui.alert(
+    'Pilih Shift Penugasan DCC',
+    'Apakah tugas ini untuk SHIFT 1 (Pagi)?\n\n- Klik YES = Shift 1 (Pagi)\n- Klik NO = Shift 2 (Siang)',
+    ui.ButtonSet.YES_NO_CANCEL
+  );
+
+  if (shiftResp === ui.Button.CANCEL) return;
+  var shiftLabel = (shiftResp === ui.Button.YES) ? 'Shift 1 (Pagi)' : 'Shift 2 (Siang)';
+
+  var skuPrompt = ui.prompt(
+    '📥 Assign Tugas DCC (' + shiftLabel + ')',
+    'Silakan Paste daftar nomor SKU di bawah ini (pisahkan enter, koma, spasi):',
+    ui.ButtonSet.OK_CANCEL
+  );
+
+  if (skuPrompt.getSelectedButton() !== ui.Button.OK) return;
+
+  var skuText = skuPrompt.getResponseText();
+  if (!skuText || !skuText.trim()) {
+    ui.alert('⚠️ Peringatan', 'Tidak ada SKU yang dimasukkan!', ui.ButtonSet.OK);
+    return;
+  }
+
+  var res = executeAssignDccTask(shiftLabel, null, skuText);
+  if (!res.success) {
+    ui.alert('⚠️ Peringatan', res.message, ui.ButtonSet.OK);
+    return;
+  }
+
   ui.alert(
     '✅ Berhasil Assign Tugas!',
-    'Berhasil menambahkan ' + rowsToAdd.length + ' SKU untuk ' + shiftLabel + ' mulai baris ' + nextRow + '.\n\nDetail nama produk, lokasi rak, qty sistem, dan status PENDING sudah otomatis terisi!',
+    'Berhasil menambahkan ' + res.count + ' SKU untuk ' + res.shift + ' mulai baris ' + res.startRow + '.\n\nDetail nama produk, lokasi rak, qty sistem, dan status PENDING sudah otomatis terisi!',
     ui.ButtonSet.OK
   );
+}
+
+/**
+ * HTML UI untuk Modal Dialog Multi-SKU DCC
+ */
+function getAssignTaskDialogHtmlDcc() {
+  var todayStr = Utilities.formatDate(new Date(), CONFIG.TIMEZONE, 'dd/MM/yyyy');
+
+  var html = [
+    '<!DOCTYPE html>',
+    '<html>',
+    '<head>',
+    '  <base target="_top">',
+    '  <meta charset="utf-8">',
+    '  <style>',
+    '    * { box-sizing: border-box; margin: 0; padding: 0; }',
+    '    body {',
+    '      background-color: #0a0f1d;',
+    '      color: #f8fafc;',
+    '      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;',
+    '      padding: 16px;',
+    '      font-size: 13px;',
+    '      line-height: 1.4;',
+    '      overflow-x: hidden;',
+    '    }',
+    '    .header {',
+    '      display: flex;',
+    '      align-items: center;',
+    '      gap: 12px;',
+    '      margin-bottom: 14px;',
+    '      padding-bottom: 12px;',
+    '      border-bottom: 1px solid rgba(56, 189, 248, 0.2);',
+    '    }',
+    '    .header-icon {',
+    '      font-size: 22px;',
+    '      background: rgba(56, 189, 248, 0.12);',
+    '      border: 1px solid rgba(56, 189, 248, 0.3);',
+    '      border-radius: 8px;',
+    '      width: 40px;',
+    '      height: 40px;',
+    '      display: flex;',
+    '      align-items: center;',
+    '      justify-content: center;',
+    '      flex-shrink: 0;',
+    '    }',
+    '    .header-title {',
+    '      font-size: 15px;',
+    '      font-weight: 700;',
+    '      color: #f8fafc;',
+    '      letter-spacing: 0.3px;',
+    '    }',
+    '    .header-sub {',
+    '      font-size: 11px;',
+    '      color: #94a3b8;',
+    '      margin-top: 2px;',
+    '    }',
+    '    .form-group { margin-bottom: 12px; }',
+    '    .form-label {',
+    '      display: block;',
+    '      font-size: 11px;',
+    '      font-weight: 600;',
+    '      color: #cbd5e1;',
+    '      text-transform: uppercase;',
+    '      letter-spacing: 0.5px;',
+    '      margin-bottom: 6px;',
+    '    }',
+    '    .shift-selector {',
+    '      display: grid;',
+    '      grid-template-columns: 1fr 1fr;',
+    '      gap: 8px;',
+    '    }',
+    '    .shift-pill {',
+    '      background: #0f172a;',
+    '      border: 1.5px solid rgba(148, 163, 184, 0.25);',
+    '      border-radius: 8px;',
+    '      padding: 9px 12px;',
+    '      display: flex;',
+    '      align-items: center;',
+    '      justify-content: center;',
+    '      gap: 8px;',
+    '      cursor: pointer;',
+    '      font-weight: 600;',
+    '      font-size: 12px;',
+    '      color: #94a3b8;',
+    '      transition: all 0.2s ease;',
+    '      user-select: none;',
+    '    }',
+    '    .shift-pill.active {',
+    '      background: rgba(56, 189, 248, 0.15);',
+    '      border-color: #38bdf8;',
+    '      color: #38bdf8;',
+    '      box-shadow: 0 0 12px rgba(56, 189, 248, 0.2);',
+    '    }',
+    '    .shift-pill input { display: none; }',
+    '    .row-meta { display: flex; align-items: center; gap: 10px; }',
+    '    .input-date {',
+    '      flex: 1;',
+    '      background: #0f172a;',
+    '      border: 1px solid rgba(148, 163, 184, 0.25);',
+    '      border-radius: 6px;',
+    '      color: #f8fafc;',
+    '      padding: 7px 10px;',
+    '      font-size: 12px;',
+    '      font-family: inherit;',
+    '      outline: none;',
+    '    }',
+    '    .input-date:focus {',
+    '      border-color: #38bdf8;',
+    '      box-shadow: 0 0 8px rgba(56, 189, 248, 0.3);',
+    '    }',
+    '    .textarea-header {',
+    '      display: flex;',
+    '      justify-content: space-between;',
+    '      align-items: center;',
+    '      margin-bottom: 6px;',
+    '    }',
+    '    .textarea-actions { display: flex; gap: 8px; }',
+    '    .text-link {',
+    '      color: #38bdf8;',
+    '      font-size: 11px;',
+    '      cursor: pointer;',
+    '      text-decoration: none;',
+    '    }',
+    '    .text-link:hover { text-decoration: underline; }',
+    '    .sku-textarea {',
+    '      width: 100%;',
+    '      height: 140px;',
+    '      background: #070b16;',
+    '      border: 1px solid rgba(148, 163, 184, 0.25);',
+    '      border-radius: 8px;',
+    '      color: #f8fafc;',
+    '      font-family: "JetBrains Mono", Consolas, monospace;',
+    '      font-size: 12px;',
+    '      padding: 10px;',
+    '      resize: vertical;',
+    '      line-height: 1.5;',
+    '      outline: none;',
+    '      transition: border-color 0.2s;',
+    '    }',
+    '    .sku-textarea:focus {',
+    '      border-color: #38bdf8;',
+    '      box-shadow: 0 0 10px rgba(56, 189, 248, 0.25);',
+    '    }',
+    '    .sku-textarea::placeholder {',
+    '      color: #475569;',
+    '      font-family: -apple-system, BlinkMacSystemFont, sans-serif;',
+    '      font-size: 11px;',
+    '    }',
+    '    .status-bar {',
+    '      display: flex;',
+    '      justify-content: space-between;',
+    '      align-items: center;',
+    '      margin-top: 6px;',
+    '      font-size: 11px;',
+    '    }',
+    '    .badge-count {',
+    '      display: inline-flex;',
+    '      align-items: center;',
+    '      gap: 6px;',
+    '      padding: 3px 10px;',
+    '      border-radius: 12px;',
+    '      background: rgba(148, 163, 184, 0.12);',
+    '      color: #94a3b8;',
+    '      font-weight: 600;',
+    '      transition: all 0.2s;',
+    '    }',
+    '    .badge-count.has-data {',
+    '      background: rgba(16, 185, 129, 0.15);',
+    '      color: #10b981;',
+    '      border: 1px solid rgba(16, 185, 129, 0.3);',
+    '    }',
+    '    .preview-box {',
+    '      margin-top: 8px;',
+    '      max-height: 58px;',
+    '      overflow-y: auto;',
+    '      background: rgba(15, 23, 42, 0.6);',
+    '      border: 1px solid rgba(148, 163, 184, 0.15);',
+    '      border-radius: 6px;',
+    '      padding: 6px 8px;',
+    '      display: flex;',
+    '      flex-wrap: wrap;',
+    '      gap: 4px;',
+    '    }',
+    '    .sku-chip {',
+    '      background: rgba(56, 189, 248, 0.15);',
+    '      color: #38bdf8;',
+    '      border: 1px solid rgba(56, 189, 248, 0.3);',
+    '      border-radius: 4px;',
+    '      padding: 1px 6px;',
+    '      font-family: "JetBrains Mono", Consolas, monospace;',
+    '      font-size: 11px;',
+    '      font-weight: 600;',
+    '    }',
+    '    .preview-empty {',
+    '      color: #475569;',
+    '      font-size: 11px;',
+    '      font-style: italic;',
+    '    }',
+    '    .tip-box {',
+    '      margin-top: 8px;',
+    '      font-size: 11px;',
+    '      color: #64748b;',
+    '      line-height: 1.4;',
+    '    }',
+    '    .actions { display: flex; gap: 10px; margin-top: 14px; }',
+    '    .btn {',
+    '      flex: 1;',
+    '      padding: 10px 14px;',
+    '      border-radius: 8px;',
+    '      font-weight: 700;',
+    '      font-size: 13px;',
+    '      cursor: pointer;',
+    '      display: flex;',
+    '      align-items: center;',
+    '      justify-content: center;',
+    '      gap: 6px;',
+    '      border: none;',
+    '      transition: all 0.18s ease;',
+    '      font-family: inherit;',
+    '    }',
+    '    .btn:active { transform: scale(0.98); }',
+    '    .btn-primary {',
+    '      background: linear-gradient(135deg, #0ea5e9, #0284c7);',
+    '      color: #ffffff;',
+    '      box-shadow: 0 4px 12px rgba(14, 165, 233, 0.3);',
+    '    }',
+    '    .btn-primary:hover:not(:disabled) {',
+    '      background: linear-gradient(135deg, #38bdf8, #0ea5e9);',
+    '    }',
+    '    .btn-primary:disabled {',
+    '      opacity: 0.4;',
+    '      cursor: not-allowed;',
+    '      box-shadow: none;',
+    '    }',
+    '    .btn-secondary {',
+    '      flex: 0 0 80px;',
+    '      background: #1e293b;',
+    '      color: #cbd5e1;',
+    '      border: 1px solid rgba(148, 163, 184, 0.2);',
+    '    }',
+    '    .btn-secondary:hover { background: #334155; }',
+    '    .success-card {',
+    '      display: none;',
+    '      text-align: center;',
+    '      padding: 24px 12px;',
+    '    }',
+    '    .success-icon {',
+    '      font-size: 42px;',
+    '      margin-bottom: 12px;',
+    '      display: inline-block;',
+    '      animation: popIn 0.3s ease;',
+    '    }',
+    '    .success-title {',
+    '      font-size: 17px;',
+    '      font-weight: 700;',
+    '      color: #10b981;',
+    '      margin-bottom: 8px;',
+    '    }',
+    '    .success-detail {',
+    '      font-size: 12px;',
+    '      color: #cbd5e1;',
+    '      background: #0f172a;',
+    '      border: 1px solid rgba(16, 185, 129, 0.25);',
+    '      border-radius: 8px;',
+    '      padding: 12px;',
+    '      margin: 14px 0;',
+    '      text-align: left;',
+    '      line-height: 1.6;',
+    '    }',
+    '    @keyframes popIn {',
+    '      0% { transform: scale(0.5); opacity: 0; }',
+    '      100% { transform: scale(1); opacity: 1; }',
+    '    }',
+    '  </style>',
+    '</head>',
+    '<body>',
+    '  <div id="formView">',
+    '    <div class="header">',
+    '      <div class="header-icon">📥</div>',
+    '      <div>',
+    '        <div class="header-title">Assign Tugas DCC</div>',
+    '        <div class="header-sub">Paste banyak SKU sekaligus untuk penugasan shift DCC</div>',
+    '      </div>',
+    '    </div>',
+    '    <div class="form-group">',
+    '      <label class="form-label">Pilih Shift</label>',
+    '      <div class="shift-selector">',
+    '        <label class="shift-pill active" id="pillShift1">',
+    '          <input type="radio" name="shift" value="Shift 1 (Pagi)" checked onchange="updateShiftSelection()">',
+    '          <span>☀️ Shift 1 (Pagi)</span>',
+    '        </label>',
+    '        <label class="shift-pill" id="pillShift2">',
+    '          <input type="radio" name="shift" value="Shift 2 (Siang)" onchange="updateShiftSelection()">',
+    '          <span>🌤️ Shift 2 (Siang)</span>',
+    '        </label>',
+    '      </div>',
+    '    </div>',
+    '    <div class="form-group">',
+    '      <label class="form-label">Tanggal Penugasan</label>',
+    '      <div class="row-meta">',
+    '        <input type="text" id="assignDate" class="input-date" value="' + todayStr + '">',
+    '      </div>',
+    '    </div>',
+    '    <div class="form-group">',
+    '      <div class="textarea-header">',
+    '        <label class="form-label" style="margin-bottom:0;">Daftar SKU Tugas</label>',
+    '        <div class="textarea-actions">',
+    '          <a class="text-link" onclick="clearTextarea()">Bersihkan</a>',
+    '        </div>',
+    '      </div>',
+    '      <textarea id="skuInput" class="sku-textarea" placeholder="Paste daftar SKU di sini (bisa dari Excel / Notepad)...\nContoh 1 kolom SKU:\n493711\n493712\n\nAtau copas tabel multi-kolom Excel langsung."></textarea>',
+    '      <div class="status-bar">',
+    '        <span id="badgeCount" class="badge-count">⚪ Menunggu input SKU...</span>',
+    '        <span id="subCount" style="color:#64748b;">0 item</span>',
+    '      </div>',
+    '      <div id="previewBox" class="preview-box">',
+    '        <span class="preview-empty">Preview SKU yang terdeteksi akan muncul di sini...</span>',
+    '      </div>',
+    '      <div class="tip-box">💡 <em>Mendukung paste dari tabel Excel, format QR (SKU;ED), maupun enter/koma/spasi. Tanggal & header otomatis difilter.</em></div>',
+    '    </div>',
+    '    <div class="actions">',
+    '      <button type="button" class="btn btn-secondary" onclick="google.script.host.close()">Batal</button>',
+    '      <button type="button" id="btnSubmit" class="btn btn-primary" disabled onclick="submitTask()">🚀 Tugaskan SKU (0)</button>',
+    '    </div>',
+    '  </div>',
+    '  <div id="successView" class="success-card">',
+    '    <div class="success-icon">✅</div>',
+    '    <div class="success-title">Berhasil Menugaskan <span id="resCount"></span> SKU!</div>',
+    '    <div class="success-detail">',
+    '      <div><strong>Shift:</strong> <span id="resShift"></span></div>',
+    '      <div><strong>Tanggal:</strong> <span id="resDate"></span></div>',
+    '      <div><strong>Lokasi:</strong> Sheet "<span id="resSheet"></span>" (Baris ke-<span id="resRow"></span>)</div>',
+    '      <div style="margin-top:6px; color:#10b981; font-weight:600;">✨ Detail nama produk, rak, qty sistem & rumus otomatis sudah aktif!</div>',
+    '    </div>',
+    '    <button type="button" class="btn btn-primary" style="width:100%;" onclick="google.script.host.close()">Selesai & Tutup</button>',
+    '  </div>',
+    '  <script>',
+    '    var detectedSkus = [];',
+    '    function updateShiftSelection() {',
+    '      var shift = document.querySelector(\'input[name="shift"]:checked\').value;',
+    '      var pill1 = document.getElementById("pillShift1");',
+    '      var pill2 = document.getElementById("pillShift2");',
+    '      if (shift.indexOf("Shift 1") !== -1) {',
+    '        pill1.classList.add("active");',
+    '        pill2.classList.remove("active");',
+    '      } else {',
+    '        pill2.classList.add("active");',
+    '        pill1.classList.remove("active");',
+    '      }',
+    '    }',
+    '    function clearTextarea() {',
+    '      var ta = document.getElementById("skuInput");',
+    '      ta.value = "";',
+    '      parseInput();',
+    '      ta.focus();',
+    '    }',
+    '    function isDateToken(tok) {',
+    '      if (!tok) return false;',
+    '      if (/^\\d{4}[-\\/]\\d{1,2}[-\\/]\\d{1,2}$/.test(tok)) return true;',
+    '      if (/^\\d{1,2}[-\\/]\\d{1,2}[-\\/]\\d{2,4}$/.test(tok)) return true;',
+    '      if (/^\\d{8}$/.test(tok)) {',
+    '        var d = parseInt(tok.substring(0, 2), 10);',
+    '        var m = parseInt(tok.substring(2, 4), 10);',
+    '        var y = parseInt(tok.substring(4, 8), 10);',
+    '        if (d >= 1 && d <= 31 && m >= 1 && m <= 12 && y >= 2024 && y <= 2035) return true;',
+    '        var y2 = parseInt(tok.substring(0, 4), 10);',
+    '        var m2 = parseInt(tok.substring(4, 6), 10);',
+    '        var d2 = parseInt(tok.substring(6, 8), 10);',
+    '        if (y2 >= 2024 && y2 <= 2035 && m2 >= 1 && m2 <= 12 && d2 >= 1 && d2 <= 31) return true;',
+    '      }',
+    '      return false;',
+    '    }',
+    '    function isHeaderToken(tok) {',
+    '      var upper = tok.toUpperCase();',
+    '      var headers = ["SKU", "NO", "NAMA", "PRODUK", "PRODUCT", "SLOC", "RAK", "QTY", "ED", "EXPIRY", "DATE", "TANGGAL", "STATUS", "GOOD", "BAD", "TOTAL", "SELISIH", "KOREKSI", "FISIK"];',
+    '      return headers.indexOf(upper) !== -1;',
+    '    }',
+    '    function isRackOrLocation(tok) {',
+    '      return /^[A-Za-z0-9]+-[A-Za-z0-9]+-[A-Za-z0-9]+/.test(tok);',
+    '    }',
+    '    function parseInput() {',
+    '      var raw = document.getElementById("skuInput").value;',
+    '      var lines = raw.split(/\\r?\\n/);',
+    '      var skus = [];',
+    '      var seen = {};',
+    '      function add(s) {',
+    '        if (!s) return;',
+    '        s = String(s).trim();',
+    '        if (s.length >= 3 && s.length <= 30 && !seen[s] && !isHeaderToken(s) && !isDateToken(s) && !isRackOrLocation(s)) {',
+    '          seen[s] = true;',
+    '          skus.push(s);',
+    '        }',
+    '      }',
+    '      for (var i = 0; i < lines.length; i++) {',
+    '        var line = lines[i].trim();',
+    '        if (!line) continue;',
+    '        if (line.indexOf("\\t") !== -1) {',
+    '          var cols = line.split("\\t").map(function(c) { return c.trim(); }).filter(function(c) { return c.length > 0; });',
+    '          var found = false;',
+    '          for (var c = 0; c < cols.length; c++) {',
+    '            var colVal = cols[c];',
+    '            if (colVal.indexOf(";") !== -1) {',
+    '              var part = colVal.split(";")[0].replace(/[^\\w-]/g, "").trim();',
+    '              if (part.length >= 3 && part.length <= 25 && !isDateToken(part) && !isHeaderToken(part) && !isRackOrLocation(part)) { add(part); found = true; break; }',
+    '            }',
+    '          }',
+    '          if (!found) {',
+    '            for (var c = 0; c < cols.length; c++) {',
+    '              var cleanCol = cols[c].replace(/[^\\w-]/g, "").trim();',
+    '              if (/^\\d{3,18}$/.test(cleanCol) && !isDateToken(cleanCol)) {',
+    '                if (/^\\d{1,2}$/.test(cleanCol) && cols.length > 1) continue;',
+    '                add(cleanCol); found = true; break;',
+    '              }',
+    '            }',
+    '          }',
+    '          if (!found) {',
+    '            for (var c2 = 0; c2 < cols.length; c2++) {',
+    '              var cleanCol2 = cols[c2].replace(/[^\\w-]/g, "").trim();',
+    '              if (cleanCol2.length >= 3 && !isDateToken(cleanCol2) && !isHeaderToken(cleanCol2) && !isRackOrLocation(cleanCol2)) {',
+    '                if (/^\\d{1,2}$/.test(cleanCol2) && cols.length > 1) continue;',
+    '                add(cleanCol2); found = true; break;',
+    '              }',
+    '            }',
+    '          }',
+    '          if (found) continue;',
+    '        }',
+    '        var tokens = line.split(/[\\s,\\|]+/).map(function(t) { return t.trim(); }).filter(function(t) { return t.length > 0; });',
+    '        for (var t = 0; t < tokens.length; t++) {',
+    '          var tok = tokens[t];',
+    '          if (tok.indexOf(";") !== -1) {',
+    '            var parts = tok.split(";").map(function(p) { return p.trim(); }).filter(function(p) { return p.length > 0; });',
+    '            var cleanPart = parts[0].replace(/[^\\w-]/g, "").trim();',
+    '            if (cleanPart.length >= 3 && !isDateToken(cleanPart) && !isHeaderToken(cleanPart) && !isRackOrLocation(cleanPart)) add(cleanPart);',
+    '            continue;',
+    '          }',
+    '          var cleanTok = tok.replace(/[^\\w-]/g, "").trim();',
+    '          if (cleanTok.length >= 3 && !isDateToken(cleanTok) && !isHeaderToken(cleanTok) && !isRackOrLocation(cleanTok)) add(cleanTok);',
+    '        }',
+    '      }',
+    '      detectedSkus = skus;',
+    '      var badge = document.getElementById("badgeCount");',
+    '      var sub = document.getElementById("subCount");',
+    '      var btn = document.getElementById("btnSubmit");',
+    '      var preview = document.getElementById("previewBox");',
+    '      if (skus.length === 0) {',
+    '        badge.className = "badge-count";',
+    '        badge.innerHTML = "⚪ Menunggu input SKU...";',
+    '        sub.textContent = "0 item";',
+    '        btn.disabled = true;',
+    '        btn.innerHTML = "🚀 Tugaskan SKU (0)";',
+    '        preview.innerHTML = \'<span class="preview-empty">Preview SKU yang terdeteksi akan muncul di sini...</span>\';',
+    '      } else {',
+    '        badge.className = "badge-count has-data";',
+    '        badge.innerHTML = "🟢 " + skus.length + " SKU Siap Ditugaskan";',
+    '        sub.textContent = skus.length + " item";',
+    '        btn.disabled = false;',
+    '        btn.innerHTML = "🚀 Tugaskan " + skus.length + " SKU";',
+    '        var maxChips = 30;',
+    '        var chipsHtml = "";',
+    '        for (var k = 0; k < Math.min(skus.length, maxChips); k++) {',
+    '          chipsHtml += \'<span class="sku-chip">\' + skus[k] + \'</span>\';',
+    '        }',
+    '        if (skus.length > maxChips) {',
+    '          chipsHtml += \'<span style="color:#94a3b8; font-size:11px; align-self:center;">+\' + (skus.length - maxChips) + \' SKU lainnya</span>\';',
+    '        }',
+    '        preview.innerHTML = chipsHtml;',
+    '      }',
+    '    }',
+    '    document.getElementById("skuInput").addEventListener("input", parseInput);',
+    '    document.getElementById("skuInput").addEventListener("paste", function() { setTimeout(parseInput, 50); });',
+    '    function submitTask() {',
+    '      if (detectedSkus.length === 0) return;',
+    '      var shift = document.querySelector(\'input[name="shift"]:checked\').value;',
+    '      var date = document.getElementById("assignDate").value;',
+    '      var raw = document.getElementById("skuInput").value;',
+    '      var btn = document.getElementById("btnSubmit");',
+    '      btn.disabled = true;',
+    '      btn.innerHTML = "⏳ Menugaskan " + detectedSkus.length + " SKU...";',
+    '      google.script.run',
+    '        .withSuccessHandler(function(res) {',
+    '          if (res && res.success) {',
+    '            document.getElementById("formView").style.display = "none";',
+    '            document.getElementById("successView").style.display = "block";',
+    '            document.getElementById("resCount").textContent = res.count;',
+    '            document.getElementById("resShift").textContent = res.shift;',
+    '            document.getElementById("resDate").textContent = res.date;',
+    '            document.getElementById("resSheet").textContent = res.sheetName;',
+    '            document.getElementById("resRow").textContent = res.startRow;',
+    '          } else {',
+    '            alert("⚠️ " + (res ? res.message : "Gagal memproses SKU."));',
+    '            btn.disabled = false;',
+    '            btn.innerHTML = "🚀 Tugaskan " + detectedSkus.length + " SKU";',
+    '          }',
+    '        })',
+    '        .withFailureHandler(function(err) {',
+    '          alert("❌ Terjadi kesalahan: " + (err.message || err));',
+    '          btn.disabled = false;',
+    '          btn.innerHTML = "🚀 Tugaskan " + detectedSkus.length + " SKU";',
+    '        })',
+    '        .executeAssignDccTask(shift, date, raw);',
+    '    }',
+    '  </script>',
+    '</body>',
+    '</html>'
+  ].join('\n');
+
+  return html;
 }
 
 // ==============================================================================
@@ -1288,12 +1973,20 @@ function fixClumpedSkuRows() {
 
     if (!skuRaw) continue;
 
-    // Cek apakah cell ini berisi banyak SKU (terpisah spasi / koma / titik koma)
-    var parts = skuRaw.split(/[\s,;|]+/).map(function(s) { return s.trim(); }).filter(function(s) { return s.length > 0; });
-    if (parts.length > 1) {
+    var isClumped = (skuRaw.indexOf('\n') !== -1 || skuRaw.indexOf('\r') !== -1 || 
+                     skuRaw.indexOf('\t') !== -1 || skuRaw.indexOf(',') !== -1 || 
+                     skuRaw.indexOf(';') !== -1 || skuRaw.indexOf(' ') !== -1 ||
+                     skuRaw.length > 25);
+
+    if (isClumped) {
       hasClumped = true;
-      for (var p = 0; p < parts.length; p++) {
-        newRows.push([dateVal, shiftVal, parts[p]]);
+      var extracted = parseDccSkuInput(skuRaw);
+      if (extracted.length > 0) {
+        for (var p = 0; p < extracted.length; p++) {
+          newRows.push([dateVal, shiftVal, extracted[p]]);
+        }
+      } else {
+        newRows.push([dateVal, shiftVal, skuRaw]);
       }
     } else {
       newRows.push([dateVal, shiftVal, skuRaw]);
@@ -1331,7 +2024,9 @@ function onEdit(e) {
     if (!e || !e.range) return;
     var sheet = e.range.getSheet();
     var sheetName = sheet.getName();
-    if (sheetName !== 'Mainlist SKU' && sheetName !== 'Mainlist Sku') return;
+    var isDcc = (sheetName === 'Mainlist SKU' || sheetName === 'Mainlist Sku');
+    var isEdc = (sheetName === 'Mainlist Sku ED Corection' || sheetName === 'Mainlist Sku ED Correction');
+    if (!isDcc && !isEdc) return;
 
     var col = e.range.getColumn();
     var row = e.range.getRow();
@@ -1341,9 +2036,14 @@ function onEdit(e) {
       var val = String(e.value || e.range.getValue() || '').trim();
       if (!val) return;
 
-      var parts = val.split(/[\s,;|]+/).map(function(s) { return s.trim(); }).filter(function(s) { return s.length > 0; });
+      var parts = parseDccSkuInput(val);
+      if (!parts || parts.length === 0) {
+        parts = val.split(/[\s,;|]+/).map(function(s) { return s.trim(); }).filter(function(s) { return s.length > 0; });
+      }
+
       if (parts.length > 1) {
-        var dateVal = sheet.getRange(row, 1).getValue() || Utilities.formatDate(new Date(), CONFIG.TIMEZONE, 'dd/MM/yyyy');
+        var todayFormatted = Utilities.formatDate(new Date(), CONFIG.TIMEZONE, isEdc ? 'yyyy-MM-dd' : 'dd/MM/yyyy');
+        var dateVal = sheet.getRange(row, 1).getValue() || todayFormatted;
         var shiftVal = sheet.getRange(row, 2).getValue() || 'Shift 1 (Pagi)';
 
         var rowsToInsert = [];
@@ -1356,7 +2056,12 @@ function onEdit(e) {
         for (var r = row; r < row + rowsToInsert.length; r++) {
           sheet.setRowHeight(r, 28);
         }
-        installDccMainlistFormulas(true);
+        
+        if (isDcc && typeof installDccMainlistFormulas === 'function') {
+          installDccMainlistFormulas(true);
+        } else if (isEdc && typeof installEdCorrectionMainlistFormulas === 'function') {
+          installEdCorrectionMainlistFormulas(true);
+        }
       }
     }
   } catch (errEdit) {
@@ -1449,6 +2154,30 @@ function handleEdCorrectionSubmitDccFallback(payload) {
     ];
 
     sheet.appendRow(rowData);
+
+    // Auto update status di Main List jika ada
+    try {
+      var mainSheet = ss.getSheetByName('Mainlist Sku ED Corection') || 
+                      ss.getSheetByName('Main List SKU ED Correction') || 
+                      ss.getSheetByName('Main List ED Correction');
+      if (mainSheet && mainSheet.getLastRow() > 1) {
+        var mainData = mainSheet.getRange(2, 3, mainSheet.getLastRow() - 1, 1).getValues();
+        for (var m = 0; m < mainData.length; m++) {
+          if (String(mainData[m][0]).trim().toLowerCase() === sku.toLowerCase()) {
+            mainSheet.getRange(m + 2, 8).setValue(edActual); // Kolom H: ED Fisik / Koreksi
+            mainSheet.getRange(m + 2, 9).setValue(edStatus); // Kolom I: Status ED
+            mainSheet.getRange(m + 2, 10).setValue(fisikGood); // Kolom J: Fisik Good
+            mainSheet.getRange(m + 2, 11).setValue(fisikBad); // Kolom K: Fisik Bad
+            mainSheet.getRange(m + 2, 12).setValue(totalFisik); // Kolom L: Total Fisik
+            mainSheet.getRange(m + 2, 13).setValue(selisih); // Kolom M: Selisih
+            mainSheet.getRange(m + 2, 14).setValue(petugas); // Kolom N: Petugas
+            mainSheet.getRange(m + 2, 15).setValue("DONE");   // Kolom O: Status
+            if (remarks) mainSheet.getRange(m + 2, 16).setValue(remarks); // Kolom P: Remarks
+            break;
+          }
+        }
+      }
+    } catch(eMain) {}
 
     return ContentService.createTextOutput(JSON.stringify({
       status: "success",

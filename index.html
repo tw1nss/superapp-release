@@ -29,7 +29,7 @@
   <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/id.js"></script>
 
   <!-- Stylesheets -->
-  <link rel="stylesheet" href="style.css?v=94">
+  <link rel="stylesheet" href="style.css?v=97">
 
   <!-- QR Code & Barcode Libraries -->
   <script src="qrcode.min.js"></script>
@@ -85,7 +85,7 @@
       <div class="home-version-wrap">
         <button type="button" class="home-version-chip" onclick="checkForAppUpdates(true)" title="Klik untuk memeriksa pembaruan aplikasi">
           <span class="home-version-dot"></span>
-          <span id="homeAppVersionText">v1.2.5</span> • Cek Update
+          <span id="homeAppVersionText">v1.2.7</span> • Cek Update
         </button>
       </div>
     </header>
@@ -1226,12 +1226,6 @@
           <button type="button" class="eds-offline-badge-btn hidden" id="edcOfflineQueueBadge" onclick="syncEdcOfflineQueue(true)" title="Klik untuk sinkronisasi data offline"></button>
         </div>
         <div class="eds-top-actions">
-          <button type="button" class="eds-info-btn" onclick="openEdcSetupModal()" title="Pengaturan Spreadsheet & WebApp">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <circle cx="12" cy="12" r="3"></circle>
-              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
-            </svg>
-          </button>
           <button type="button" class="eds-refresh-btn edc-refresh-btn" onclick="refreshEdcData()" title="Muat Ulang Data dari Sheet">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
               stroke-linecap="round" stroke-linejoin="round">
@@ -1284,7 +1278,10 @@
         <!-- Sort Bar -->
         <div class="eds-sort-bar">
           <span class="eds-sort-label">Urutkan:</span>
-          <button type="button" class="eds-sort-btn active" id="edcSortNameAsc" onclick="toggleEdcSort('name_asc')">
+          <button type="button" class="eds-sort-btn active" id="edcSortDefault" onclick="toggleEdcSort('default')">
+            Urutan Tugas
+          </button>
+          <button type="button" class="eds-sort-btn" id="edcSortNameAsc" onclick="toggleEdcSort('name_asc')">
             Nama A-Z
           </button>
           <button type="button" class="eds-sort-btn" id="edcSortSlocAsc" onclick="toggleEdcSort('sloc_asc')">
@@ -2310,23 +2307,23 @@
         <h3 class="app-update-title" style="color: #4ade80;">Versi Anda Terbaru!</h3>
         <p class="app-update-subtitle" id="alreadyLatestSubtitle">Aplikasi Super App MTG sudah diperbarui</p>
         <div class="app-update-version-row">
-          <span class="app-update-badge current" id="alreadyLatestBadge">Versi Aktif: v1.2.5 (Build 21)</span>
+          <span class="app-update-badge current" id="alreadyLatestBadge">Versi Aktif: v1.2.7 (Build 23)</span>
         </div>
       </div>
       <div class="app-update-body">
-        <div style="font-size: 0.88rem; color: #a7f3d0; font-weight: 600; margin-bottom: 6px; text-align: center;">
-          🚀 Pembaruan Sistem v1.2.5 Sudah Aktif (Live OTA)
+        <div id="alreadyLatestLiveTitle" style="font-size: 0.88rem; color: #a7f3d0; font-weight: 600; margin-bottom: 6px; text-align: center;">
+          🚀 Pembaruan Sistem v1.2.7 Sudah Aktif (Live OTA)
         </div>
         <ul class="app-update-changelog" id="alreadyLatestChangelog" style="font-size: 0.82rem; color: #cbd5e1; margin: 0 0 10px 0; padding-left: 18px; text-align: left;">
-          <li>Perbaikan notifikasi complain & cancel order WhatsApp realtime</li>
-          <li>Restriksi task complain resmi dari grup CX &lt;&gt; QA Fresh Discussion (tolak japri foto)</li>
-          <li>Pembaruan autentikasi Google Firebase Cloud Messaging (FCM) & badge menu utama</li>
+          <li>Perbaikan pembacaan SKU ED Correction dari chart Superset &amp; barcode scanner</li>
+          <li>Perbaikan akurasi status tugas PENDING dan report live audit</li>
+          <li>Peningkatan multi-SKU paste modal dan auto-split format QR &amp; EAN-13</li>
         </ul>
       </div>
       <div class="app-update-actions" style="flex-direction: column; gap: 8px;">
         <button type="button" class="btn-primary" style="width: 100%;" onclick="closeAppAlreadyLatestModal()">Oke, Mengerti</button>
-        <button type="button" class="btn-secondary" style="width: 100%; font-size: 0.85rem; border-color: rgba(6,214,160,0.3); color: #06d6a0;" onclick="forceDownloadLatestApk()">
-          📥 Unduh & Pasang APK v1.2.5 Terbaru
+        <button type="button" class="btn-secondary" id="alreadyLatestDownloadBtn" style="width: 100%; font-size: 0.85rem; border-color: rgba(6,214,160,0.3); color: #06d6a0;" onclick="forceDownloadLatestApk()">
+          📥 Unduh &amp; Pasang APK v1.2.7 Terbaru
         </button>
       </div>
     </div>
@@ -2413,7 +2410,7 @@
   </div>
 
   <!-- App Logic -->
-  <script src="app.js?v=94"></script>
+  <script src="app.js?v=97"></script>
 </body>
 
 </html>
