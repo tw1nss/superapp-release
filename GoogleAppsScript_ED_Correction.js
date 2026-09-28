@@ -49,7 +49,8 @@ var EDC_SHEETS = {
   MAIN_LIST: "Mainlist Sku ED Corection",
   HASIL: "Hasil ED Correction",
   HISTORICAL: "Hasil ED Correction",
-  DATA_UPDATE: "Data Update ED Corection"
+  DATA_UPDATE: "Data Update ED Corection",
+  BACKUP: "Backup ED Corection"
 };
 
 // ==============================================================================
@@ -88,12 +89,16 @@ function getEdCorrectionSheet(type) {
            ss.getSheetByName('Data Update ED Sweeper') || 
            ss.getSheetByName('STOCK UPDATE');
   }
-  if (type === 'HASIL' || type === 'HISTORICAL' || type === 'BACKUP') {
+  if (type === 'HASIL' || type === 'HISTORICAL') {
     return ss.getSheetByName('Hasil ED Correction') || 
            ss.getSheetByName('Hasil ED Corection') || 
-           ss.getSheetByName('Hasil EDC') || 
-           ss.getSheetByName('Backup ED Corection') || 
-           ss.getSheetByName('Backup Data ED Correction');
+           ss.getSheetByName('Hasil EDC');
+  }
+  if (type === 'BACKUP') {
+    return ss.getSheetByName('Backup ED Corection') || 
+           ss.getSheetByName('Backup Data ED Correction') || 
+           ss.getSheetByName('Backup ED Correction') || 
+           ss.getSheetByName('Backup Data');
   }
   return ss.getSheetByName(type);
 }
@@ -107,6 +112,11 @@ function onOpen() {
   if (typeof buildSupersetMenu === 'function') buildSupersetMenu(ui);
   if (typeof buildDccMenu === 'function') buildDccMenu(ui);
   if (typeof buildEdSweeperMenu === 'function') buildEdSweeperMenu(ui);
+
+  // Pasang trigger auto-backup harian ED Correction (23:30 WIB)
+  try {
+    ensureDailyBackupTriggerEdCorrection();
+  } catch(eTrig) {}
 
   // Bangun Menu Utama ED Correction
   buildEdCorrectionMenu(ui);
@@ -140,6 +150,15 @@ function buildEdCorrectionMenu(ui) {
       .addItem('⚡ Pasang Rumus Otomatis "Main List"', 'installEdCorrectionMainlistFormulasManual')
       .addItem('🔧 Bersihkan Sel Penimpa Rumus (Error D122 / #REF!)', 'repairFormulaRunwayPrompt')
       .addItem('🧹 Kosongkan / Reset Sheet "Main List"', 'resetMainlistSkuEdCorrectionPrompt')
+    )
+    .addSeparator()
+
+    // ── SUBMENU 3: BACKUP & ARSIP DATA ──
+    .addSubMenu(ui.createMenu('📦 3. Backup & Arsip Data')
+      .addItem('📦 Backup Data Hasil ED Correction', 'backupHasilEdCorrectionManual')
+      .addItem('🔄 Backup & Reset Total (Hasil + Main List)', 'backupAndResetHasilEdCorrectionManual')
+      .addItem('📑 Setup Sheet "Backup ED Corection"', 'setupBackupEdCorrectionSheet')
+      .addItem('🧹 Kosongkan Data Sheet "Hasil ED Correction"', 'clearHasilEdCorrectionPrompt')
     )
     .addSeparator()
 
@@ -1272,6 +1291,220 @@ function clearHasilEdCorrectionPrompt() {
     alertEdc('✅ Data di sheet "Hasil ED Correction" telah berhasil dibersihkan.');
   } else {
     alertEdc('ℹ️ Sheet "Hasil ED Correction" memang sudah kosong.');
+  }
+}
+
+// ==============================================================================
+// 📦 3.1 FITUR BACKUP HASIL ED CORRECTION & ARSIP
+// ==============================================================================
+
+/**
+ * Backup manual data sheet Hasil ED Correction ke sheet Backup ED Corection
+ */
+function backupHasilEdCorrectionManual() {
+  var res = backupHasilEdCorrectionToBackupSheet(false);
+  alertEdc(res.message);
+}
+
+/**
+ * Backup dan reset total: data Hasil disimpan ke Backup, lalu Hasil & Mainlist dikosongkan
+ */
+function backupAndResetHasilEdCorrectionManual() {
+  var ui = SpreadsheetApp.getUi();
+  var confirm = ui.alert(
+    'Konfirmasi Backup & Reset Total ED Correction',
+    'Semua data audit di sheet "Hasil ED Correction" akan disimpan ke sheet "Backup ED Corection".\n\n' +
+    'Setelah itu, sheet "Hasil ED Correction" dan sheet "Main List" akan otomatis dikosongkan untuk persiapan sesi/shift tugas berikutnya.\n\n' +
+    'Apakah Anda ingin melanjutkan?',
+    ui.ButtonSet.YES_NO
+  );
+  if (confirm !== ui.Button.YES) return;
+
+  var res = backupHasilEdCorrectionToBackupSheet(true);
+  alertEdc(res.message);
+}
+
+/**
+ * Setup format & desain sheet "Backup ED Corection"
+ */
+function setupBackupEdCorrectionSheet() {
+  var ss = getEdCorrectionSpreadsheet();
+  if (!ss) return;
+
+  var sheet = getEdCorrectionSheet('BACKUP');
+  if (!sheet) {
+    sheet = ss.insertSheet(EDC_SHEETS.BACKUP);
+  }
+
+  var headers = [
+    [
+      'TIMESTAMP', 'SKU', 'NAMA PRODUK', 'LOKASI RAK (SLOC)', 'SLOC ACTUAL', 
+      'SLOC MATCH?', 'ED SISTEM (LAMA)', 'ED FISIK / KOREKSI', 'STATUS ED', 
+      'FISIK GOOD', 'FISIK BAD', 'TOTAL FISIK', 'SELISIH', 'PETUGAS', 'SHIFT', 
+      'BUKTI FOTO (DRIVE)', 'REMARKS', 'WAKTU BACKUP', 'BATCH ID'
+    ]
+  ];
+
+  sheet.getRange(1, 1, 1, 19).setValues(headers);
+  sheet.getRange(1, 1, 1, 19)
+    .setBackground('#1E1B4B') // Indigo Navy
+    .setFontColor('#FBBF24') // Amber Gold text
+    .setFontWeight('bold')
+    .setFontSize(10)
+    .setHorizontalAlignment('center')
+    .setVerticalAlignment('middle');
+
+  sheet.setRowHeight(1, 35);
+  sheet.setFrozenRows(1);
+  sheet.setFrozenColumns(2);
+  try {
+    sheet.autoResizeColumns(1, 19);
+  } catch(e) {}
+
+  alertEdc('✅ Sheet "' + sheet.getName() + '" berhasil disetup dan siap menyimpan arsip data!');
+}
+
+/**
+ * Fungsi inti pemindahan data dari Hasil ED Correction ke Backup ED Corection
+ */
+function backupHasilEdCorrectionToBackupSheet(autoClear) {
+  var ss = getEdCorrectionSpreadsheet();
+  var hasilSheet = getEdCorrectionSheet('HASIL');
+
+  if (!hasilSheet || hasilSheet.getLastRow() <= 1) {
+    return {
+      success: false,
+      message: 'ℹ️ Sheet "Hasil ED Correction" masih kosong atau belum memiliki data untuk di-backup.'
+    };
+  }
+
+  var backupSheet = getEdCorrectionSheet('BACKUP');
+  var headers = [
+    'TIMESTAMP', 'SKU', 'NAMA PRODUK', 'LOKASI RAK (SLOC)', 'SLOC ACTUAL', 
+    'SLOC MATCH?', 'ED SISTEM (LAMA)', 'ED FISIK / KOREKSI', 'STATUS ED', 
+    'FISIK GOOD', 'FISIK BAD', 'TOTAL FISIK', 'SELISIH', 'PETUGAS', 'SHIFT', 
+    'BUKTI FOTO (DRIVE)', 'REMARKS', 'WAKTU BACKUP', 'BATCH ID'
+  ];
+
+  if (!backupSheet) {
+    backupSheet = ss.insertSheet(EDC_SHEETS.BACKUP);
+    backupSheet.appendRow(headers);
+    backupSheet.getRange(1, 1, 1, headers.length)
+      .setBackground('#1E1B4B')
+      .setFontColor('#FBBF24')
+      .setFontWeight('bold');
+    backupSheet.setFrozenRows(1);
+  } else if (backupSheet.getLastRow() === 0) {
+    backupSheet.appendRow(headers);
+  }
+
+  var hasilData = hasilSheet.getDataRange().getValues();
+  var dataRows = hasilData.slice(1).filter(function(r) {
+    return String(r[0] || r[1] || '').trim() !== '';
+  });
+
+  if (dataRows.length === 0) {
+    return {
+      success: false,
+      message: '⚠️ Tidak ada baris data valid di sheet ' + hasilSheet.getName() + '.'
+    };
+  }
+
+  var existingBackup = backupSheet.getLastRow() > 1 ? backupSheet.getDataRange().getValues() : [];
+  var existingKeys = new Set();
+  for (var i = 1; i < existingBackup.length; i++) {
+    var bTime = String(existingBackup[i][0] || '').trim();
+    var bSku = String(existingBackup[i][1] || '').trim().toLowerCase();
+    if (bSku || bTime) {
+      existingKeys.add(bTime + '___' + bSku);
+    }
+  }
+
+  var now = new Date();
+  var waktuBackup = Utilities.formatDate(now, EDC_CONFIG.TIMEZONE, "dd/MM/yyyy HH:mm:ss");
+  var batchId = 'BATCH-EDC-' + Utilities.formatDate(now, EDC_CONFIG.TIMEZONE, "yyyyMMdd-HHmmss");
+
+  var rowsToAppend = [];
+  var duplicateCount = 0;
+
+  for (var j = 0; j < dataRows.length; j++) {
+    var row = dataRows[j];
+    var time = String(row[0] || '').trim();
+    var sku = String(row[1] || '').trim().toLowerCase();
+    var key = time + '___' + sku;
+
+    if (!existingKeys.has(key)) {
+      var fullRow = row.slice(0, 17);
+      while (fullRow.length < 17) fullRow.push('');
+      fullRow.push(waktuBackup);
+      fullRow.push(batchId);
+      rowsToAppend.push(fullRow);
+      existingKeys.add(key);
+    } else {
+      duplicateCount++;
+    }
+  }
+
+  if (rowsToAppend.length > 0) {
+    var startRow = backupSheet.getLastRow() + 1;
+    backupSheet.getRange(startRow, 1, rowsToAppend.length, headers.length).setValues(rowsToAppend);
+  }
+
+  var msg = '📦 Berhasil mem-backup ' + rowsToAppend.length + ' baris ke sheet "' + backupSheet.getName() + '"!\n(Batch: ' + batchId + ')';
+  if (duplicateCount > 0) {
+    msg += '\n(' + duplicateCount + ' baris sudah ada sebelumnya di arsip dan dilewati).';
+  }
+
+  if (autoClear) {
+    // 1. Kosongkan Hasil ED Correction
+    var lastH = hasilSheet.getLastRow();
+    if (lastH > 1) {
+      hasilSheet.deleteRows(2, lastH - 1);
+    }
+    msg += '\n\n✅ Sheet "Hasil ED Correction" telah dikosongkan.';
+
+    // 2. Kosongkan Main List & pasang kembali rumus
+    var mainSheet = getEdCorrectionSheet('MAIN_LIST');
+    if (mainSheet) {
+      var lastM = mainSheet.getLastRow();
+      if (lastM > 1) {
+        mainSheet.getRange(2, 1, lastM - 1, Math.max(mainSheet.getLastColumn(), 16)).clearContent();
+      }
+      installEdCorrectionMainlistFormulas(true);
+      msg += '\n✅ Sheet "Main List" telah di-reset dan siap untuk penugasan shift berikutnya.';
+    }
+  }
+
+  return {
+    success: true,
+    message: msg
+  };
+}
+
+/**
+ * Auto-backup harian malam hari (23:30 WIB)
+ */
+function ensureDailyBackupTriggerEdCorrection() {
+  var triggers = ScriptApp.getProjectTriggers();
+  for (var i = 0; i < triggers.length; i++) {
+    if (triggers[i].getHandlerFunction() === 'dailyAutoBackupTaskEdCorrection') {
+      return; // Trigger sudah aktif
+    }
+  }
+  ScriptApp.newTrigger('dailyAutoBackupTaskEdCorrection')
+    .timeBased()
+    .atHour(23)
+    .everyDays(1)
+    .inTimezone(EDC_CONFIG.TIMEZONE)
+    .create();
+  console.log('Background Daily Backup Trigger ED Correction (23:00 WIB) aktif.');
+}
+
+function dailyAutoBackupTaskEdCorrection() {
+  try {
+    backupHasilEdCorrectionToBackupSheet(false);
+  } catch(err) {
+    console.error('Error saat auto-backup harian ED Correction:', err);
   }
 }
 
