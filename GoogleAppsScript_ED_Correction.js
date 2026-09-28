@@ -998,7 +998,7 @@ function installEdCorrectionMainlistFormulas(isSilent) {
       'IFERROR(TEXT(XLOOKUP(TRIM(sku) & ";*", \'' + updateName + '\'!D:D, \'' + updateName + '\'!G:G, "", 2), "yyyy-mm-dd"), ' +
       'IFERROR(TEXT(XLOOKUP(TRIM(sku), \'' + updateName + '\'!D:D, \'' + updateName + '\'!G:G, "", 0), "yyyy-mm-dd"), ' +
       'IFERROR(XLOOKUP(TRIM(sku) & ";*", \'' + updateName + '\'!D:D, \'' + updateName + '\'!G:G, "", 2), ' +
-      'IFERROR(XLOOKUP(TRIM(sku), \'' + updateName + '\'!D:D, \'' + updateName + '\'!G:G, "", 0), "-"))))))))'
+      'IFERROR(XLOOKUP(TRIM(sku), \'' + updateName + '\'!D:D, \'' + updateName + '\'!G:G, "", 0), "-")))))))'
   );
 
   // 2. HASIL AUDIT & KOREKSI DARI SHEET HASIL (Kolom H - P)
