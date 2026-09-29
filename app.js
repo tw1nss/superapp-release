@@ -3037,7 +3037,7 @@
   const DCC_REPORT_URL = DCC_BASE_SHEET_URL + '&sheet=Report';
   const DCC_WEBAPP_URL = 'https://script.google.com/macros/s/AKfycbzRhVQZEv3TJwTfUhKKV0QtzexKvMS8mfz-iE72LiVRLKulE4_IlU4IW10rII8k7ICpLQ/exec';
 
-  const DCC_MAIN_CACHE_KEY = 'DCC_MAIN_CACHE_MTG_V9';
+  const DCC_MAIN_CACHE_KEY = 'DCC_MAIN_CACHE_MTG_V10';
   const DCC_REPORT_CACHE_KEY = 'DCC_REPORT_CACHE_MTG_V9';
   const DCC_SUBMITTED_CACHE_KEY = 'DCC_SUBMITTED_CACHE_MTG_V9';
   const DCC_PETUGAS2_KEY = 'DCC_PETUGAS2_NAME_V1';
@@ -4279,18 +4279,60 @@
         const mainRows = parseCSV(textMain);
         if (mainRows && mainRows.length > 1) {
           const headers = mainRows[0].map(h => (h || '').toLowerCase().trim());
-          const shiftIdx = headers.findIndex(h => h === 'shift');
-          let skuIdx = headers.findIndex(h => (h === 'sku' || h === 'sku no' || h === 'sku number') && !h.includes('/'));
+          const sampleRows = mainRows.slice(1, Math.min(mainRows.length, 12));
+
+          // 1. Shift Column: Detect by header OR sample row values containing shift/pagi/siang
+          let shiftIdx = headers.findIndex(h => h === 'shift' || h === 'shift_name' || (h.startsWith('shift') && !h.includes('date')));
+          if (shiftIdx === -1) {
+            shiftIdx = headers.findIndex((_, colIdx) => sampleRows.some(r => /shift\s*[12]|pagi|siang/i.test((r[colIdx] || '').trim())));
+          }
+
+          // 2. SKU Column: Detect by header OR sample row numeric digits (4-15 chars)
+          let skuIdx = headers.findIndex((h, colIdx) => colIdx !== shiftIdx && (h === 'sku' || h === 'sku no' || h === 'sku number' || h === 'sku_id' || h === 'item_code') && !h.includes('/'));
+          if (skuIdx === -1) {
+            skuIdx = headers.findIndex((_, colIdx) => colIdx !== shiftIdx && sampleRows.filter(r => /^\d{4,15}$/.test((r[colIdx] || '').trim())).length >= Math.ceil(sampleRows.length * 0.7));
+          }
+          if (skuIdx === -1) {
+            skuIdx = headers.findIndex((h, colIdx) => colIdx !== shiftIdx && (h === 'location_name' || h === 'sku'));
+          }
           if (skuIdx === -1) skuIdx = 2;
-          let nameIdx = headers.findIndex(h => h === 'nama produk' || h === 'product name' || h.includes('nama') || h.includes('product'));
-          if (nameIdx === -1) nameIdx = 3;
-          let slocIdx = headers.findIndex(h => h.includes('lokasi') || h.includes('rack') || (h.includes('sloc') && !h.includes('/')));
+
+          // 3. SLOC / Rack Column: Detect by rack pattern (e.g. L1-AMF-RF3-T5-2) or header
+          let slocIdx = headers.findIndex((_, colIdx) => colIdx !== shiftIdx && colIdx !== skuIdx && sampleRows.some(r => /^[A-Z0-9]{1,4}-[A-Z0-9\-]+$/i.test((r[colIdx] || '').trim())));
+          if (slocIdx === -1) {
+            slocIdx = headers.findIndex((h, colIdx) => colIdx !== shiftIdx && colIdx !== skuIdx && (h.includes('lokasi') || h.includes('rack') || h.includes('sloc') || h.includes('bin')) && !h.includes('/') && sampleRows.some(r => (r[colIdx] || '').trim().length > 0));
+          }
           if (slocIdx === -1) slocIdx = 4;
-          let stockIdx = headers.findIndex(h => h.includes('qty sistem') || h.includes('stock available') || h.includes('qty') || h.includes('stock'));
+
+          // 4. Product Name Column: Detect text column with descriptive names, avoiding shift, sku, sloc, dates
+          let nameIdx = headers.findIndex((h, colIdx) => colIdx !== shiftIdx && colIdx !== skuIdx && colIdx !== slocIdx && (h === 'nama produk' || h === 'product name' || h === 'nama_produk' || h === 'nama barang' || h === 'item_name' || h === 'deskripsi'));
+          if (nameIdx === -1) {
+            nameIdx = headers.findIndex((h, colIdx) => 
+              colIdx !== shiftIdx && colIdx !== skuIdx && colIdx !== slocIdx &&
+              h !== 'datenow' && !h.includes('date') && !h.includes('status') && !h.includes('qty') &&
+              sampleRows.some(r => {
+                const val = (r[colIdx] || '').trim();
+                return val.length > 3 && /[a-zA-Z]/.test(val) && !/shift\s*[12]|pagi|siang/i.test(val);
+              })
+            );
+          }
+          if (nameIdx === -1) nameIdx = 3;
+
+          // 5. Stock / Qty Column
+          let stockIdx = headers.findIndex((h, colIdx) => colIdx !== shiftIdx && colIdx !== skuIdx && colIdx !== slocIdx && colIdx !== nameIdx && (h.includes('qty') || h.includes('stock') || h === 'system_qty' || h === 'qty_system'));
           if (stockIdx === -1) stockIdx = 5;
-          const typeIdx = headers.findIndex(h => h === 'type' || h.includes('type'));
-          const petugasIdx = headers.findIndex(h => h.includes('petugas') || h.includes('pic') || h.includes('assign'));
-          const statusIdx = headers.findIndex(h => h === 'status');
+
+          // 6. Type Column
+          const typeIdx = headers.findIndex((h, colIdx) => colIdx !== shiftIdx && colIdx !== skuIdx && colIdx !== slocIdx && colIdx !== nameIdx && colIdx !== stockIdx && (h === 'type' || h.includes('type') || h === 'expiry_date' || h === 'fresh'));
+
+          // 7. Petugas / PIC Column
+          const petugasIdx = headers.findIndex((h, colIdx) => colIdx !== shiftIdx && colIdx !== skuIdx && colIdx !== slocIdx && colIdx !== nameIdx && (h.includes('petugas') || h.includes('pic') || h.includes('assign')));
+
+          // 8. Status Column
+          let statusIdx = headers.findIndex((_, colIdx) => sampleRows.some(r => /^(?:PENDING|DONE|CANCEL|SELESAI)$/i.test((r[colIdx] || '').trim())));
+          if (statusIdx === -1) {
+            statusIdx = headers.findIndex((h, colIdx) => colIdx !== shiftIdx && colIdx !== skuIdx && (h === 'status' || h.endsWith('_status') || h === 'status_notes_name'));
+          }
 
           dccTask1List = [];
           dccTask2List = [];
@@ -4312,7 +4354,9 @@
             const statusVal = statusIdx !== -1 ? (row[statusIdx] || '').toUpperCase().trim() : '';
             const petugasVal = petugasIdx !== -1 ? (row[petugasIdx] || '').trim() : '';
 
-            const isPagi = shiftStr.includes('1') || shiftStr.includes('pagi') || (!shiftStr && isItemTask1({ assign: petugasVal }));
+            const isPagi = shiftStr.includes('2') || shiftStr.includes('siang')
+              ? false
+              : (shiftStr.includes('1') || shiftStr.includes('pagi') || (!shiftStr && isItemTask1({ assign: petugasVal })));
             const assign = petugasVal || (isPagi ? 'Bintang' : p2);
 
             const item = {
