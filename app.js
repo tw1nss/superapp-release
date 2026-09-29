@@ -262,6 +262,75 @@
     return { map, msltcArray };
   }
 
+  // ── MSLTC Lookup & Shelf-Life Calculator Engine (Centralized) ──
+  function getMsltcInfo(sku, productName = '') {
+    if (!msltcMap || (!sku && !productName)) return null;
+
+    let cleanSku = String(sku || '').trim();
+    if (cleanSku.includes('|')) cleanSku = cleanSku.split('|')[0].trim();
+    if (cleanSku.includes(';')) cleanSku = cleanSku.split(';')[0].trim();
+
+    // 1. Direct match by SKU
+    if (cleanSku && msltcMap.has(cleanSku)) {
+      const found = msltcMap.get(cleanSku);
+      if (found && found.length > 0) return found[0];
+    }
+    // 2. Without leading zeros
+    const noZero = cleanSku ? cleanSku.replace(/^0+/, '') : '';
+    if (noZero && msltcMap.has(noZero)) {
+      const found = msltcMap.get(noZero);
+      if (found && found.length > 0) return found[0];
+    }
+    // 3. Search all entries by SKU / Product ID
+    if (cleanSku) {
+      for (const [key, items] of msltcMap.entries()) {
+        if (key.toLowerCase() === cleanSku.toLowerCase() || (noZero && key.toLowerCase() === noZero.toLowerCase())) {
+          if (items && items.length > 0) return items[0];
+        }
+      }
+    }
+    // 4. Fallback search by Product Name if SKU not found
+    if (productName) {
+      const cleanName = productName.toLowerCase().replace(/[^a-z0-9]/g, ' ').replace(/\s+/g, ' ').trim();
+      const nameWords = cleanName.split(' ').filter(w => w.length > 0);
+      let bestMatch = null;
+      let highestScore = 0;
+      for (const [, items] of msltcMap.entries()) {
+        for (const item of items) {
+          if (item && item.productName) {
+            const score = typeof matchProductName === 'function' ? matchProductName(item.productName, cleanName, nameWords) : 0;
+            if (score > highestScore) {
+              highestScore = score;
+              bestMatch = item;
+            }
+          }
+        }
+      }
+      if (bestMatch && highestScore >= 60) {
+        return bestMatch;
+      }
+    }
+    return null;
+  }
+  window.getMsltcInfo = getMsltcInfo;
+
+  function enrichDataMapWithMsltc() {
+    if (!dataMap || !msltcMap) return;
+    for (const [skuKey, items] of dataMap.entries()) {
+      const mInfo = getMsltcInfo(skuKey, items[0] ? items[0].productName : '');
+      if (mInfo) {
+        items.forEach(it => {
+          if (mInfo.msltcDays !== undefined && mInfo.msltcDays !== null) {
+            it.msltcDays = mInfo.msltcDays;
+          }
+          if (!it.type || it.type === 'Fresh' || it.type === '-') {
+            it.type = mInfo.type || it.type;
+          }
+        });
+      }
+    }
+  }
+
   async function fetchSheetData(isBackground = false) {
     if (!isBackground) {
       setStatus('loading', 'Memuat data terbaru dari Google Sheets...');
@@ -289,6 +358,7 @@
 
       dataMap = masterResult.map;
       msltcMap = msltcResult.map;
+      enrichDataMapWithMsltc();
       totalRecords = masterResult.count;
       dataLoaded = true;
       dataTimestamp = new Date();
@@ -351,6 +421,8 @@
         });
         msltcMap = mmap;
       }
+
+      enrichDataMapWithMsltc();
 
       totalRecords = cache.count || map.size;
       dataLoaded = true;
@@ -508,13 +580,27 @@
 
     // 1. Direct SKU check in Master Data map
     if (dataMap.has(cleaned)) {
-      const items = [...dataMap.get(cleaned)];
+      const items = [...dataMap.get(cleaned)].map(it => {
+        const msInfo = getMsltcInfo(it.sku || cleaned, it.productName);
+        return {
+          ...it,
+          msltcDays: (msInfo && msInfo.msltcDays !== undefined && msInfo.msltcDays !== null) ? msInfo.msltcDays : (it.msltcDays || 0),
+          type: (msInfo && msInfo.type) ? msInfo.type : (it.type || 'Fresh')
+        };
+      });
       items.sort((a, b) => compareSlocNatural(a.sloc || a.masterSloc, b.sloc || b.masterSloc));
       return items;
     }
     for (const [key, value] of dataMap) {
       if (key.toLowerCase().trim() === cleaned.toLowerCase()) {
-        const items = [...value];
+        const items = [...value].map(it => {
+          const msInfo = getMsltcInfo(it.sku || key, it.productName);
+          return {
+            ...it,
+            msltcDays: (msInfo && msInfo.msltcDays !== undefined && msInfo.msltcDays !== null) ? msInfo.msltcDays : (it.msltcDays || 0),
+            type: (msInfo && msInfo.type) ? msInfo.type : (it.type || 'Fresh')
+          };
+        });
         items.sort((a, b) => compareSlocNatural(a.sloc || a.masterSloc, b.sloc || b.masterSloc));
         return items;
       }
@@ -542,7 +628,8 @@
         productName: m.productName || 'Produk MSLTC',
         masterSloc: m.rackName || '',
         type: m.type || 'Fresh',
-        left: m.productId || ''
+        left: m.productId || '',
+        msltcDays: (m.msltcDays !== undefined && m.msltcDays !== null) ? m.msltcDays : 0
       }));
       mapped.sort((a, b) => compareSlocNatural(a.sloc, b.sloc));
       return mapped;
@@ -559,8 +646,14 @@
           const uniqueId = `${item.sku || key}_${item.sloc || item.masterSloc}`;
           if (!seenMasterKeys.has(uniqueId)) {
             seenMasterKeys.add(uniqueId);
+            const msInfo = getMsltcInfo(item.sku || key, item.productName);
             masterScored.push({
-              item: { ...item, sku: item.sku || key },
+              item: {
+                ...item,
+                sku: item.sku || key,
+                msltcDays: (msInfo && msInfo.msltcDays !== undefined && msInfo.msltcDays !== null) ? msInfo.msltcDays : (item.msltcDays || 0),
+                type: (msInfo && msInfo.type) ? msInfo.type : (item.type || 'Fresh')
+              },
               score: score
             });
           }
@@ -591,7 +684,8 @@
                 productName: item.productName || 'Produk MSLTC',
                 masterSloc: item.rackName || '',
                 type: item.type || 'Fresh',
-                left: item.productId || ''
+                left: item.productId || '',
+                msltcDays: (item.msltcDays !== undefined && item.msltcDays !== null) ? item.msltcDays : 0
               },
               score: score
             });
@@ -797,7 +891,14 @@
 
     let results = null;
     if (dataMap.has(sku)) {
-      results = [...dataMap.get(sku)];
+      results = [...dataMap.get(sku)].map(it => {
+        const msInfo = getMsltcInfo(it.sku || sku, it.productName);
+        return {
+          ...it,
+          msltcDays: (msInfo && msInfo.msltcDays !== undefined && msInfo.msltcDays !== null) ? msInfo.msltcDays : (it.msltcDays || 0),
+          type: (msInfo && msInfo.type) ? msInfo.type : (it.type || 'Fresh')
+        };
+      });
     } else if (msltcMap.has(sku)) {
       const msltcFound = msltcMap.get(sku);
       results = msltcFound.map(m => ({
@@ -806,7 +907,8 @@
         productName: m.productName || 'Produk MSLTC',
         masterSloc: m.rackName || '',
         type: m.type || 'Fresh',
-        left: m.productId || ''
+        left: m.productId || '',
+        msltcDays: (m.msltcDays !== undefined && m.msltcDays !== null) ? m.msltcDays : 0
       }));
     } else {
       results = searchSKU(sku);
@@ -1118,9 +1220,15 @@
           rack = candidate;
         }
       }
-      const typeBadge = item.type ? `<span class="type-badge ${getTypeBadgeClass(item.type)}">${escapeHtml(item.type)}</span>` : '';
 
-      const msltcDays = item.msltcDays || 30;
+      // Ambil data MSLTC rill dari engine DCC (msltcMap)
+      const msltcInfo = getMsltcInfo(itemSku, item.productName);
+      const msltcDays = (msltcInfo && msltcInfo.msltcDays !== undefined && msltcInfo.msltcDays !== null && Number(msltcInfo.msltcDays) > 0)
+        ? Number(msltcInfo.msltcDays)
+        : (item.msltcDays !== undefined && item.msltcDays !== null && Number(item.msltcDays) > 0 ? Number(item.msltcDays) : 0);
+
+      const effectiveType = (msltcInfo && msltcInfo.type) ? msltcInfo.type : (item.type || 'Fresh');
+      const typeBadge = effectiveType ? `<span class="type-badge ${getTypeBadgeClass(effectiveType)}">${escapeHtml(effectiveType)}</span>` : '';
 
       html += `
         <div class="result-section">
@@ -1160,11 +1268,11 @@
               </div>
               <div class="msltc-detail-item">
                 <span class="msltc-detail-label">Batas MSLTC (Clearance)</span>
-                <span class="msltc-detail-value" style="color: var(--accent-primary);">${msltcDays} Hari</span>
+                <span class="msltc-detail-value" style="color: var(--accent-primary);">${msltcDays > 0 ? msltcDays + ' Hari' : 'Tidak Ada (0 Hari)'}</span>
               </div>
               <div class="msltc-detail-item" style="grid-column: span 2;">
                 <span class="msltc-detail-label">Nama Produk</span>
-                <span class="msltc-detail-value" style="font-family: var(--font-body); font-size: 0.9rem; word-break: break-word;">${escapeHtml(item.productName || '-')}</span>
+                <span class="msltc-detail-value" style="font-family: var(--font-body); font-size: 0.9rem; word-break: break-word;">${escapeHtml(item.productName || (msltcInfo ? msltcInfo.productName : '-'))}</span>
               </div>
               <div class="msltc-detail-item" style="grid-column: span 2;">
                 <span class="msltc-detail-label">Kategori / Type</span>
@@ -1180,10 +1288,15 @@
     resultSection.innerHTML = html;
 
     results.forEach((item, idx) => {
-      const msltcDays = item.msltcDays || 30;
+      const itemSku = item.sku || searchQuery;
+      const msltcInfo = getMsltcInfo(itemSku, item.productName);
+      const msltcDays = (msltcInfo && msltcInfo.msltcDays !== undefined && msltcInfo.msltcDays !== null && Number(msltcInfo.msltcDays) > 0)
+        ? Number(msltcInfo.msltcDays)
+        : (item.msltcDays !== undefined && item.msltcDays !== null && Number(item.msltcDays) > 0 ? Number(item.msltcDays) : 0);
+
       const expInput = document.getElementById(`expInput_${idx}`);
       let selectedExpDate = new Date();
-      selectedExpDate.setDate(selectedExpDate.getDate() + msltcDays + 15);
+      selectedExpDate.setDate(selectedExpDate.getDate() + (msltcDays > 0 ? msltcDays + 3 : 7));
 
       if (scannedDateStr && /^\d{8}$/.test(scannedDateStr)) {
         const day = parseInt(scannedDateStr.substring(0, 2), 10);
@@ -1218,31 +1331,50 @@
         now.setHours(0, 0, 0, 0);
         expDate.setHours(0, 0, 0, 0);
 
-        // Batas Tanggal Penarikan = Expired Date minus MSLTC Days
-        const clearanceDate = new Date(expDate);
-        clearanceDate.setDate(clearanceDate.getDate() - msltcDays);
-
-        // Sisa Hari Menuju Penarikan = Clearance Date minus Today
-        const diffTime = clearanceDate.getTime() - now.getTime();
-        const daysLeftToClearance = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
-        const clearanceDateStr = formatDateId(clearanceDate);
+        const diffMs = expDate.getTime() - now.getTime();
+        const remainingDays = Math.round(diffMs / (1000 * 60 * 60 * 24));
         const expDateStr = formatDateId(expDate);
 
-        if (daysLeftToClearance <= 0) {
-          // MUST BE PULLED NOW (PENARIKAN BARANG)
+        if (remainingDays <= 0) {
+          // EXPIRED / REJECT
           alertBox.className = 'msltc-alert-box alert-danger';
-          alertBadge.textContent = '🚨 OUT OF SHELF - PENARIKAN BARANG';
+          alertBadge.textContent = '⛔ BARANG EXPIRED / REJECT';
+          const daysOver = Math.abs(remainingDays);
+          alertMain.textContent = `SUDAH EXPIRED! (${daysOver === 0 ? 'Hari Ini Kedaluwarsa' : 'Lewat ' + daysOver + ' Hari'})`;
+          alertSub.textContent = `Produk telah melewati tanggal expired (${expDateStr}). Dilarang dipajang/dijual!`;
+          return;
+        }
 
-          const daysOver = Math.abs(daysLeftToClearance);
-          alertMain.textContent = `HARUS DITARIK SEKARANG! (${daysOver === 0 ? 'Hari Ini Batas Terakhir' : 'Lewat ' + daysOver + ' Hari'})`;
-          alertSub.textContent = `Produk telah memasuki batas MSLTC (${msltcDays} hari sebelum expired). Batas penarikan: ${clearanceDateStr} (Expired: ${expDateStr}).`;
+        if (msltcDays > 0) {
+          // Batas Tanggal Penarikan = Expired Date minus MSLTC Days
+          const clearanceDate = new Date(expDate);
+          clearanceDate.setDate(clearanceDate.getDate() - msltcDays);
+
+          // Sisa Hari Menuju Penarikan = Clearance Date minus Today
+          const diffTime = clearanceDate.getTime() - now.getTime();
+          const daysLeftToClearance = Math.round(diffTime / (1000 * 60 * 60 * 24));
+          const clearanceDateStr = formatDateId(clearanceDate);
+
+          if (daysLeftToClearance <= 0) {
+            // OUT OF SHELF - PENARIKAN BARANG
+            alertBox.className = 'msltc-alert-box alert-danger';
+            alertBadge.textContent = '🚨 OUT OF SHELF - PENARIKAN BARANG';
+            const daysOver = Math.abs(daysLeftToClearance);
+            alertMain.textContent = `HARUS DITARIK SEKARANG! (${daysOver === 0 ? 'Hari Ini Batas Terakhir' : 'Lewat ' + daysOver + ' Hari'})`;
+            alertSub.textContent = `Sisa ED: ${remainingDays} Hari | Standar MSLTC: ${msltcDays} Hari. Produk telah memasuki batas penarikan sejak ${clearanceDateStr} (Expired: ${expDateStr}).`;
+          } else {
+            // CLEARANCE AMAN (Memenuhi Standar)
+            alertBox.className = 'msltc-alert-box alert-safe';
+            alertBadge.textContent = '✅ CLEARANCE AMAN (Memenuhi Standar)';
+            alertMain.textContent = `${daysLeftToClearance} Hari Lagi Harus Ditarik (+${daysLeftToClearance} Hari Aman)`;
+            alertSub.textContent = `Sisa ED: ${remainingDays} Hari | Standar MSLTC: ${msltcDays} Hari (+${daysLeftToClearance} hari aman). Batas penarikan: ${clearanceDateStr} (Expired: ${expDateStr}).`;
+          }
         } else {
-          // SAFE / COUNTDOWN
+          // Produk tanpa standar MSLTC khusus di sheet MSLTC
           alertBox.className = 'msltc-alert-box alert-safe';
-          alertBadge.textContent = '✅ PRODUK AMAN DI RAK';
-          alertMain.textContent = `${daysLeftToClearance} Hari Lagi Harus Ditarik`;
-          alertSub.textContent = `Produk masuk batas penarikan MSLTC pada ${clearanceDateStr} (${msltcDays} hari sebelum expired: ${expDateStr}).`;
+          alertBadge.textContent = '✅ CLEARANCE AMAN';
+          alertMain.textContent = `Sisa ${remainingDays} Hari Menuju Expired`;
+          alertSub.textContent = `Produk belum memiliki standar batas MSLTC di sistem. Expired: ${expDateStr}.`;
         }
       }
 
@@ -4671,30 +4803,7 @@
     calculateDccMsltcStatus();
   }
 
-  // ── MSLTC Lookup & Shelf-Life Calculator Engine ──
-  function getMsltcInfo(sku) {
-    if (!sku || !msltcMap) return null;
-    let cleanSku = String(sku).trim();
-    if (cleanSku.includes('|')) cleanSku = cleanSku.split('|')[0].trim();
-    if (cleanSku.includes(';')) cleanSku = cleanSku.split(';')[0].trim();
-
-    // 1. Direct match
-    if (msltcMap.has(cleanSku)) {
-      return msltcMap.get(cleanSku)[0];
-    }
-    // 2. Without leading zeros
-    const noZero = cleanSku.replace(/^0+/, '');
-    if (noZero && msltcMap.has(noZero)) {
-      return msltcMap.get(noZero)[0];
-    }
-    // 3. Search all entries
-    for (const [key, items] of msltcMap.entries()) {
-      if (key.toLowerCase() === cleanSku.toLowerCase() || (noZero && key.toLowerCase() === noZero.toLowerCase())) {
-        return items[0];
-      }
-    }
-    return null;
-  }
+  // Note: getMsltcInfo is centralized at top of script with SKU + product name matching
 
   function calculateDccMsltcStatus() {
     const skuInput = document.getElementById('dccSkuInput');
