@@ -1336,18 +1336,18 @@
             alertBadge.textContent = '🚨 OUT OF SHELF - PENARIKAN BARANG';
             const daysOver = Math.abs(daysLeftToClearance);
             alertMain.textContent = `HARUS DITARIK SEKARANG! (${daysOver === 0 ? 'Hari Ini Batas Terakhir' : 'Lewat ' + daysOver + ' Hari'})`;
-            alertSub.textContent = `Sisa ED: ${remainingDays} Hari | Standar MSLTC: ${msltcDays} Hari. Produk telah memasuki batas penarikan sejak ${clearanceDateStr} (Expired: ${expDateStr}).`;
+            alertSub.textContent = `Produk telah memasuki batas penarikan MSLTC (${msltcDays} hari sebelum expired). Batas penarikan: ${clearanceDateStr} (Expired: ${expDateStr}).`;
           } else {
-            // CLEARANCE AMAN (Memenuhi Standar)
+            // PRODUK AMAN DI RAK (CLEARANCE OK)
             alertBox.className = 'msltc-alert-box alert-safe';
-            alertBadge.textContent = '✅ CLEARANCE AMAN (Memenuhi Standar)';
-            alertMain.textContent = `${daysLeftToClearance} Hari Lagi Harus Ditarik (+${daysLeftToClearance} Hari Aman)`;
-            alertSub.textContent = `Sisa ED: ${remainingDays} Hari | Standar MSLTC: ${msltcDays} Hari (+${daysLeftToClearance} hari aman). Batas penarikan: ${clearanceDateStr} (Expired: ${expDateStr}).`;
+            alertBadge.textContent = '✅ PRODUK AMAN DI RAK';
+            alertMain.textContent = `${daysLeftToClearance} Hari Lagi Harus Ditarik`;
+            alertSub.textContent = `Produk aman di rak sampai ${clearanceDateStr} (Standar MSLTC: ${msltcDays} hari sebelum expired: ${expDateStr}). Sisa masa ED: ${remainingDays} Hari.`;
           }
         } else {
           // Produk tanpa standar MSLTC khusus di sheet MSLTC
           alertBox.className = 'msltc-alert-box alert-safe';
-          alertBadge.textContent = '✅ CLEARANCE AMAN';
+          alertBadge.textContent = '✅ PRODUK AMAN DI RAK';
           alertMain.textContent = `Sisa ${remainingDays} Hari Menuju Expired`;
           alertSub.textContent = `Produk belum memiliki standar batas MSLTC di sistem. Expired: ${expDateStr}.`;
         }
