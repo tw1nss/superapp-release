@@ -3037,7 +3037,7 @@
   const DCC_REPORT_URL = DCC_BASE_SHEET_URL + '&sheet=Report';
   const DCC_WEBAPP_URL = 'https://script.google.com/macros/s/AKfycbzRhVQZEv3TJwTfUhKKV0QtzexKvMS8mfz-iE72LiVRLKulE4_IlU4IW10rII8k7ICpLQ/exec';
 
-  const DCC_MAIN_CACHE_KEY = 'DCC_MAIN_CACHE_MTG_V10';
+  const DCC_MAIN_CACHE_KEY = 'DCC_MAIN_CACHE_MTG_V11';
   const DCC_REPORT_CACHE_KEY = 'DCC_REPORT_CACHE_MTG_V9';
   const DCC_SUBMITTED_CACHE_KEY = 'DCC_SUBMITTED_CACHE_MTG_V9';
   const DCC_PETUGAS2_KEY = 'DCC_PETUGAS2_NAME_V1';
@@ -3378,7 +3378,6 @@
 
       if (clean1) skuSet.add(clean1);
       if (clean17) skuSet.add(clean17);
-      if (name) skuSet.add(name);
 
       cleanRows.push(row);
     }
@@ -3633,8 +3632,7 @@
     let count = 0;
     for (const item of list) {
       const skuClean = (item.sku || '').trim().toLowerCase();
-      const nameClean = (item.productName || '').trim().toLowerCase();
-      if (dccSubmittedSkuSet.has(skuClean) || (nameClean && dccSubmittedSkuSet.has(nameClean))) {
+      if (dccSubmittedSkuSet.has(skuClean)) {
         count++;
       }
     }
@@ -4107,8 +4105,7 @@
     let submittedCount = 0;
     activeShiftList.forEach(item => {
       const skuClean = (item.sku || '').trim().toLowerCase();
-      const nameClean = (item.productName || '').trim().toLowerCase();
-      if (activeSubmittedSet.has(skuClean) || (nameClean && activeSubmittedSet.has(nameClean)) || dccSubmittedSkuSet.has(skuClean)) {
+      if (activeSubmittedSet.has(skuClean) || dccSubmittedSkuSet.has(skuClean)) {
         submittedCount++;
       }
     });
@@ -4141,8 +4138,7 @@
       const stockVal = item.stock !== undefined && item.stock !== '' ? item.stock : '0';
       const slocVal = item.slocExisting || 'Belum ada SLOC';
       const skuClean = (item.sku || '').trim().toLowerCase();
-      const nameClean = (item.productName || '').trim().toLowerCase();
-      const isSubmitted = activeSubmittedSet.has(skuClean) || (nameClean && activeSubmittedSet.has(nameClean)) || dccSubmittedSkuSet.has(skuClean);
+      const isSubmitted = activeSubmittedSet.has(skuClean) || dccSubmittedSkuSet.has(skuClean);
 
       const statusBadge = isSubmitted
         ? `<span class="dcc-card-status-badge submitted">✅ Sudah Diinput</span>`
@@ -4375,18 +4371,15 @@
               dccTask1List.push(item);
               if (statusVal === 'DONE') {
                 dccSubmittedTask1Set.add(cleanSku.toLowerCase());
-                if (name) dccSubmittedTask1Set.add(name.toLowerCase());
               }
             } else {
               dccTask2List.push(item);
               if (statusVal === 'DONE') {
                 dccSubmittedTask2Set.add(cleanSku.toLowerCase());
-                if (name) dccSubmittedTask2Set.add(name.toLowerCase());
               }
             }
             if (statusVal === 'DONE') {
               dccSubmittedSkuSet.add(cleanSku.toLowerCase());
-              if (name) dccSubmittedSkuSet.add(name.toLowerCase());
             }
           }
 
@@ -4409,7 +4402,6 @@
           [...dccTask1List, ...dccTask2List].forEach(it => {
             if (it.status === 'PENDING') {
               if (it.sku) pendingSkuMap.add(it.sku.toLowerCase());
-              if (it.productName) pendingSkuMap.add(it.productName.toLowerCase());
             }
           });
         }
@@ -4417,10 +4409,9 @@
         for (const row of parsedHasilDcc.rows) {
           const sku1 = (row[1] || '').trim().toLowerCase();
           const sku17 = (row[17] || '').trim().toLowerCase();
-          const name = (row[2] || '').trim().toLowerCase();
           const inputBy = (row[18] || '').trim().toLowerCase();
 
-          const isExplicitPending = pendingSkuMap.has(sku1) || (sku17 && pendingSkuMap.has(sku17)) || (name && pendingSkuMap.has(name));
+          const isExplicitPending = pendingSkuMap.has(sku1) || (sku17 && pendingSkuMap.has(sku17));
 
           const isTask1Item = inputBy.includes('bintang') || (sku1 && dccTask1List.some(it => it.sku.toLowerCase() === sku1));
           if (isTask1Item) {
@@ -4428,20 +4419,17 @@
             if (!isExplicitPending) {
               if (sku1) dccSubmittedTask1Set.add(sku1);
               if (sku17) dccSubmittedTask1Set.add(sku17);
-              if (name) dccSubmittedTask1Set.add(name);
             }
           } else {
             dccHasil2Rows.push(row);
             if (!isExplicitPending) {
               if (sku1) dccSubmittedTask2Set.add(sku1);
               if (sku17) dccSubmittedTask2Set.add(sku17);
-              if (name) dccSubmittedTask2Set.add(name);
             }
           }
           if (!isExplicitPending) {
             if (sku1) dccSubmittedSkuSet.add(sku1);
             if (sku17) dccSubmittedSkuSet.add(sku17);
-            if (name) dccSubmittedSkuSet.add(name);
           }
         }
       }
@@ -4494,8 +4482,7 @@
     let countSubmitted = 0;
     baseList.forEach(item => {
       const skuClean = (item.sku || '').trim().toLowerCase();
-      const nameClean = (item.productName || '').trim().toLowerCase();
-      if (activeSubmittedSet.has(skuClean) || (nameClean && activeSubmittedSet.has(nameClean)) || dccSubmittedSkuSet.has(skuClean)) {
+      if (activeSubmittedSet.has(skuClean) || dccSubmittedSkuSet.has(skuClean)) {
         countSubmitted++;
       }
     });
@@ -4522,14 +4509,12 @@
     if (currentDccStatusFilter === 'submitted') {
       filtered = filtered.filter(item => {
         const skuClean = (item.sku || '').trim().toLowerCase();
-        const nameClean = (item.productName || '').trim().toLowerCase();
-        return activeSubmittedSet.has(skuClean) || (nameClean && activeSubmittedSet.has(nameClean)) || dccSubmittedSkuSet.has(skuClean);
+        return activeSubmittedSet.has(skuClean) || dccSubmittedSkuSet.has(skuClean);
       });
     } else if (currentDccStatusFilter === 'pending') {
       filtered = filtered.filter(item => {
         const skuClean = (item.sku || '').trim().toLowerCase();
-        const nameClean = (item.productName || '').trim().toLowerCase();
-        const isDone = activeSubmittedSet.has(skuClean) || (nameClean && activeSubmittedSet.has(nameClean)) || dccSubmittedSkuSet.has(skuClean);
+        const isDone = activeSubmittedSet.has(skuClean) || dccSubmittedSkuSet.has(skuClean);
         return !isDone;
       });
     }
@@ -5328,15 +5313,12 @@
 
       if (selectedDccShift === 'pagi') {
         dccSubmittedTask1Set.add(skuLower);
-        if (namaSku) dccSubmittedTask1Set.add(namaSku.toLowerCase());
         dccHasil1Rows.push([timestamp, skuNo, namaSku, slocExisting, slocActual, expiredDate, fisikGood, fisikBad, sales, safeReasonSloc, reasonBad, finalEvidance, '', '', '', '', '', skuNo, inputByVal, labelProduct, labelSloc]);
       } else {
         dccSubmittedTask2Set.add(skuLower);
-        if (namaSku) dccSubmittedTask2Set.add(namaSku.toLowerCase());
         dccHasil2Rows.push([timestamp, skuNo, namaSku, slocExisting, slocActual, expiredDate, fisikGood, fisikBad, sales, safeReasonSloc, reasonBad, finalEvidance, '', '', '', '', '', skuNo, inputByVal, labelProduct, labelSloc]);
       }
       dccSubmittedSkuSet.add(skuLower);
-      if (namaSku) dccSubmittedSkuSet.add(namaSku.toLowerCase());
 
       try {
         localStorage.setItem(DCC_SUBMITTED_CACHE_KEY, JSON.stringify(Array.from(dccSubmittedSkuSet)));
