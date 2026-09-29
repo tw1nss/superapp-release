@@ -262,7 +262,7 @@
     return { map, msltcArray };
   }
 
-  // ── MSLTC Lookup & Shelf-Life Calculator Engine (Centralized) ──
+  // ── MSLTC Lookup & Shelf-Life Calculator Engine (Centralized & Fast O(1)) ──
   function getMsltcInfo(sku, productName = '') {
     if (!msltcMap || (!sku && !productName)) return null;
 
@@ -281,7 +281,7 @@
       const found = msltcMap.get(noZero);
       if (found && found.length > 0) return found[0];
     }
-    // 3. Search all entries by SKU / Product ID
+    // 3. Search entries by SKU / Product ID
     if (cleanSku) {
       for (const [key, items] of msltcMap.entries()) {
         if (key.toLowerCase() === cleanSku.toLowerCase() || (noZero && key.toLowerCase() === noZero.toLowerCase())) {
@@ -289,47 +289,25 @@
         }
       }
     }
-    // 4. Fallback search by Product Name if SKU not found
+    // 4. Fast Substring Product Name Match (Lightweight & Safe)
     if (productName) {
-      const cleanName = productName.toLowerCase().replace(/[^a-z0-9]/g, ' ').replace(/\s+/g, ' ').trim();
-      const nameWords = cleanName.split(' ').filter(w => w.length > 0);
-      let bestMatch = null;
-      let highestScore = 0;
-      for (const [, items] of msltcMap.entries()) {
-        for (const item of items) {
-          if (item && item.productName) {
-            const score = typeof matchProductName === 'function' ? matchProductName(item.productName, cleanName, nameWords) : 0;
-            if (score > highestScore) {
-              highestScore = score;
-              bestMatch = item;
+      const cleanName = productName.toLowerCase().replace(/[^a-z0-9]/g, '').trim();
+      if (cleanName && cleanName.length >= 3) {
+        for (const [, items] of msltcMap.entries()) {
+          for (const item of items) {
+            if (item && item.productName) {
+              const itemClean = item.productName.toLowerCase().replace(/[^a-z0-9]/g, '').trim();
+              if (itemClean === cleanName || itemClean.includes(cleanName) || cleanName.includes(itemClean)) {
+                return item;
+              }
             }
           }
         }
-      }
-      if (bestMatch && highestScore >= 60) {
-        return bestMatch;
       }
     }
     return null;
   }
   window.getMsltcInfo = getMsltcInfo;
-
-  function enrichDataMapWithMsltc() {
-    if (!dataMap || !msltcMap) return;
-    for (const [skuKey, items] of dataMap.entries()) {
-      const mInfo = getMsltcInfo(skuKey, items[0] ? items[0].productName : '');
-      if (mInfo) {
-        items.forEach(it => {
-          if (mInfo.msltcDays !== undefined && mInfo.msltcDays !== null) {
-            it.msltcDays = mInfo.msltcDays;
-          }
-          if (!it.type || it.type === 'Fresh' || it.type === '-') {
-            it.type = mInfo.type || it.type;
-          }
-        });
-      }
-    }
-  }
 
   async function fetchSheetData(isBackground = false) {
     if (!isBackground) {
@@ -358,7 +336,6 @@
 
       dataMap = masterResult.map;
       msltcMap = msltcResult.map;
-      enrichDataMapWithMsltc();
       totalRecords = masterResult.count;
       dataLoaded = true;
       dataTimestamp = new Date();
@@ -421,8 +398,6 @@
         });
         msltcMap = mmap;
       }
-
-      enrichDataMapWithMsltc();
 
       totalRecords = cache.count || map.size;
       dataLoaded = true;
@@ -2868,111 +2843,104 @@
       clockInterval = null;
     }
 
+    const hideAllWorkspaces = () => {
+      const workspaces = [
+        'homeMenuSection',
+        'appWorkspace',
+        'dccWorkspace',
+        'slipGajiWorkspace',
+        'mpScheduleWorkspace',
+        'edSweeperWorkspace',
+        'complainWorkspace',
+        'koliInboundWorkspace',
+        'edCorrectionWorkspace'
+      ];
+      workspaces.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.classList.add('hidden');
+      });
+    };
+
     if (menu === 'barcode') {
-      document.getElementById('homeMenuSection').classList.add('hidden');
-      document.getElementById('appWorkspace').classList.remove('hidden');
-      document.getElementById('dccWorkspace').classList.add('hidden');
-      document.getElementById('slipGajiWorkspace').classList.add('hidden');
-      document.getElementById('mpScheduleWorkspace').classList.add('hidden');
-      document.getElementById('backToMenuBtn').classList.remove('hidden');
+      hideAllWorkspaces();
+      const ws = document.getElementById('appWorkspace');
+      if (ws) ws.classList.remove('hidden');
+      const bBtn = document.getElementById('backToMenuBtn');
+      if (bBtn) bBtn.classList.remove('hidden');
     } else if (menu === 'dcc') {
-      openDccLockModal();
+      if (typeof window.openDccLockModal === 'function') {
+        window.openDccLockModal();
+      } else if (typeof openDccLockModal === 'function') {
+        openDccLockModal();
+      }
     } else if (menu === 'ed_sweeper') {
-      document.getElementById('homeMenuSection').classList.add('hidden');
-      document.getElementById('appWorkspace').classList.add('hidden');
-      document.getElementById('dccWorkspace').classList.add('hidden');
+      hideAllWorkspaces();
       const edsWs = document.getElementById('edSweeperWorkspace');
       if (edsWs) {
         edsWs.classList.remove('hidden');
         edsWs.scrollTop = 0;
       }
-      document.getElementById('slipGajiWorkspace').classList.add('hidden');
-      document.getElementById('mpScheduleWorkspace').classList.add('hidden');
-      document.getElementById('backToMenuBtn').classList.remove('hidden');
+      const bBtn = document.getElementById('backToMenuBtn');
+      if (bBtn) bBtn.classList.remove('hidden');
 
       if (typeof switchEdsTab === 'function') switchEdsTab('main');
       if (typeof initEdsFlatpickr === 'function') initEdsFlatpickr();
       if (typeof fetchEdSweeperData === 'function') fetchEdSweeperData(true);
     } else if (menu === 'slip_gaji' || menu === 'hk') {
-      document.getElementById('homeMenuSection').classList.add('hidden');
-      document.getElementById('appWorkspace').classList.add('hidden');
-      document.getElementById('dccWorkspace').classList.add('hidden');
-      const edsWs = document.getElementById('edSweeperWorkspace');
-      if (edsWs) edsWs.classList.add('hidden');
-      document.getElementById('slipGajiWorkspace').classList.remove('hidden');
-      document.getElementById('mpScheduleWorkspace').classList.add('hidden');
-      document.getElementById('backToMenuBtn').classList.remove('hidden');
-      fetchSlipGajiData();
+      hideAllWorkspaces();
+      const sgWs = document.getElementById('slipGajiWorkspace');
+      if (sgWs) sgWs.classList.remove('hidden');
+      const bBtn = document.getElementById('backToMenuBtn');
+      if (bBtn) bBtn.classList.remove('hidden');
+      if (typeof fetchSlipGajiData === 'function') fetchSlipGajiData();
     } else if (menu === 'mp_schedule') {
-      document.getElementById('homeMenuSection').classList.add('hidden');
-      document.getElementById('appWorkspace').classList.add('hidden');
-      document.getElementById('dccWorkspace').classList.add('hidden');
-      const edsWs = document.getElementById('edSweeperWorkspace');
-      if (edsWs) edsWs.classList.add('hidden');
-      document.getElementById('slipGajiWorkspace').classList.add('hidden');
-      document.getElementById('mpScheduleWorkspace').classList.remove('hidden');
-      document.getElementById('backToMenuBtn').classList.remove('hidden');
-      
+      hideAllWorkspaces();
       const mpsWs = document.getElementById('mpScheduleWorkspace');
-      if (mpsWs) mpsWs.scrollTop = 0;
-      window.closeMpScheduleDetail();
-      switchMpsTab('manpower');
-      fetchMpScheduleData();
+      if (mpsWs) {
+        mpsWs.classList.remove('hidden');
+        mpsWs.scrollTop = 0;
+      }
+      const bBtn = document.getElementById('backToMenuBtn');
+      if (bBtn) bBtn.classList.remove('hidden');
+
+      if (typeof window.closeMpScheduleDetail === 'function') window.closeMpScheduleDetail();
+      if (typeof switchMpsTab === 'function') switchMpsTab('manpower');
+      if (typeof fetchMpScheduleData === 'function') fetchMpScheduleData();
     } else if (menu === 'complain') {
-      document.getElementById('homeMenuSection').classList.add('hidden');
-      document.getElementById('appWorkspace').classList.add('hidden');
-      document.getElementById('dccWorkspace').classList.add('hidden');
-      const edsWs2 = document.getElementById('edSweeperWorkspace');
-      if (edsWs2) edsWs2.classList.add('hidden');
-      document.getElementById('slipGajiWorkspace').classList.add('hidden');
-      document.getElementById('mpScheduleWorkspace').classList.add('hidden');
-      document.getElementById('complainWorkspace').classList.remove('hidden');
-      const koliWs1 = document.getElementById('koliInboundWorkspace');
-      if (koliWs1) koliWs1.classList.add('hidden');
-      document.getElementById('backToMenuBtn').classList.remove('hidden');
-      fetchComplainData();
+      hideAllWorkspaces();
+      const cplWs = document.getElementById('complainWorkspace');
+      if (cplWs) cplWs.classList.remove('hidden');
+      const bBtn = document.getElementById('backToMenuBtn');
+      if (bBtn) bBtn.classList.remove('hidden');
+      if (typeof fetchComplainData === 'function') fetchComplainData();
     } else if (menu === 'koli_inbound') {
-      document.getElementById('homeMenuSection').classList.add('hidden');
-      document.getElementById('appWorkspace').classList.add('hidden');
-      document.getElementById('dccWorkspace').classList.add('hidden');
-      const edsWs = document.getElementById('edSweeperWorkspace');
-      if (edsWs) edsWs.classList.add('hidden');
-      const edcWs = document.getElementById('edCorrectionWorkspace');
-      if (edcWs) edcWs.classList.add('hidden');
-      document.getElementById('slipGajiWorkspace').classList.add('hidden');
-      document.getElementById('mpScheduleWorkspace').classList.add('hidden');
-      document.getElementById('complainWorkspace').classList.add('hidden');
+      hideAllWorkspaces();
       const koliWs = document.getElementById('koliInboundWorkspace');
       if (koliWs) {
         koliWs.classList.remove('hidden');
         koliWs.scrollTop = 0;
       }
-      document.getElementById('backToMenuBtn').classList.remove('hidden');
+      const bBtn = document.getElementById('backToMenuBtn');
+      if (bBtn) bBtn.classList.remove('hidden');
       if (typeof window.fetchKoliInboundData === 'function') {
         window.fetchKoliInboundData();
       }
     } else if (menu === 'ed_correction' || menu === 'edc') {
-      document.getElementById('homeMenuSection').classList.add('hidden');
-      document.getElementById('appWorkspace').classList.add('hidden');
-      document.getElementById('dccWorkspace').classList.add('hidden');
-      const edsWs = document.getElementById('edSweeperWorkspace');
-      if (edsWs) edsWs.classList.add('hidden');
+      hideAllWorkspaces();
       const edcWs = document.getElementById('edCorrectionWorkspace');
       if (edcWs) {
         edcWs.classList.remove('hidden');
         edcWs.scrollTop = 0;
       }
-      document.getElementById('slipGajiWorkspace').classList.add('hidden');
-      document.getElementById('mpScheduleWorkspace').classList.add('hidden');
-      document.getElementById('complainWorkspace').classList.add('hidden');
-      const koliWs = document.getElementById('koliInboundWorkspace');
-      if (koliWs) koliWs.classList.add('hidden');
-      document.getElementById('backToMenuBtn').classList.remove('hidden');
+      const bBtn = document.getElementById('backToMenuBtn');
+      if (bBtn) bBtn.classList.remove('hidden');
 
       if (typeof window.switchEdcTab === 'function') window.switchEdcTab('main');
       if (typeof window.initEdcFlatpickr === 'function') window.initEdcFlatpickr();
       if (typeof window.initEdcInputListeners === 'function') window.initEdcInputListeners();
       if (typeof window.fetchEdCorrectionData === 'function') window.fetchEdCorrectionData(true);
+    } else if (menu === 'retur') {
+      alert('Fitur Retur Task sedang disiapkan.');
     } else {
       alert('Fitur ini akan di-develop menyusul.');
     }
