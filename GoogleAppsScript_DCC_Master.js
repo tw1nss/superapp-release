@@ -355,6 +355,21 @@ function doPost(e) {
       }
     }
 
+    // Router jika request adalah auto-complete Perbaiki Rumus ED
+    if (payload.action === 'autoFillEdCorrection' || payload.action === 'perbaikiRumusEd') {
+      if (typeof executeAutoFillEdCorrectionTask === 'function') {
+        var res = executeAutoFillEdCorrectionTask(
+          payload.picName || payload.petugas || payload.pic,
+          payload.maxCount,
+          payload.minSeconds,
+          payload.maxSeconds,
+          payload.rackDelaySeconds,
+          payload.endTimeStr
+        );
+        return ContentService.createTextOutput(JSON.stringify(res)).setMimeType(ContentService.MimeType.JSON);
+      }
+    }
+
     // Router jika request adalah audit ED Correction
     if (payload.action === 'saveEdCorrectionResult' || payload.module === 'ed_correction' || payload.module === 'edc') {
       if (typeof handleEdCorrectionSubmit === 'function') {

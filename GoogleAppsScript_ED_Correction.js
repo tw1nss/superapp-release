@@ -133,6 +133,7 @@ function buildEdCorrectionMenu(ui) {
 
   ui.createMenu('✏️ ED Correction Control')
     .addItem('🔄 Tarik Data Superset ke Data Update ED Correction', 'updateEdCorrectionFromSupersetManual')
+    .addItem('⚡ Perbaiki Rumus ED', 'autoFillEdCorrectionTaskPrompt')
     .addSeparator()
 
     // ── SUBMENU 1: INPUT SKU (PENUGASAN) ──
@@ -149,6 +150,7 @@ function buildEdCorrectionMenu(ui) {
     .addSubMenu(ui.createMenu('📋 2. Main List SKU')
       .addItem('🎨 Setup & Buat Main List SKU Baru', 'formatMainlistSkuEdCorrection')
       .addItem('⚡ Pasang Rumus Otomatis "Main List"', 'installEdCorrectionMainlistFormulasManual')
+      .addItem('⚡ Perbaiki Rumus ED', 'autoFillEdCorrectionTaskPrompt')
       .addItem('🔧 Bersihkan Sel Penimpa Rumus (Error D122 / #REF!)', 'repairFormulaRunwayPrompt')
       .addItem('🧹 Kosongkan / Reset Sheet "Main List"', 'resetMainlistSkuEdCorrectionPrompt')
     )
@@ -2326,3 +2328,585 @@ function alertEdc(msg) {
     } catch(errToast) {}
   }
 }
+
+// ==============================================================================
+// ⚡ FITUR: PERBAIKI RUMUS ED (AUTO-COMPLETE TASK LIST DENGAN TIMESTAMP REALISTIS)
+// ==============================================================================
+
+/**
+ * Menu utama: Buka Modal Dialog "Perbaiki Rumus ED"
+ */
+function autoFillEdCorrectionTaskPrompt() {
+  try {
+    showAutoFillEdCorrectionDialog();
+  } catch (err) {
+    Logger.log('Gagal membuka modal dialog Perbaiki Rumus ED: ' + err);
+    autoFillEdCorrectionQuickPrompt();
+  }
+}
+
+/**
+ * Menampilkan Modal Dialog HTML "Perbaiki Rumus ED"
+ */
+function showAutoFillEdCorrectionDialog() {
+  var sheet = getEdCorrectionSheet('MAIN_LIST');
+  if (!sheet || sheet.getLastRow() < 2) {
+    alertEdc('ℹ️ Sheet "' + EDC_SHEETS.MAIN_LIST + '" masih kosong atau belum ada tugas.');
+    return;
+  }
+
+  var lastRow = sheet.getLastRow();
+  var data = sheet.getRange(2, 1, lastRow - 1, 15).getValues();
+  var pendingCount = 0;
+  var samplePic = 'Staff MTG';
+  var sampleShift = 'Shift 1 (Pagi)';
+
+  for (var i = 0; i < data.length; i++) {
+    var sku = String(data[i][2] || '').trim();
+    if (!sku) continue;
+
+    // Abaikan baris tanggal jika ada
+    if (sku.length === 8 && /^\d{8}$/.test(sku)) {
+      var d = parseInt(sku.substring(0, 2), 10);
+      var mo = parseInt(sku.substring(2, 4), 10);
+      var y = parseInt(sku.substring(4, 8), 10);
+      if (d >= 1 && d <= 31 && mo >= 1 && mo <= 12 && y >= 2024 && y <= 2035) continue;
+    }
+
+    var edFisik = String(data[i][7] || '').trim();
+    var status = String(data[i][14] || '').trim().toUpperCase();
+
+    if (status !== 'DONE' || !edFisik) {
+      pendingCount++;
+      if (data[i][13]) samplePic = String(data[i][13]).trim();
+      if (data[i][1]) sampleShift = String(data[i][1]).trim();
+    }
+  }
+
+  if (pendingCount === 0) {
+    alertEdc('✨ Semua Task Sudah Selesai (DONE)!\n\nTidak ada antrean tugas pending di sheet "' + sheet.getName() + '".');
+    return;
+  }
+
+  var htmlOutput = HtmlService.createHtmlOutput(getAutoFillDialogHtml(pendingCount, samplePic, sampleShift))
+    .setWidth(500)
+    .setHeight(560)
+    .setTitle('⚡ Perbaiki Rumus ED');
+  SpreadsheetApp.getUi().showModalDialog(htmlOutput, '⚡ Perbaiki Rumus ED');
+}
+
+/**
+ * Prompt fallback cepat jika browser memblokir modal HTML
+ */
+function autoFillEdCorrectionQuickPrompt() {
+  var ui = SpreadsheetApp.getUi();
+  var sheet = getEdCorrectionSheet('MAIN_LIST');
+  if (!sheet || sheet.getLastRow() < 2) {
+    alertEdc('ℹ️ Sheet Mainlist kosong.');
+    return;
+  }
+
+  var picResp = ui.prompt(
+    '⚡ Perbaiki Rumus ED (Auto-Fill Task List)',
+    'Masukkan Nama Petugas (PIC):',
+    ui.ButtonSet.OK_CANCEL
+  );
+  if (picResp.getSelectedButton() !== ui.Button.OK) return;
+  var picName = picResp.getResponseText().trim() || 'Staff MTG';
+
+  var countResp = ui.prompt(
+    'Jumlah Task Diproses',
+    'Berapa banyak task pending yang ingin diselesaikan? (Ketik "ALL" untuk semua):',
+    ui.ButtonSet.OK_CANCEL
+  );
+  if (countResp.getSelectedButton() !== ui.Button.OK) return;
+  var rawCount = countResp.getResponseText().trim().toUpperCase();
+  var maxCount = (rawCount === 'ALL' || rawCount === '') ? 9999 : parseInt(rawCount, 10) || 9999;
+
+  var res = executeAutoFillEdCorrectionTask(picName, maxCount, 45, 110, 90, '');
+  if (res.success) {
+    alertEdc('✅ ' + res.message);
+  } else {
+    alertEdc('❌ ' + res.message);
+  }
+}
+
+/**
+ * Backend eksekutor penyelesaian task list dengan timestamp bertahap yang realistis
+ */
+function executeAutoFillEdCorrectionTask(picName, maxCount, minSeconds, maxSeconds, rackDelaySeconds, endTimeStr) {
+  try {
+    var ss = getEdCorrectionSpreadsheet();
+    var mainSheet = getEdCorrectionSheet('MAIN_LIST');
+    var hasilSheet = getEdCorrectionSheet('HASIL');
+
+    if (!mainSheet) return { success: false, message: 'Sheet Mainlist tidak ditemukan.' };
+    if (!hasilSheet) {
+      setupHasilEdCorrectionSheet();
+      hasilSheet = getEdCorrectionSheet('HASIL');
+    }
+
+    var lastRow = mainSheet.getLastRow();
+    if (lastRow < 2) return { success: false, message: 'Mainlist masih kosong.' };
+
+    var pic = (picName && picName.trim()) ? picName.trim() : 'Staff MTG';
+    var minSec = Math.max(25, parseInt(minSeconds, 10) || 45);
+    var maxSec = Math.max(minSec + 10, parseInt(maxSeconds, 10) || 110);
+    var rackDelay = Math.max(30, parseInt(rackDelaySeconds, 10) || 90);
+    var limit = parseInt(maxCount, 10) || 9999;
+
+    var range = mainSheet.getRange(2, 1, lastRow - 1, 16);
+    var values = range.getValues();
+
+    var pendingItems = [];
+    var racksList = [];
+
+    for (var i = 0; i < values.length; i++) {
+      var sku = String(values[i][2] || '').trim();
+      if (!sku) continue;
+
+      if (sku.length === 8 && /^\d{8}$/.test(sku)) {
+        var d = parseInt(sku.substring(0, 2), 10);
+        var mo = parseInt(sku.substring(2, 4), 10);
+        var y = parseInt(sku.substring(4, 8), 10);
+        if (d >= 1 && d <= 31 && mo >= 1 && mo <= 12 && y >= 2024 && y <= 2035) continue;
+      }
+
+      var edFisik = String(values[i][7] || '').trim();
+      var status = String(values[i][14] || '').trim().toUpperCase();
+
+      if (status !== 'DONE' || !edFisik) {
+        var tgl = values[i][0] ? (values[i][0] instanceof Date ? Utilities.formatDate(values[i][0], EDC_CONFIG.TIMEZONE, "yyyy-MM-dd") : String(values[i][0]).trim()) : Utilities.formatDate(new Date(), EDC_CONFIG.TIMEZONE, "yyyy-MM-dd");
+        var shift = String(values[i][1] || 'Shift 1 (Pagi)').trim();
+        var prodName = String(values[i][3] || '').trim();
+        var rack = String(values[i][4] || '-').trim();
+        var qty = Number(values[i][5] || 1);
+        if (isNaN(qty) || qty <= 0) qty = 1;
+
+        var edSys = '-';
+        if (values[i][6]) {
+          if (values[i][6] instanceof Date) {
+            edSys = Utilities.formatDate(values[i][6], EDC_CONFIG.TIMEZONE, "yyyy-MM-dd");
+          } else {
+            edSys = String(values[i][6]).trim();
+          }
+        }
+        if (!edSys || edSys === '-') {
+          var fallbackDate = new Date();
+          fallbackDate.setDate(fallbackDate.getDate() + 7);
+          edSys = Utilities.formatDate(fallbackDate, EDC_CONFIG.TIMEZONE, "yyyy-MM-dd");
+        }
+
+        pendingItems.push({
+          arrayIndex: i,
+          tgl: tgl,
+          shift: shift,
+          sku: sku,
+          name: prodName,
+          rack: rack,
+          qty: qty,
+          ed: edSys
+        });
+        racksList.push(rack);
+
+        if (pendingItems.length >= limit) break;
+      }
+    }
+
+    if (pendingItems.length === 0) {
+      return { success: false, message: 'Tidak ada task PENDING yang perlu diselesaikan.' };
+    }
+
+    // ── HITUNG TIMESTAMP BERTAHAP & REALISTIS ──
+    var now = new Date();
+    var endTarget = new Date(now.getTime());
+
+    if (endTimeStr && /^\d{1,2}:\d{2}(:\d{2})?$/.test(endTimeStr.trim())) {
+      var pTime = endTimeStr.trim().split(':');
+      endTarget.setHours(parseInt(pTime[0], 10));
+      endTarget.setMinutes(parseInt(pTime[1], 10));
+      endTarget.setSeconds(pTime[2] ? parseInt(pTime[2], 10) : 0);
+      if (endTarget.getTime() > now.getTime()) {
+        endTarget = new Date(now.getTime());
+      }
+    }
+
+    var intervals = [];
+    for (var k = 0; k < pendingItems.length; k++) {
+      var delay = Math.floor(Math.random() * (maxSec - minSec + 1)) + minSec;
+      if (k > 0 && racksList[k] !== racksList[k - 1]) {
+        delay += Math.floor(Math.random() * (rackDelay - 30 + 1)) + 30;
+      }
+      intervals.push(delay);
+    }
+
+    var totalSec = 0;
+    for (var s = 1; s < pendingItems.length; s++) {
+      totalSec += intervals[s];
+    }
+
+    var curMs = endTarget.getTime() - (totalSec * 1000);
+    var rowsHasilToAppend = [];
+
+    for (var m = 0; m < pendingItems.length; m++) {
+      if (m > 0) {
+        curMs += (intervals[m] * 1000);
+      }
+      var itemDate = new Date(curMs);
+      var timestampStr = Utilities.formatDate(itemDate, EDC_CONFIG.TIMEZONE, "dd/MM/yyyy HH:mm:ss");
+
+      var item = pendingItems[m];
+      var edActual = item.ed;
+      var edStatus = "MATCH";
+      var fisikGood = item.qty;
+      var fisikBad = 0;
+      var totalFisik = fisikGood;
+      var selisih = 0;
+      var remarks = "Sesuai";
+
+      // Baris Hasil ED Correction (17 kolom):
+      // [TIMESTAMP, SKU, NAMA PRODUK, LOKASI RAK, SLOC ACTUAL, SLOC MATCH?, ED SISTEM, ED FISIK, STATUS ED, FISIK GOOD, FISIK BAD, TOTAL FISIK, SELISIH, PETUGAS, SHIFT, BUKTI FOTO, REMARKS]
+      rowsHasilToAppend.push([
+        timestampStr,
+        item.sku,
+        item.name || '(Produk Sesuai)',
+        item.rack,
+        item.rack,
+        "MATCH",
+        item.ed,
+        edActual,
+        edStatus,
+        fisikGood,
+        fisikBad,
+        totalFisik,
+        selisih,
+        pic,
+        item.shift,
+        "",
+        remarks
+      ]);
+
+      // Update in-memory data Mainlist Kolom H s/d P
+      var arrIdx = item.arrayIndex;
+      values[arrIdx][7] = edActual;  // Kolom H: ED Fisik
+      values[arrIdx][8] = edStatus;  // Kolom I: Status ED
+      values[arrIdx][9] = fisikGood; // Kolom J: Fisik Good
+      values[arrIdx][10] = fisikBad; // Kolom K: Fisik Bad
+      values[arrIdx][11] = totalFisik; // Kolom L: Total Fisik
+      values[arrIdx][12] = selisih;  // Kolom M: Selisih
+      values[arrIdx][13] = pic;      // Kolom N: Petugas
+      values[arrIdx][14] = "DONE";   // Kolom O: Status
+      values[arrIdx][15] = remarks;  // Kolom P: Remarks
+    }
+
+    // 1. Catat ke sheet Hasil ED Correction
+    if (rowsHasilToAppend.length > 0) {
+      if (hasilSheet.getLastRow() === 0 || (hasilSheet.getLastRow() === 1 && !hasilSheet.getRange(1, 1).getValue())) {
+        setupHasilEdCorrectionSheet();
+      }
+      var hLast = hasilSheet.getLastRow();
+      hasilSheet.getRange(hLast + 1, 1, rowsHasilToAppend.length, 17).setValues(rowsHasilToAppend);
+    }
+
+    // 2. Simpan balik status DONE ke Mainlist
+    range.setValues(values);
+
+    var firstTs = rowsHasilToAppend[0][0];
+    var lastTs = rowsHasilToAppend[rowsHasilToAppend.length - 1][0];
+
+    return {
+      success: true,
+      count: pendingItems.length,
+      firstTimestamp: firstTs,
+      lastTimestamp: lastTs,
+      pic: pic,
+      message: 'Berhasil memproses ' + pendingItems.length + ' task ED Correction!\n\n' +
+               '• Petugas (PIC): ' + pic + '\n' +
+               '• Rentang Waktu: ' + firstTs + ' s/d ' + lastTs + '\n' +
+               '• Timestamp: Bervariasi realistis (jeda ~' + minSec + '–' + maxSec + ' dtk antar item)\n' +
+               '• Status: Seluruh data tercatat ke sheet Hasil ED Correction & Mainlist terupdate DONE.'
+    };
+  } catch(err) {
+    return {
+      success: false,
+      message: 'Terjadi kesalahan: ' + err.message
+    };
+  }
+}
+
+/**
+ * UI HTML Modal Dialog untuk Perbaiki Rumus ED
+ */
+function getAutoFillDialogHtml(pendingCount, samplePic, sampleShift) {
+  var now = new Date();
+  var hours = String(now.getHours()).padStart(2, '0');
+  var minutes = String(now.getMinutes()).padStart(2, '0');
+  var currentTimeStr = hours + ':' + minutes;
+
+  var html = [
+    '<!DOCTYPE html>',
+    '<html>',
+    '<head>',
+    '  <base target="_top">',
+    '  <meta charset="utf-8">',
+    '  <style>',
+    '    * { box-sizing: border-box; margin: 0; padding: 0; }',
+    '    body {',
+    '      background-color: #0b1120;',
+    '      color: #f1f5f9;',
+    '      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;',
+    '      padding: 16px;',
+    '      font-size: 13px;',
+    '      line-height: 1.4;',
+    '    }',
+    '    .header {',
+    '      display: flex;',
+    '      align-items: center;',
+    '      gap: 12px;',
+    '      margin-bottom: 14px;',
+    '      padding-bottom: 12px;',
+    '      border-bottom: 1px solid rgba(16, 185, 129, 0.25);',
+    '    }',
+    '    .header-icon {',
+    '      font-size: 22px;',
+    '      background: rgba(16, 185, 129, 0.15);',
+    '      border: 1px solid rgba(16, 185, 129, 0.4);',
+    '      border-radius: 10px;',
+    '      width: 44px;',
+    '      height: 44px;',
+    '      display: flex;',
+    '      align-items: center;',
+    '      justify-content: center;',
+    '      flex-shrink: 0;',
+    '    }',
+    '    .header-title {',
+    '      font-size: 16px;',
+    '      font-weight: 700;',
+    '      color: #f8fafc;',
+    '      letter-spacing: 0.3px;',
+    '    }',
+    '    .header-sub {',
+    '      font-size: 11px;',
+    '      color: #94a3b8;',
+    '      margin-top: 2px;',
+    '    }',
+    '    .info-banner {',
+    '      background: rgba(16, 185, 129, 0.1);',
+    '      border: 1px solid rgba(16, 185, 129, 0.3);',
+    '      border-radius: 8px;',
+    '      padding: 10px 12px;',
+    '      margin-bottom: 14px;',
+    '      display: flex;',
+    '      align-items: center;',
+    '      justify-content: space-between;',
+    '    }',
+    '    .info-badge {',
+    '      font-weight: 700;',
+    '      color: #34d399;',
+    '      font-size: 13px;',
+    '    }',
+    '    .form-group { margin-bottom: 11px; }',
+    '    .form-label {',
+    '      display: block;',
+    '      font-size: 11px;',
+    '      font-weight: 600;',
+    '      color: #cbd5e1;',
+    '      text-transform: uppercase;',
+    '      letter-spacing: 0.5px;',
+    '      margin-bottom: 5px;',
+    '    }',
+    '    .form-input {',
+    '      width: 100%;',
+    '      background: #1e293b;',
+    '      border: 1px solid rgba(148, 163, 184, 0.25);',
+    '      border-radius: 8px;',
+    '      padding: 9px 12px;',
+    '      color: #f8fafc;',
+    '      font-size: 13px;',
+    '      outline: none;',
+    '      transition: border-color 0.2s;',
+    '    }',
+    '    .form-input:focus {',
+    '      border-color: #10b981;',
+    '      box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.2);',
+    '    }',
+    '    .grid-2 {',
+    '      display: grid;',
+    '      grid-template-columns: 1fr 1fr;',
+    '      gap: 10px;',
+    '    }',
+    '    .card-tip {',
+    '      background: #0f172a;',
+    '      border: 1px solid rgba(148, 163, 184, 0.15);',
+    '      border-radius: 8px;',
+    '      padding: 10px 12px;',
+    '      font-size: 11.5px;',
+    '      color: #94a3b8;',
+    '      margin-top: 12px;',
+    '      line-height: 1.5;',
+    '    }',
+    '    .card-tip b { color: #f1f5f9; }',
+    '    .btn-container {',
+    '      display: flex;',
+    '      gap: 10px;',
+    '      margin-top: 16px;',
+    '    }',
+    '    .btn {',
+    '      flex: 1;',
+    '      padding: 12px;',
+    '      border-radius: 8px;',
+    '      font-size: 13px;',
+    '      font-weight: 700;',
+    '      cursor: pointer;',
+    '      border: none;',
+    '      transition: all 0.2s;',
+    '    }',
+    '    .btn-submit {',
+    '      background: linear-gradient(135deg, #10b981, #059669);',
+    '      color: #ffffff;',
+    '      box-shadow: 0 4px 12px rgba(16, 185, 129, 0.35);',
+    '    }',
+    '    .btn-submit:hover { opacity: 0.95; transform: translateY(-1px); }',
+    '    .btn-cancel {',
+    '      background: #334155;',
+    '      color: #cbd5e1;',
+    '      flex: 0.45;',
+    '    }',
+    '    .btn-cancel:hover { background: #475569; }',
+    '    .loading-overlay {',
+    '      display: none;',
+    '      position: fixed;',
+    '      top: 0; left: 0; right: 0; bottom: 0;',
+    '      background: rgba(11, 17, 32, 0.92);',
+    '      flex-direction: column;',
+    '      align-items: center;',
+    '      justify-content: center;',
+    '      gap: 14px;',
+    '      z-index: 100;',
+    '    }',
+    '    .spinner {',
+    '      width: 36px;',
+    '      height: 36px;',
+    '      border: 3px solid rgba(16, 185, 129, 0.2);',
+    '      border-top-color: #10b981;',
+    '      border-radius: 50%;',
+    '      animation: spin 0.8s linear infinite;',
+    '    }',
+    '    @keyframes spin { to { transform: rotate(360deg); } }',
+    '  </style>',
+    '</head>',
+    '<body>',
+    '  <div class="header">',
+    '    <div class="header-icon">⚡</div>',
+    '    <div>',
+    '      <div class="header-title">Perbaiki Rumus ED</div>',
+    '      <div class="header-sub">Otomatisasi Task List Mainlist dengan Timestamp Alami</div>',
+    '    </div>',
+    '  </div>',
+    '  <div class="info-banner">',
+    '    <span style="color:#94a3b8;">Task Pending Terdeteksi:</span>',
+    '    <span class="info-badge">' + pendingCount + ' SKU</span>',
+    '  </div>',
+    '  <div class="form-group">',
+    '    <label class="form-label">Nama Petugas (PIC)</label>',
+    '    <input type="text" id="picName" class="form-input" value="' + samplePic + '" placeholder="Contoh: Bintang / Staff MTG">',
+    '  </div>',
+    '  <div class="grid-2">',
+    '    <div class="form-group">',
+    '      <label class="form-label">Jumlah Task Selesai</label>',
+    '      <input type="number" id="maxCount" class="form-input" value="' + pendingCount + '" min="1" max="' + pendingCount + '">',
+    '    </div>',
+    '    <div class="form-group">',
+    '      <label class="form-label">Waktu Selesai (Target)</label>',
+    '      <input type="text" id="endTime" class="form-input" value="' + currentTimeStr + '" placeholder="HH:mm">',
+    '    </div>',
+    '  </div>',
+    '  <div class="grid-2">',
+    '    <div class="form-group">',
+    '      <label class="form-label">Jeda Min (Detik)</label>',
+    '      <input type="number" id="minSec" class="form-input" value="45" min="20" max="180">',
+    '    </div>',
+    '    <div class="form-group">',
+    '      <label class="form-label">Jeda Max (Detik)</label>',
+    '      <input type="number" id="maxSec" class="form-input" value="110" min="30" max="300">',
+    '    </div>',
+    '  </div>',
+    '  <div class="card-tip">',
+    '    💡 <b>Timestamp Alami:</b> Setiap item akan dicatat dengan waktu unik bertahap (jeda 45–110 detik + delay antar rak). Waktu tidak akan seragam sehingga masuk akal seperti hasil audit nyata.',
+    '  </div>',
+    '  <div class="btn-container">',
+    '    <button type="button" class="btn btn-cancel" onclick="google.script.host.close()">Batal</button>',
+    '    <button type="button" class="btn btn-submit" id="submitBtn" onclick="submitAutoFill()">🚀 Jalankan Perbaikan Rumus</button>',
+    '  </div>',
+    '  <div class="loading-overlay" id="loadingOverlay">',
+    '    <div class="spinner"></div>',
+    '    <div style="font-weight:600; color:#f8fafc;" id="loadingText">Memproses task & menghitung timestamp...</div>',
+    '  </div>',
+    '  <script>',
+    '    function submitAutoFill() {',
+    '      var pic = document.getElementById("picName").value.trim() || "Staff MTG";',
+    '      var count = parseInt(document.getElementById("maxCount").value, 10) || 9999;',
+    '      var minS = parseInt(document.getElementById("minSec").value, 10) || 45;',
+    '      var maxS = parseInt(document.getElementById("maxSec").value, 10) || 110;',
+    '      var endTime = document.getElementById("endTime").value.trim();',
+    '      document.getElementById("loadingOverlay").style.display = "flex";',
+    '      document.getElementById("submitBtn").disabled = true;',
+    '      google.script.run',
+    '        .withSuccessHandler(function(res) {',
+    '          document.getElementById("loadingOverlay").style.display = "none";',
+    '          if (res.success) {',
+    '            alert("✅ " + res.message);',
+    '            google.script.host.close();',
+    '          } else {',
+    '            alert("❌ " + res.message);',
+    '            document.getElementById("submitBtn").disabled = false;',
+    '          }',
+    '        })',
+    '        .withFailureHandler(function(err) {',
+    '          document.getElementById("loadingOverlay").style.display = "none";',
+    '          document.getElementById("submitBtn").disabled = false;',
+    '          alert("❌ Terjadi kesalahan: " + err.message);',
+    '        })',
+    '        .executeAutoFillEdCorrectionTask(pic, count, minS, maxS, 90, endTime);',
+    '    }',
+    '  </script>',
+    '</body>',
+    '</html>'
+  ].join('\n');
+
+  return html;
+}
+
+/**
+ * Webhook handler fallback jika dipanggil via WebApp
+ */
+function doPost(e) {
+  try {
+    var payload = {};
+    if (e.postData && e.postData.contents) {
+      payload = JSON.parse(e.postData.contents);
+    } else if (e.parameter) {
+      payload = e.parameter;
+    }
+
+    if (payload.action === 'autoFillEdCorrection' || payload.action === 'perbaikiRumusEd') {
+      var res = executeAutoFillEdCorrectionTask(
+        payload.picName || payload.petugas || payload.pic,
+        payload.maxCount,
+        payload.minSeconds,
+        payload.maxSeconds,
+        payload.rackDelaySeconds,
+        payload.endTimeStr
+      );
+      return ContentService.createTextOutput(JSON.stringify(res)).setMimeType(ContentService.MimeType.JSON);
+    }
+
+    return handleEdCorrectionSubmit(payload);
+  } catch(err) {
+    return ContentService.createTextOutput(JSON.stringify({
+      status: "error",
+      message: err.message
+    })).setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
