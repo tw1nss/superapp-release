@@ -1,12 +1,13 @@
 {
-  "versionCode": 24,
-  "versionName": "1.2.8",
+  "versionCode": 25,
+  "versionName": "1.2.9",
   "apkUrl": "https://github.com/tw1nss/superapp-release/raw/main/app-debug.apk",
   "forceUpdate": false,
-  "title": "Pembaruan Superapp MTG v1.2.8",
+  "title": "Pembaruan Superapp MTG v1.2.9",
   "changelog": [
-    "Pembaruan sumber Master Barcode SLOC langsung dari tab RACK UPDATE (Superset SLOC MASTER)",
-    "Pembersihan otomatis cache lama dan sinkronisasi real-time rak L1-FRZ-CF-NH-T1-K5-6"
+    "Dukungan pencarian produk menggunakan SLOC / Lokasi Rak (contoh: CF-NH, L1-FRZ-CF-NH-T1-K5-6)",
+    "Highlight badge SLOC pada rekomendasi pencarian & tampilan seluruh produk dalam satu rak",
+    "Optimasi pencarian SKU, nama produk, dan lokasi rak multi-item"
   ],
   "releasedAt": "2026-10-01"
 }

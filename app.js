@@ -625,6 +625,101 @@
       return mapped;
     }
 
+    // 2b. Search by SLOC (Lokasi Rak) in Master Data (RACK UPDATE) & MSLTC
+    const rawLower = cleaned.toLowerCase();
+    const noHyphenQuery = rawLower.replace(/[^a-z0-9]/g, '');
+    const slocMatches = [];
+    const seenSlocKeys = new Set();
+
+    if (cleaned.length >= 2) {
+      // Cari di dataMap (RACK UPDATE)
+      for (const [key, items] of dataMap) {
+        for (const item of items) {
+          const sloc = (item.sloc || item.masterSloc || '').trim();
+          if (!sloc) continue;
+          const lowerSloc = sloc.toLowerCase();
+          const noHyphenSloc = lowerSloc.replace(/[^a-z0-9]/g, '');
+
+          let isMatch = false;
+          let isExact = false;
+
+          if (lowerSloc === rawLower || noHyphenSloc === noHyphenQuery) {
+            isMatch = true;
+            isExact = true;
+          } else if (lowerSloc.startsWith(rawLower) || noHyphenSloc.startsWith(noHyphenQuery)) {
+            isMatch = true;
+          } else if (cleaned.length >= 3 && (lowerSloc.includes(rawLower) || (noHyphenQuery.length >= 3 && noHyphenSloc.includes(noHyphenQuery)))) {
+            isMatch = true;
+          }
+
+          if (isMatch) {
+            const actualSku = item.sku || key;
+            const uniqueId = `${actualSku}_${sloc}`;
+            if (!seenSlocKeys.has(uniqueId)) {
+              seenSlocKeys.add(uniqueId);
+              const msInfo = getMsltcInfo(actualSku, item.productName);
+              slocMatches.push({
+                item: {
+                  ...item,
+                  sku: actualSku,
+                  msltcDays: (msInfo && msInfo.msltcDays !== undefined && msInfo.msltcDays !== null) ? msInfo.msltcDays : (item.msltcDays || 0),
+                  type: (msInfo && msInfo.type) ? msInfo.type : (item.type || 'Fresh')
+                },
+                isExact: isExact
+              });
+            }
+          }
+        }
+      }
+
+      // Cari di msltcMap
+      for (const [key, items] of msltcMap) {
+        for (const item of items) {
+          const sloc = (item.rackName || item.locationName || '').trim();
+          if (!sloc) continue;
+          const lowerSloc = sloc.toLowerCase();
+          const noHyphenSloc = lowerSloc.replace(/[^a-z0-9]/g, '');
+
+          let isMatch = false;
+          let isExact = false;
+
+          if (lowerSloc === rawLower || noHyphenSloc === noHyphenQuery) {
+            isMatch = true;
+            isExact = true;
+          } else if (lowerSloc.startsWith(rawLower) || noHyphenSloc.startsWith(noHyphenQuery)) {
+            isMatch = true;
+          } else if (cleaned.length >= 3 && (lowerSloc.includes(rawLower) || (noHyphenQuery.length >= 3 && noHyphenSloc.includes(noHyphenQuery)))) {
+            isMatch = true;
+          }
+
+          if (isMatch) {
+            const actualSku = item.sku || item.productId || cleaned;
+            const uniqueId = `${actualSku}_${sloc}`;
+            if (!seenSlocKeys.has(uniqueId)) {
+              seenSlocKeys.add(uniqueId);
+              slocMatches.push({
+                item: {
+                  sku: actualSku,
+                  sloc: sloc,
+                  productName: item.productName || 'Produk MSLTC',
+                  masterSloc: sloc,
+                  type: item.type || 'Fresh',
+                  left: item.productId || '',
+                  msltcDays: (item.msltcDays !== undefined && item.msltcDays !== null) ? item.msltcDays : 0
+                },
+                isExact: isExact
+              });
+            }
+          }
+        }
+      }
+    }
+
+    if (slocMatches.length > 0) {
+      slocMatches.sort((a, b) => (b.isExact ? 1 : 0) - (a.isExact ? 1 : 0) || compareSlocNatural(a.item.sloc, b.item.sloc) || (a.item.productName || '').localeCompare(b.item.productName || ''));
+      return slocMatches.map(s => s.item);
+    }
+
     // 3. Search by Product Name in Master Data map
     const masterScored = [];
     const seenMasterKeys = new Set();
@@ -747,6 +842,80 @@
       }
     }
 
+    // 1b. Search by SLOC (Rak) in dataMap (RACK UPDATE) & MSLTC
+    const rawLower = cleaned.toLowerCase();
+    const noHyphenQuery = rawLower.replace(/[^a-z0-9]/g, '');
+
+    if (cleaned.length >= 2) {
+      for (const [skuKey, items] of dataMap) {
+        for (const item of items) {
+          const sloc = (item.sloc || item.masterSloc || '').trim();
+          if (!sloc) continue;
+          const lowerSloc = sloc.toLowerCase();
+          const noHyphenSloc = lowerSloc.replace(/[^a-z0-9]/g, '');
+
+          let slocScore = 0;
+          if (lowerSloc === rawLower || noHyphenSloc === noHyphenQuery) {
+            slocScore = 98;
+          } else if (lowerSloc.startsWith(rawLower) || noHyphenSloc.startsWith(noHyphenQuery)) {
+            slocScore = 92;
+          } else if (cleaned.length >= 3 && (lowerSloc.includes(rawLower) || (noHyphenQuery.length >= 3 && noHyphenSloc.includes(noHyphenQuery)))) {
+            slocScore = 86;
+          }
+
+          if (slocScore > 0) {
+            const actualSku = item.sku || skuKey;
+            const existing = suggestionMap.get(actualSku);
+            if (!existing || slocScore > existing.score) {
+              suggestionMap.set(actualSku, {
+                sku: actualSku,
+                productName: item.productName || skuKey,
+                sloc: sloc,
+                type: item.type || '',
+                expDate: expDate,
+                score: slocScore,
+                matchedBy: 'sloc'
+              });
+            }
+          }
+        }
+      }
+
+      for (const [skuKey, items] of msltcMap) {
+        for (const item of items) {
+          const sloc = (item.rackName || item.locationName || '').trim();
+          if (!sloc) continue;
+          const lowerSloc = sloc.toLowerCase();
+          const noHyphenSloc = lowerSloc.replace(/[^a-z0-9]/g, '');
+
+          let slocScore = 0;
+          if (lowerSloc === rawLower || noHyphenSloc === noHyphenQuery) {
+            slocScore = 97;
+          } else if (lowerSloc.startsWith(rawLower) || noHyphenSloc.startsWith(noHyphenQuery)) {
+            slocScore = 91;
+          } else if (cleaned.length >= 3 && (lowerSloc.includes(rawLower) || (noHyphenQuery.length >= 3 && noHyphenSloc.includes(noHyphenQuery)))) {
+            slocScore = 85;
+          }
+
+          if (slocScore > 0) {
+            const actualSku = item.sku || skuKey;
+            const existing = suggestionMap.get(actualSku);
+            if (!existing || slocScore > existing.score) {
+              suggestionMap.set(actualSku, {
+                sku: actualSku,
+                productName: item.productName || skuKey,
+                sloc: sloc,
+                type: item.type || '',
+                expDate: expDate,
+                score: slocScore,
+                matchedBy: 'sloc'
+              });
+            }
+          }
+        }
+      }
+    }
+
     // 2. Search by Product Name in dataMap
     for (const [skuKey, items] of dataMap) {
       const bestItem = items.find(it => !isBadSloc(it.sloc || it.masterSloc)) || items[0] || {};
@@ -818,7 +987,7 @@
             </div>
             <div class="dropdown-item-meta">
               <span class="dropdown-meta-sku">SKU: <strong>${escapeHtml(item.sku)}</strong></span>
-              ${item.sloc ? `<span class="dropdown-meta-sloc">📍 SLOC: <strong>${escapeHtml(item.sloc)}</strong></span>` : ''}
+              ${item.sloc ? `<span class="dropdown-meta-sloc" ${item.matchedBy === 'sloc' ? 'style="color: #38bdf8; background: rgba(56, 189, 248, 0.14); padding: 1px 6px; border-radius: 4px; font-weight: 700;"' : ''}>📍 SLOC: <strong>${escapeHtml(item.sloc)}</strong>${item.matchedBy === 'sloc' ? ' ✨' : ''}</span>` : ''}
             </div>
           </div>
         </div>
@@ -995,6 +1164,9 @@
       if (exactMatchIdx >= 0) {
         currentSuggestions = suggestions;
         selectSuggestionItem(exactMatchIdx);
+      } else if (suggestions.some(s => s.matchedBy === 'sloc')) {
+        // Jika pencarian menggunakan SLOC / Lokasi Rak, tampilkan seluruh hasil produk pada rak tersebut
+        performSearch(val);
       } else {
         currentSuggestions = suggestions;
         selectSuggestionItem(0);
@@ -7165,8 +7337,8 @@
   //  IN-APP UPDATE & VERSION CHECKING ENGINE
   // ══════════════════════════════════════════════
 
-  const APP_VERSION_CODE = 24; // Local current version code (v1.2.8 Master OTA)
-  const APP_VERSION_NAME = '1.2.8';
+  const APP_VERSION_CODE = 25; // Local current version code (v1.2.9 Master OTA)
+  const APP_VERSION_NAME = '1.2.9';
   const UPDATE_MANIFEST_URL = 'https://raw.githubusercontent.com/tw1nss/superapp-release/main/version.json';
 
   let currentUpdateData = null;
