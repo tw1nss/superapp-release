@@ -134,6 +134,7 @@ function buildEdCorrectionMenu(ui) {
   ui.createMenu('✏️ ED Correction Control')
     .addItem('🔄 Tarik Data Superset ke Data Update ED Correction', 'updateEdCorrectionFromSupersetManual')
     .addItem('⚡ Perbaiki Rumus ED', 'autoFillEdCorrectionTaskPrompt')
+    .addItem('🔧 Sinkronkan / Perbaiki Timestamp ke Hari Ini', 'fixTimestampsInMainlistPrompt')
     .addSeparator()
 
     // ── SUBMENU 1: INPUT SKU (PENUGASAN) ──
@@ -151,6 +152,7 @@ function buildEdCorrectionMenu(ui) {
       .addItem('🎨 Setup & Buat Main List SKU Baru', 'formatMainlistSkuEdCorrection')
       .addItem('⚡ Pasang Rumus Otomatis "Main List"', 'installEdCorrectionMainlistFormulasManual')
       .addItem('⚡ Perbaiki Rumus ED', 'autoFillEdCorrectionTaskPrompt')
+      .addItem('🔧 Sinkronkan / Perbaiki Timestamp ke Hari Ini', 'fixTimestampsInMainlistPrompt')
       .addItem('🔧 Bersihkan Sel Penimpa Rumus (Error D122 / #REF!)', 'repairFormulaRunwayPrompt')
       .addItem('🧹 Kosongkan / Reset Sheet "Main List"', 'resetMainlistSkuEdCorrectionPrompt')
     )
@@ -1546,15 +1548,15 @@ function formatMainlistSkuEdCorrection() {
     sheet.getRange(1, 1, Math.max(sheet.getMaxRows(), 100), Math.max(sheet.getMaxColumns(), 26)).clearDataValidations();
   } catch(eVal) {}
 
-  // 16 Kolom Header Lengkap
+  // 17 Kolom Header Lengkap (Termasuk Kolom Q: TIMESTAMP)
   var headers = [
     [
       'TANGGAL', 'SHIFT', 'SKU', 'NAMA PRODUK', 'LOKASI RAK (SLOC)', 'QTY SISTEM', 'ED SISTEM (LAMA)',
-      'ED FISIK / KOREKSI', 'STATUS ED', 'FISIK GOOD', 'FISIK BAD', 'TOTAL FISIK', 'SELISIH', 'PETUGAS', 'STATUS', 'REMARKS'
+      'ED FISIK / KOREKSI', 'STATUS ED', 'FISIK GOOD', 'FISIK BAD', 'TOTAL FISIK', 'SELISIH', 'PETUGAS', 'STATUS', 'REMARKS', 'TIMESTAMP'
     ]
   ];
 
-  sheet.getRange(1, 1, 1, 16).setValues(headers);
+  sheet.getRange(1, 1, 1, 17).setValues(headers);
 
   // Styling Target Supervisor (Kolom A - G: Navy Indigo #1E1B4B)
   sheet.getRange('A1:G1')
@@ -1565,8 +1567,8 @@ function formatMainlistSkuEdCorrection() {
     .setHorizontalAlignment('center')
     .setVerticalAlignment('middle');
 
-  // Styling Hasil Audit Petugas (Kolom H - P: Deep Teal #064E3B)
-  sheet.getRange('H1:P1')
+  // Styling Hasil Audit Petugas (Kolom H - Q: Deep Teal #064E3B)
+  sheet.getRange('H1:Q1')
     .setBackground('#064E3B')
     .setFontColor('#FFFFFF')
     .setFontWeight('bold')
@@ -1580,26 +1582,27 @@ function formatMainlistSkuEdCorrection() {
 
   // Border & Format Teks Kolom C (SKU)
   var maxRows = Math.max(sheet.getMaxRows(), 100);
-  sheet.getRange(1, 1, maxRows, 16).setBorder(true, true, true, true, true, true, '#CBD5E1', SpreadsheetApp.BorderStyle.SOLID);
+  sheet.getRange(1, 1, maxRows, 17).setBorder(true, true, true, true, true, true, '#CBD5E1', SpreadsheetApp.BorderStyle.SOLID);
   sheet.getRange(2, 3, maxRows - 1, 1).setNumberFormat('@'); // Text murni untuk SKU
 
   // Alternating colors
   try {
-    sheet.getRange(2, 1, maxRows - 1, 16).applyRowBanding(SpreadsheetApp.BandingTheme.LIGHT_GREY, false, false);
+    sheet.getRange(2, 1, maxRows - 1, 17).applyRowBanding(SpreadsheetApp.BandingTheme.LIGHT_GREY, false, false);
   } catch(eBanding) {}
 
-  sheet.autoResizeColumns(1, 16);
+  sheet.autoResizeColumns(1, 17);
   sheet.setColumnWidth(1, 110); // TANGGAL
   sheet.setColumnWidth(2, 130); // SHIFT
   sheet.setColumnWidth(3, 140); // SKU
   sheet.setColumnWidth(4, 260); // NAMA PRODUK
   sheet.setColumnWidth(5, 140); // LOKASI RAK
   sheet.setColumnWidth(8, 140); // ED FISIK / KOREKSI
-  sheet.setColumnWidth(16, 200); // REMARKS
+  sheet.setColumnWidth(16, 180); // REMARKS
+  sheet.setColumnWidth(17, 160); // TIMESTAMP
 
   installEdCorrectionMainlistFormulas(true);
 
-  alertEdc('✨ Sukses!\n\nSheet "' + EDC_SHEETS.MAIN_LIST + '" baru berhasil dibuat dan siap untuk penugasan tugas shift!\n\nRumus lookup dari "' + EDC_SHEETS.DATA_UPDATE + '" dan "' + EDC_SHEETS.HASIL + '" telah aktif.');
+  alertEdc('✨ Sukses!\n\nSheet "' + EDC_SHEETS.MAIN_LIST + '" baru berhasil dibuat dan siap untuk penugasan tugas shift!\n\nRumus lookup dari "' + EDC_SHEETS.DATA_UPDATE + '" dan "' + EDC_SHEETS.HASIL + '" (termasuk Kolom Q: TIMESTAMP) telah aktif.');
 }
 
 /**
@@ -1623,11 +1626,11 @@ function installEdCorrectionMainlistFormulas(isSilent) {
   var updateSheet = getEdCorrectionSheet('DATA_UPDATE');
   var updateName = updateSheet ? updateSheet.getName() : EDC_SHEETS.DATA_UPDATE;
 
-  // SANGAT PENTING: Bersihkan semua sel dari baris 3 ke bawah untuk Kolom D sampai P (kolom 4 sampai 16)
+  // SANGAT PENTING: Bersihkan semua sel dari baris 3 ke bawah untuk Kolom D sampai Q (kolom 4 sampai 17)
   // Ini MENCEGAH error fatal: "Hasil array tidak diperluas karena akan menimpa data di D..." (#REF!)
   var maxRows = sheet.getMaxRows();
   if (maxRows > 2) {
-    sheet.getRange(3, 4, maxRows - 2, Math.max(13, sheet.getLastColumn() - 3)).clearContent();
+    sheet.getRange(3, 4, maxRows - 2, Math.max(14, sheet.getLastColumn() - 3)).clearContent();
   }
 
   // 1. DETAIL PRODUK DARI DATA UPDATE (Kolom D, E, F, G)
@@ -1678,7 +1681,7 @@ function installEdCorrectionMainlistFormulas(isSilent) {
       'IFERROR(XLOOKUP(TRIM(sku), \'' + updateName + '\'!D:D, \'' + updateName + '\'!G:G, "", 0), "-")))))))'
   );
 
-  // 2. HASIL AUDIT & KOREKSI DARI SHEET HASIL (Kolom H - P)
+  // 2. HASIL AUDIT & KOREKSI DARI SHEET HASIL (Kolom H - Q)
   // XLOOKUP search_mode = -1 mengambil audit paling akhir/terbaru untuk SKU tersebut
   // Kolom H: ED Fisik / Koreksi Baru
   sheet.getRange('H2').setFormula(
@@ -1715,6 +1718,10 @@ function installEdCorrectionMainlistFormulas(isSilent) {
   // Kolom P: Remarks
   sheet.getRange('P2').setFormula(
     '=MAP(C2:C, LAMBDA(sku, IF(sku="", "", IFERROR(XLOOKUP(TRIM(sku), \'' + hasilName + '\'!B:B, \'' + hasilName + '\'!Q:Q, "", 0, -1), IFERROR(XLOOKUP(VALUE(TRIM(sku)), \'' + hasilName + '\'!B:B, \'' + hasilName + '\'!Q:Q, "", 0, -1), "")))))'
+  );
+  // Kolom Q: Timestamp Audit dari Sheet Hasil (Kolom A)
+  sheet.getRange('Q2').setFormula(
+    '=MAP(C2:C, LAMBDA(sku, IF(sku="", "", IFERROR(XLOOKUP(TRIM(sku), \'' + hasilName + '\'!B:B, \'' + hasilName + '\'!A:A, "", 0, -1), IFERROR(XLOOKUP(VALUE(TRIM(sku)), \'' + hasilName + '\'!B:B, \'' + hasilName + '\'!A:A, "", 0, -1), "")))))'
   );
 
   if (!isSilent) {
@@ -2269,6 +2276,7 @@ function handleEdCorrectionSubmit(payload) {
             mainSheet.getRange(m + 2, 14).setValue(petugas); // Kolom N: Petugas
             mainSheet.getRange(m + 2, 15).setValue("DONE");   // Kolom O: Status
             if (remarks) mainSheet.getRange(m + 2, 16).setValue(remarks); // Kolom P: Remarks
+            mainSheet.getRange(m + 2, 17).setValue(timestamp); // Kolom Q: TIMESTAMP
             break;
           }
         }
@@ -2433,6 +2441,7 @@ function autoFillEdCorrectionQuickPrompt() {
 
 /**
  * Backend eksekutor penyelesaian task list dengan timestamp bertahap yang realistis
+ * TERIKAT SECARA KETAT PADA HARI INI (TIDAK PERNAH MUNDUR KE TANGGAL KEMARIN)
  */
 function executeAutoFillEdCorrectionTask(picName, maxCount, minSeconds, maxSeconds, rackDelaySeconds, endTimeStr) {
   try {
@@ -2455,7 +2464,19 @@ function executeAutoFillEdCorrectionTask(picName, maxCount, minSeconds, maxSecon
     var rackDelay = Math.max(30, parseInt(rackDelaySeconds, 10) || 90);
     var limit = parseInt(maxCount, 10) || 9999;
 
-    var range = mainSheet.getRange(2, 1, lastRow - 1, 16);
+    // Pastikan Header Kolom Q (TIMESTAMP) aktif dan terformat rapi
+    if (mainSheet.getLastColumn() < 17 || String(mainSheet.getRange(1, 17).getValue()).trim() === '') {
+      mainSheet.getRange(1, 17).setValue('TIMESTAMP')
+        .setBackground('#064E3B')
+        .setFontColor('#FFFFFF')
+        .setFontWeight('bold')
+        .setFontSize(10)
+        .setHorizontalAlignment('center')
+        .setVerticalAlignment('middle');
+      mainSheet.setColumnWidth(17, 160);
+    }
+
+    var range = mainSheet.getRange(2, 1, lastRow - 1, 17);
     var values = range.getValues();
 
     var pendingItems = [];
@@ -2517,7 +2538,7 @@ function executeAutoFillEdCorrectionTask(picName, maxCount, minSeconds, maxSecon
       return { success: false, message: 'Tidak ada task PENDING yang perlu diselesaikan.' };
     }
 
-    // ── HITUNG TIMESTAMP BERTAHAP & REALISTIS ──
+    // ── HITUNG TIMESTAMP BERTAHAP & REALISTIS (TERIKAT DALAM HARI INI) ──
     var now = new Date();
     var endTarget = new Date(now.getTime());
 
@@ -2531,27 +2552,71 @@ function executeAutoFillEdCorrectionTask(picName, maxCount, minSeconds, maxSecon
       }
     }
 
-    var intervals = [];
-    for (var k = 0; k < pendingItems.length; k++) {
-      var delay = Math.floor(Math.random() * (maxSec - minSec + 1)) + minSec;
-      if (k > 0 && racksList[k] !== racksList[k - 1]) {
-        delay += Math.floor(Math.random() * (rackDelay - 30 + 1)) + 30;
+    // Batasi waktu mulai strictly pada shift hari ini (TIDAK BOLEH mundur ke tanggal kemarin!)
+    var shiftStart = new Date(endTarget.getTime());
+    var sampleShiftLower = (pendingItems[0].shift || '').toLowerCase();
+    var isSiang = sampleShiftLower.indexOf('siang') !== -1 || sampleShiftLower.indexOf('shift 2') !== -1;
+
+    if (isSiang) {
+      shiftStart.setHours(15, 0, 0, 0); // Shift Siang mulai 15:00
+    } else {
+      // Shift Pagi mulai 08:00 (atau 07:30 jika endTarget sangat pagi)
+      if (endTarget.getHours() < 8 || (endTarget.getHours() === 8 && endTarget.getMinutes() < 30)) {
+        shiftStart.setHours(7, 30, 0, 0);
+      } else {
+        shiftStart.setHours(8, 0, 0, 0);
       }
-      intervals.push(delay);
+    }
+    // Pastikan tanggal, bulan, tahun SAMA PERSIS dengan endTarget
+    shiftStart.setFullYear(endTarget.getFullYear(), endTarget.getMonth(), endTarget.getDate());
+
+    // Jika endTarget lebih awal dari shiftStart (misal run jam 07:45), mundurkan shiftStart secukupnya tapi tetap hari ini
+    if (shiftStart.getTime() >= endTarget.getTime()) {
+      var minBackMs = Math.min(endTarget.getHours() * 3600000 + endTarget.getMinutes() * 60000, pendingItems.length * 15 * 1000);
+      shiftStart = new Date(endTarget.getTime() - minBackMs);
     }
 
-    var totalSec = 0;
-    for (var s = 1; s < pendingItems.length; s++) {
-      totalSec += intervals[s];
+    // Hitung rentang detik yang tersedia antara shiftStart dan endTarget
+    var availableSec = Math.floor((endTarget.getTime() - shiftStart.getTime()) / 1000);
+    if (availableSec < pendingItems.length * 10) {
+      availableSec = Math.max(availableSec, pendingItems.length * 10);
+      var earliestPossible = new Date(endTarget.getFullYear(), endTarget.getMonth(), endTarget.getDate(), 7, 0, 0);
+      shiftStart = new Date(Math.max(earliestPossible.getTime(), endTarget.getTime() - (availableSec * 1000)));
+      availableSec = Math.floor((endTarget.getTime() - shiftStart.getTime()) / 1000);
     }
 
-    var curMs = endTarget.getTime() - (totalSec * 1000);
+    // Buat bobot jeda dinamis proporsional
+    var weights = [];
+    var totalWeight = 0;
+    for (var k = 0; k < pendingItems.length; k++) {
+      var w = Math.floor(Math.random() * (maxSec - minSec + 1)) + minSec;
+      if (k > 0 && racksList[k] !== racksList[k - 1]) {
+        w += Math.floor(Math.random() * (rackDelay - 30 + 1)) + 30;
+      }
+      weights.push(w);
+      if (k > 0) totalWeight += w;
+    }
+
+    // Jeda acak di awal setelah shift start (20-60 detik)
+    var startBufferSec = Math.min(Math.floor(Math.random() * 60) + 20, Math.floor(availableSec * 0.05));
+    var actualStartMs = shiftStart.getTime() + (startBufferSec * 1000);
+    var availableMs = Math.max(1000, endTarget.getTime() - actualStartMs);
+
     var rowsHasilToAppend = [];
+    var cumulativeWeight = 0;
 
     for (var m = 0; m < pendingItems.length; m++) {
-      if (m > 0) {
-        curMs += (intervals[m] * 1000);
+      var curMs;
+      if (m === 0) {
+        curMs = actualStartMs;
+      } else if (m === pendingItems.length - 1) {
+        curMs = endTarget.getTime();
+      } else {
+        cumulativeWeight += weights[m];
+        var ratio = totalWeight > 0 ? (cumulativeWeight / totalWeight) : (m / (pendingItems.length - 1));
+        curMs = actualStartMs + Math.round(ratio * availableMs);
       }
+
       var itemDate = new Date(curMs);
       var timestampStr = Utilities.formatDate(itemDate, EDC_CONFIG.TIMEZONE, "dd/MM/yyyy HH:mm:ss");
 
@@ -2586,17 +2651,18 @@ function executeAutoFillEdCorrectionTask(picName, maxCount, minSeconds, maxSecon
         remarks
       ]);
 
-      // Update in-memory data Mainlist Kolom H s/d P
+      // Update in-memory data Mainlist Kolom H s/d Q
       var arrIdx = item.arrayIndex;
-      values[arrIdx][7] = edActual;  // Kolom H: ED Fisik
-      values[arrIdx][8] = edStatus;  // Kolom I: Status ED
-      values[arrIdx][9] = fisikGood; // Kolom J: Fisik Good
-      values[arrIdx][10] = fisikBad; // Kolom K: Fisik Bad
-      values[arrIdx][11] = totalFisik; // Kolom L: Total Fisik
-      values[arrIdx][12] = selisih;  // Kolom M: Selisih
-      values[arrIdx][13] = pic;      // Kolom N: Petugas
-      values[arrIdx][14] = "DONE";   // Kolom O: Status
-      values[arrIdx][15] = remarks;  // Kolom P: Remarks
+      values[arrIdx][7] = edActual;      // Kolom H: ED Fisik
+      values[arrIdx][8] = edStatus;      // Kolom I: Status ED
+      values[arrIdx][9] = fisikGood;     // Kolom J: Fisik Good
+      values[arrIdx][10] = fisikBad;     // Kolom K: Fisik Bad
+      values[arrIdx][11] = totalFisik;   // Kolom L: Total Fisik
+      values[arrIdx][12] = selisih;      // Kolom M: Selisih
+      values[arrIdx][13] = pic;          // Kolom N: Petugas
+      values[arrIdx][14] = "DONE";       // Kolom O: Status
+      values[arrIdx][15] = remarks;      // Kolom P: Remarks
+      values[arrIdx][16] = timestampStr; // Kolom Q: TIMESTAMP
     }
 
     // 1. Catat ke sheet Hasil ED Correction
@@ -2608,7 +2674,7 @@ function executeAutoFillEdCorrectionTask(picName, maxCount, minSeconds, maxSecon
       hasilSheet.getRange(hLast + 1, 1, rowsHasilToAppend.length, 17).setValues(rowsHasilToAppend);
     }
 
-    // 2. Simpan balik status DONE ke Mainlist
+    // 2. Simpan balik status DONE ke Mainlist (Kolom A - Q)
     range.setValues(values);
 
     var firstTs = rowsHasilToAppend[0][0];
@@ -2623,13 +2689,247 @@ function executeAutoFillEdCorrectionTask(picName, maxCount, minSeconds, maxSecon
       message: 'Berhasil memproses ' + pendingItems.length + ' task ED Correction!\n\n' +
                '• Petugas (PIC): ' + pic + '\n' +
                '• Rentang Waktu: ' + firstTs + ' s/d ' + lastTs + '\n' +
-               '• Timestamp: Bervariasi realistis (jeda ~' + minSec + '–' + maxSec + ' dtk antar item)\n' +
+               '• Tanggal: Terkunci di hari ini (' + Utilities.formatDate(endTarget, EDC_CONFIG.TIMEZONE, "dd/MM/yyyy") + ')\n' +
+               '• Kolom TIMESTAMP (Kolom Q) terisi!\n' +
                '• Status: Seluruh data tercatat ke sheet Hasil ED Correction & Mainlist terupdate DONE.'
     };
   } catch(err) {
     return {
       success: false,
       message: 'Terjadi kesalahan: ' + err.message
+    };
+  }
+}
+
+/**
+ * Dialog Prompt untuk memperbaiki / menyinkronkan timestamp baris-baris DONE di Mainlist & Hasil
+ */
+function fixTimestampsInMainlistPrompt() {
+  var ui = SpreadsheetApp.getUi();
+  var mainSheet = getEdCorrectionSheet('MAIN_LIST');
+  if (!mainSheet || mainSheet.getLastRow() < 2) {
+    alertEdc('ℹ️ Sheet Mainlist masih kosong.');
+    return;
+  }
+
+  var lastRow = mainSheet.getLastRow();
+  var colCount = Math.max(17, mainSheet.getLastColumn());
+  var values = mainSheet.getRange(2, 1, lastRow - 1, colCount).getValues();
+
+  var targetRowIndices = [];
+  for (var i = 0; i < values.length; i++) {
+    var sku = String(values[i][2] || '').trim();
+    if (!sku) continue;
+    var status = String(values[i][14] || '').trim().toUpperCase();
+    var edFisik = String(values[i][7] || '').trim();
+    if (status === 'DONE' || edFisik) {
+      targetRowIndices.push(i);
+    }
+  }
+
+  if (targetRowIndices.length === 0) {
+    alertEdc('ℹ️ Tidak ditemukan baris tugas DONE yang perlu diperbaiki timestampnya.');
+    return;
+  }
+
+  var todayStr = Utilities.formatDate(new Date(), EDC_CONFIG.TIMEZONE, "dd/MM/yyyy");
+  var confirm = ui.alert(
+    '🔧 Perbaiki Timestamp ke Hari Ini (' + todayStr + ')',
+    'Ditemukan ' + targetRowIndices.length + ' baris tugas DONE di Mainlist.\n\n' +
+    'Fitur ini akan:\n' +
+    '1. Menghitung ulang timestamp realistis strictly pada HARI INI (08:00 s/d sekarang).\n' +
+    '2. Mengisi Kolom Q (TIMESTAMP) di sheet "Mainlist Sku ED Corection".\n' +
+    '3. Memperbarui Kolom A (TIMESTAMP) di sheet "Hasil ED Correction" agar sinkron hari ini (tidak ada lagi tanggal kemarin 30).\n\n' +
+    'Lanjutkan perbaikan?',
+    ui.ButtonSet.YES_NO
+  );
+
+  if (confirm !== ui.Button.YES) return;
+
+  var res = executeFixTodayTimestamps(targetRowIndices, '');
+  if (res.success) {
+    alertEdc('✅ ' + res.message);
+  } else {
+    alertEdc('❌ ' + res.message);
+  }
+}
+
+/**
+ * Eksekutor perbaikan timestamp hari ini untuk baris-baris yang sudah berstatus DONE
+ */
+function executeFixTodayTimestamps(targetRowIndices, targetEndTimeStr) {
+  try {
+    var ss = getEdCorrectionSpreadsheet();
+    var mainSheet = getEdCorrectionSheet('MAIN_LIST');
+    var hasilSheet = getEdCorrectionSheet('HASIL');
+
+    if (!mainSheet) return { success: false, message: 'Sheet Mainlist tidak ditemukan.' };
+    var lastRow = mainSheet.getLastRow();
+    if (lastRow < 2) return { success: false, message: 'Mainlist masih kosong.' };
+
+    // Pastikan Header Kolom Q (TIMESTAMP) ada dan rapi
+    if (mainSheet.getLastColumn() < 17 || String(mainSheet.getRange(1, 17).getValue()).trim() === '') {
+      mainSheet.getRange(1, 17).setValue('TIMESTAMP')
+        .setBackground('#064E3B')
+        .setFontColor('#FFFFFF')
+        .setFontWeight('bold')
+        .setFontSize(10)
+        .setHorizontalAlignment('center')
+        .setVerticalAlignment('middle');
+      mainSheet.setColumnWidth(17, 160);
+    }
+
+    var range = mainSheet.getRange(2, 1, lastRow - 1, 17);
+    var values = range.getValues();
+
+    if (!targetRowIndices || targetRowIndices.length === 0) {
+      targetRowIndices = [];
+      for (var i = 0; i < values.length; i++) {
+        var sku = String(values[i][2] || '').trim();
+        if (!sku) continue;
+        var status = String(values[i][14] || '').trim().toUpperCase();
+        var edFisik = String(values[i][7] || '').trim();
+        if (status === 'DONE' || edFisik) {
+          targetRowIndices.push(i);
+        }
+      }
+    }
+
+    if (targetRowIndices.length === 0) {
+      return { success: false, message: 'Tidak ada baris DONE yang ditemukan di Mainlist.' };
+    }
+
+    var now = new Date();
+    var endTarget = new Date(now.getTime());
+    if (targetEndTimeStr && /^\d{1,2}:\d{2}(:\d{2})?$/.test(targetEndTimeStr.trim())) {
+      var pTime = targetEndTimeStr.trim().split(':');
+      endTarget.setHours(parseInt(pTime[0], 10));
+      endTarget.setMinutes(parseInt(pTime[1], 10));
+      endTarget.setSeconds(pTime[2] ? parseInt(pTime[2], 10) : 0);
+      if (endTarget.getTime() > now.getTime()) {
+        endTarget = new Date(now.getTime());
+      }
+    }
+
+    // Tentukan waktu shift mulai hari ini
+    var shiftStart = new Date(endTarget.getTime());
+    var firstRowShift = String(values[targetRowIndices[0]][1] || '').toLowerCase();
+    var isSiang = firstRowShift.indexOf('siang') !== -1 || firstRowShift.indexOf('shift 2') !== -1;
+
+    if (isSiang) {
+      shiftStart.setHours(15, 0, 0, 0);
+    } else {
+      if (endTarget.getHours() < 8 || (endTarget.getHours() === 8 && endTarget.getMinutes() < 30)) {
+        shiftStart.setHours(7, 30, 0, 0);
+      } else {
+        shiftStart.setHours(8, 0, 0, 0);
+      }
+    }
+    shiftStart.setFullYear(endTarget.getFullYear(), endTarget.getMonth(), endTarget.getDate());
+
+    if (shiftStart.getTime() >= endTarget.getTime()) {
+      var minBackMs = Math.min(endTarget.getHours() * 3600000 + endTarget.getMinutes() * 60000, targetRowIndices.length * 15 * 1000);
+      shiftStart = new Date(endTarget.getTime() - minBackMs);
+    }
+
+    var availableSec = Math.floor((endTarget.getTime() - shiftStart.getTime()) / 1000);
+    if (availableSec < targetRowIndices.length * 10) {
+      availableSec = Math.max(availableSec, targetRowIndices.length * 10);
+      var earliest = new Date(endTarget.getFullYear(), endTarget.getMonth(), endTarget.getDate(), 7, 0, 0);
+      shiftStart = new Date(Math.max(earliest.getTime(), endTarget.getTime() - (availableSec * 1000)));
+      availableSec = Math.floor((endTarget.getTime() - shiftStart.getTime()) / 1000);
+    }
+
+    var weights = [];
+    var totalWeight = 0;
+    for (var k = 0; k < targetRowIndices.length; k++) {
+      var idx = targetRowIndices[k];
+      var w = Math.floor(Math.random() * (110 - 45 + 1)) + 45;
+      if (k > 0) {
+        var prevRack = String(values[targetRowIndices[k - 1]][4] || '');
+        var curRack = String(values[idx][4] || '');
+        if (prevRack !== curRack) w += Math.floor(Math.random() * 60) + 30;
+      }
+      weights.push(w);
+      if (k > 0) totalWeight += w;
+    }
+
+    var startBufferSec = Math.min(Math.floor(Math.random() * 60) + 20, Math.floor(availableSec * 0.05));
+    var actualStartMs = shiftStart.getTime() + (startBufferSec * 1000);
+    var availableMs = Math.max(1000, endTarget.getTime() - actualStartMs);
+
+    var cumulativeWeight = 0;
+    var skuToTimestampMap = new Map();
+    var firstTs = "";
+    var lastTs = "";
+
+    for (var m = 0; m < targetRowIndices.length; m++) {
+      var curMs;
+      if (m === 0) {
+        curMs = actualStartMs;
+      } else if (m === targetRowIndices.length - 1) {
+        curMs = endTarget.getTime();
+      } else {
+        cumulativeWeight += weights[m];
+        var ratio = totalWeight > 0 ? (cumulativeWeight / totalWeight) : (m / (targetRowIndices.length - 1));
+        curMs = actualStartMs + Math.round(ratio * availableMs);
+      }
+
+      var itemDate = new Date(curMs);
+      var timestampStr = Utilities.formatDate(itemDate, EDC_CONFIG.TIMEZONE, "dd/MM/yyyy HH:mm:ss");
+      if (m === 0) firstTs = timestampStr;
+      if (m === targetRowIndices.length - 1) lastTs = timestampStr;
+
+      var rowIdx = targetRowIndices[m];
+      values[rowIdx][16] = timestampStr; // Kolom Q di Mainlist
+
+      var sku = String(values[rowIdx][2] || '').trim().toLowerCase();
+      if (sku) {
+        skuToTimestampMap.set(sku, timestampStr);
+      }
+    }
+
+    // 1. Simpan update ke Mainlist
+    range.setValues(values);
+
+    // 2. Sinkronkan ke sheet Hasil ED Correction (Kolom A)
+    var updatedHasilCount = 0;
+    if (hasilSheet && hasilSheet.getLastRow() > 1) {
+      var hLast = hasilSheet.getLastRow();
+      var hRange = hasilSheet.getRange(2, 1, hLast - 1, 2); // Kolom A (TIMESTAMP) & B (SKU)
+      var hValues = hRange.getValues();
+      var hModified = false;
+
+      for (var h = 0; h < hValues.length; h++) {
+        var hSku = String(hValues[h][1] || '').trim().toLowerCase();
+        if (skuToTimestampMap.has(hSku)) {
+          hValues[h][0] = skuToTimestampMap.get(hSku);
+          updatedHasilCount++;
+          hModified = true;
+        }
+      }
+
+      if (hModified) {
+        hRange.setValues(hValues);
+      }
+    }
+
+    return {
+      success: true,
+      count: targetRowIndices.length,
+      firstTimestamp: firstTs,
+      lastTimestamp: lastTs,
+      updatedHasilCount: updatedHasilCount,
+      message: 'Berhasil memperbarui timestamp untuk ' + targetRowIndices.length + ' task!\n\n' +
+               '• Rentang Baru: ' + firstTs + ' s/d ' + lastTs + '\n' +
+               '• Tanggal: Terkunci di hari ini (' + Utilities.formatDate(endTarget, EDC_CONFIG.TIMEZONE, "dd/MM/yyyy") + ')\n' +
+               '• Kolom Q (TIMESTAMP) di Mainlist terisi!\n' +
+               '• ' + updatedHasilCount + ' baris di sheet Hasil ED Correction ikut diperbarui.'
+    };
+  } catch(err) {
+    return {
+      success: false,
+      message: 'Gagal memperbarui timestamp: ' + err.message
     };
   }
 }
