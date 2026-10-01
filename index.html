@@ -1273,13 +1273,6 @@
             </div>
             <span id="edcListCountBadge" class="eds-count-badge">0 Selesai / 0 SKU (0%)</span>
           </div>
-
-          <div style="display: flex; gap: 8px; margin-top: 8px;">
-            <button type="button" id="edcAutoPerbaikiBtn" onclick="openAutoPerbaikiRumusModal()"
-              style="flex: 1; padding: 9px 12px; background: linear-gradient(135deg, #10b981, #059669); border: none; border-radius: 8px; color: #fff; font-size: 0.82rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);">
-              <span>⚡ Perbaiki Rumus ED</span>
-            </button>
-          </div>
         </div>
 
         <!-- Sort Bar -->
@@ -1557,52 +1550,6 @@
           <button type="button" id="edcConfirmEditProceedBtn" class="btn" style="flex: 1.2; padding: 12px; background: linear-gradient(135deg, #9333ea, #7c3aed); border: none; border-radius: 12px; color: #fff; font-weight: 700; cursor: pointer; box-shadow: 0 4px 14px rgba(147, 51, 234, 0.4);" onclick="proceedEdcConfirmedSubmit()">
             Ya, Perbarui Data
           </button>
-        </div>
-      </div>
-    </div>
-
-    <!-- EDC Auto Perbaiki Rumus Modal -->
-    <div id="edcAutoPerbaikiModal" class="eds-modal hidden">
-      <div class="eds-modal-backdrop" onclick="closeAutoPerbaikiRumusModal()"></div>
-      <div class="eds-modal-card">
-        <div class="eds-modal-header" style="border-bottom: 1px solid rgba(16, 185, 129, 0.25);">
-          <div class="eds-modal-title" style="color: #34d399; display: flex; align-items: center; gap: 8px;">
-            <span>⚡ Perbaiki Rumus ED</span>
-          </div>
-          <button type="button" class="eds-modal-close" onclick="closeAutoPerbaikiRumusModal()">✕</button>
-        </div>
-        <div class="eds-modal-body">
-          <div style="background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 8px; padding: 10px 12px; margin-bottom: 14px; display: flex; justify-content: space-between; align-items: center;">
-            <span style="color: #94a3b8; font-size: 0.85rem;">Task Pending Siap:</span>
-            <span id="edcAutoPendingCountBadge" style="font-weight: 700; color: #34d399; font-size: 0.95rem;">0 SKU</span>
-          </div>
-
-          <div class="eds-guide-block">
-            <label class="form-label" style="font-size: 0.8rem; font-weight: 600; color: #cbd5e1; display: block; margin-bottom: 6px;">NAMA PETUGAS (PIC)</label>
-            <input type="text" id="edcAutoPicInput" class="eds-field-input" placeholder="Masukkan nama Anda (misal: Bintang)...">
-          </div>
-
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px;">
-            <div>
-              <label class="form-label" style="font-size: 0.8rem; font-weight: 600; color: #cbd5e1; display: block; margin-bottom: 6px;">JUMLAH TASK</label>
-              <input type="number" id="edcAutoMaxCountInput" class="eds-field-input" value="10" min="1">
-            </div>
-            <div>
-              <label class="form-label" style="font-size: 0.8rem; font-weight: 600; color: #cbd5e1; display: block; margin-bottom: 6px;">JAM SELESAI</label>
-              <input type="text" id="edcAutoEndTimeInput" class="eds-field-input" placeholder="HH:mm (Sekarang)">
-            </div>
-          </div>
-
-          <div style="background: #0f172a; border: 1px solid rgba(148, 163, 184, 0.15); border-radius: 8px; padding: 10px 12px; font-size: 0.78rem; color: #94a3b8; margin-top: 14px; line-height: 1.5;">
-            💡 <b>Timestamp Alami:</b> Setiap item akan dicatat dengan waktu unik bertahap (jeda ~45–110 detik + delay antar rak). Waktu pengisian tidak seragam sehingga masuk akal seperti hasil audit nyata.
-          </div>
-
-          <div style="display: flex; gap: 10px; margin-top: 18px;">
-            <button type="button" class="btn" style="flex: 0.45; padding: 12px; background: #334155; border: none; border-radius: 10px; color: #cbd5e1; font-weight: 600; cursor: pointer;" onclick="closeAutoPerbaikiRumusModal()">Batal</button>
-            <button type="button" id="edcAutoSubmitBtn" class="btn" style="flex: 1; padding: 12px; background: linear-gradient(135deg, #10b981, #059669); border: none; border-radius: 10px; color: #fff; font-weight: 700; cursor: pointer; box-shadow: 0 4px 14px rgba(16, 185, 129, 0.4);" onclick="executeAutoPerbaikiRumusClient()">
-              🚀 Jalankan Perbaikan Rumus
-            </button>
-          </div>
         </div>
       </div>
     </div>
