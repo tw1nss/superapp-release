@@ -1,13 +1,12 @@
 {
-  "versionCode": 23,
-  "versionName": "1.2.7",
+  "versionCode": 24,
+  "versionName": "1.2.8",
   "apkUrl": "https://github.com/tw1nss/superapp-release/raw/main/app-debug.apk",
   "forceUpdate": false,
-  "title": "Pembaruan Superapp MTG v1.2.7",
+  "title": "Pembaruan Superapp MTG v1.2.8",
   "changelog": [
-    "Perbaikan pembacaan SKU ED Correction dari chart Superset & barcode scanner",
-    "Perbaikan akurasi status tugas PENDING dan report live audit",
-    "Peningkatan multi-SKU paste modal dan auto-split format QR & EAN-13"
+    "Pembaruan sumber Master Barcode SLOC langsung dari tab RACK UPDATE (Superset SLOC MASTER)",
+    "Pembersihan otomatis cache lama dan sinkronisasi real-time rak L1-FRZ-CF-NH-T1-K5-6"
   ],
-  "releasedAt": "2026-09-28"
+  "releasedAt": "2026-10-01"
 }

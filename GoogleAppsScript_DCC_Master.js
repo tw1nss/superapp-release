@@ -90,6 +90,7 @@ function buildSupersetMenu(ui) {
     .addItem('4. RACK UPDATE', 'Menu_rack_update')
     .addItem('5. ED CORRECTION (Chart 12077)', 'menu_ed_correction')
     .addSeparator()
+    .addItem('⚙️ Set URL / Slice ID "SLOC MASTER" (RACK UPDATE)', 'setRackUpdateChartPrompt')
     .addItem('🔑 Set / Ganti Cookie Superset', 'setSupersetCookiePrompt')
     .addSeparator()
     .addItem('⏰ Aktifkan Pemicu Auto-Sync (Setiap Jam)', 'setupSupersetHourlyTrigger')
@@ -559,19 +560,32 @@ function pullSupersetData(chartId, sheetName) {
   }
 
   var timestamp = new Date().getTime();
+  var props = PropertiesService.getScriptProperties();
 
-  var formDataKey = (chartId === 12077) ? "FGnMPSQjzn-IkTT_ZdewtmeAw3D7uPCz56ErrkOHEZT-KyQ5BLwbb8-QXzzmQpaL" : "";
-  var pageId = (chartId === 12077) ? "OuCI-jVWZVevhI7VLi-Uh" : "";
+  // Dukungan kustom form_data_key & chart ID untuk RACK UPDATE (SLOC MASTER)
+  var rackFormDataKey = props.getProperty('RACK_UPDATE_FORM_DATA_KEY') || "";
+  var rackPageId = props.getProperty('RACK_UPDATE_PAGE_ID') || "";
+  var rackCustomChartId = props.getProperty('RACK_UPDATE_CHART_ID');
+  var effectiveChartId = (sheetName === 'RACK UPDATE' && rackCustomChartId) ? Number(rackCustomChartId) : chartId;
+
+  var formDataKey = (effectiveChartId === 12077) 
+    ? "FGnMPSQjzn-IkTT_ZdewtmeAw3D7uPCz56ErrkOHEZT-KyQ5BLwbb8-QXzzmQpaL" 
+    : ((sheetName === 'RACK UPDATE' && rackFormDataKey) ? rackFormDataKey : "");
+
+  var pageId = (effectiveChartId === 12077) 
+    ? "OuCI-jVWZVevhI7VLi-Uh" 
+    : ((sheetName === 'RACK UPDATE' && rackPageId) ? rackPageId : "");
 
   var urlVariants = [];
   if (formDataKey) {
-    urlVariants.push(CONFIG.BASE_URL + "superset/explore_json/?form_data_key=" + encodeURIComponent(formDataKey) + "&slice_id=" + chartId + "&force=true&_t=" + timestamp);
+    urlVariants.push(CONFIG.BASE_URL + "superset/explore_json/?form_data_key=" + encodeURIComponent(formDataKey) + "&slice_id=" + effectiveChartId + "&force=true&_t=" + timestamp);
+    urlVariants.push(CONFIG.BASE_URL + "superset/explore_json/?form_data_key=" + encodeURIComponent(formDataKey) + "&force=true&_t=" + timestamp);
   }
-  urlVariants.push(CONFIG.BASE_URL + "api/v1/chart/" + chartId + "/data?force=true&_t=" + timestamp);
+  urlVariants.push(CONFIG.BASE_URL + "api/v1/chart/" + effectiveChartId + "/data?force=true&_t=" + timestamp);
   if (pageId) {
-    urlVariants.push(CONFIG.BASE_URL + "superset/explore_json/?form_data=" + encodeURIComponent(JSON.stringify({ slice_id: Number(chartId), dashboard_page_id: pageId })) + "&force=true&_t=" + timestamp);
+    urlVariants.push(CONFIG.BASE_URL + "superset/explore_json/?form_data=" + encodeURIComponent(JSON.stringify({ slice_id: Number(effectiveChartId), dashboard_page_id: pageId })) + "&force=true&_t=" + timestamp);
   }
-  urlVariants.push(CONFIG.BASE_URL + "superset/explore_json/?form_data={\"slice_id\":" + chartId + "}&force=true&_t=" + timestamp);
+  urlVariants.push(CONFIG.BASE_URL + "superset/explore_json/?form_data={\"slice_id\":" + effectiveChartId + "}&force=true&_t=" + timestamp);
 
   var response;
   var data;
@@ -879,7 +893,8 @@ function installDccMainlistFormulas(isSilent) {
   // 1. Detail Produk dari 'STOCK UPDATE' (Kolom D - G)
   // MAP LAMBDA memastikan evaluasi akurat per baris untuk tipe Angka maupun Teks
   sheet.getRange('D2').setFormula("=MAP(C2:C, LAMBDA(sku, IF(sku=\"\", \"\", IFERROR(XLOOKUP(VALUE(TRIM(sku)), 'STOCK UPDATE'!C:C, 'STOCK UPDATE'!E:E), IFERROR(XLOOKUP(TRIM(sku), 'STOCK UPDATE'!C:C, 'STOCK UPDATE'!E:E), \"\")))))");
-  sheet.getRange('E2').setFormula("=MAP(C2:C, LAMBDA(sku, IF(sku=\"\", \"\", IFERROR(XLOOKUP(VALUE(TRIM(sku)), 'STOCK UPDATE'!C:C, 'STOCK UPDATE'!D:D), IFERROR(XLOOKUP(TRIM(sku), 'STOCK UPDATE'!C:C, 'STOCK UPDATE'!D:D), \"\")))))");
+  // Kolom E (Lokasi Rak): Prioritaskan data rak terbaru dari 'RACK UPDATE' (Kolom C: SKU, Kolom F: Rack Name), fallback ke 'STOCK UPDATE'
+  sheet.getRange('E2').setFormula("=MAP(C2:C, LAMBDA(sku, IF(sku=\"\", \"\", IFERROR(XLOOKUP(VALUE(TRIM(sku)), 'RACK UPDATE'!C:C, 'RACK UPDATE'!F:F), IFERROR(XLOOKUP(TRIM(sku), 'RACK UPDATE'!C:C, 'RACK UPDATE'!F:F), IFERROR(XLOOKUP(VALUE(TRIM(sku)), 'STOCK UPDATE'!C:C, 'STOCK UPDATE'!D:D), IFERROR(XLOOKUP(TRIM(sku), 'STOCK UPDATE'!C:C, 'STOCK UPDATE'!D:D), \"\")))))))");
   sheet.getRange('F2').setFormula("=MAP(C2:C, LAMBDA(sku, IF(sku=\"\", \"\", IFERROR(XLOOKUP(VALUE(TRIM(sku)), 'STOCK UPDATE'!C:C, 'STOCK UPDATE'!F:F), IFERROR(XLOOKUP(TRIM(sku), 'STOCK UPDATE'!C:C, 'STOCK UPDATE'!F:F), 0)))))");
   sheet.getRange('G2').setFormula("=MAP(C2:C, LAMBDA(sku, IF(sku=\"\", \"\", IFERROR(XLOOKUP(VALUE(TRIM(sku)), 'STOCK UPDATE'!C:C, 'STOCK UPDATE'!J:J), IFERROR(XLOOKUP(TRIM(sku), 'STOCK UPDATE'!C:C, 'STOCK UPDATE'!J:J), \"-\")))))");
 
@@ -896,12 +911,12 @@ function installDccMainlistFormulas(isSilent) {
   sheet.getRange('P2').setFormula("=MAP(C2:C, LAMBDA(sku, IF(sku=\"\", \"\", IFERROR(XLOOKUP(TRIM(sku), 'Hasil DCC'!B:B, 'Hasil DCC'!K:K, \"\", 0, -1), IFERROR(XLOOKUP(VALUE(TRIM(sku)), 'Hasil DCC'!B:B, 'Hasil DCC'!K:K, \"\", 0, -1), \"\")))))");
 
   if (!isSilent) {
-    alertUser('✅ Berhasil memasang rumus otomatis di "Mainlist SKU"!\n\nSemua data dari "STOCK UPDATE" dan "Hasil DCC" kini tersinkronisasi secara real-time.');
+    alertUser('✅ Berhasil memasang rumus otomatis di "Mainlist SKU"!\n\nSemua data dari "RACK UPDATE", "STOCK UPDATE" dan "Hasil DCC" kini tersinkronisasi secara real-time.');
   }
 }
 
 // ==============================================================================
-// 📋 TARIK DETAIL SKU DARI "STOCK UPDATE" (OPSI HARD VALUES)
+// 📋 TARIK DETAIL SKU DARI "STOCK UPDATE" & "RACK UPDATE" (OPSI HARD VALUES)
 // ==============================================================================
 function syncDetailSkuMainlist() {
   var ss = getSpreadsheet();
@@ -929,6 +944,19 @@ function syncDetailSkuMainlist() {
         qty: stockData[s][5] !== '' ? stockData[s][5] : 0, // Col F: Qty
         type: stockData[s][9] || ''     // Col J: Type
       };
+    }
+  }
+
+  // Sinkronkan lokasi rak terbaru dari 'RACK UPDATE' jika sheet tersedia
+  var rackSheet = ss.getSheetByName('RACK UPDATE');
+  if (rackSheet) {
+    var rackData = rackSheet.getDataRange().getValues();
+    for (var r = 1; r < rackData.length; r++) {
+      var rSku = String(rackData[r][2] || '').trim().toLowerCase(); // Col C: SKU
+      var rSloc = String(rackData[r][5] || '').trim();              // Col F: Rack Name
+      if (rSku && rSloc && stockMap[rSku]) {
+        stockMap[rSku].sloc = rSloc;
+      }
     }
   }
 
@@ -1196,6 +1224,56 @@ function setSupersetCookiePrompt() {
     }
     PropertiesService.getScriptProperties().setProperty('MY_COOKIE', cookieVal);
     ui.alert('✅ Cookie Superset berhasil diperbarui!\n\nSekarang Anda dapat menjalankan menu "🚀 Update Semua Data".');
+  }
+}
+
+// ==============================================================================
+// ⚙️ SET URL / SLICE ID CHART "SLOC MASTER" (RACK UPDATE)
+// ==============================================================================
+function setRackUpdateChartPrompt() {
+  var ui = SpreadsheetApp.getUi();
+  var currentKey = PropertiesService.getScriptProperties().getProperty('RACK_UPDATE_FORM_DATA_KEY') || '';
+  var currentId = PropertiesService.getScriptProperties().getProperty('RACK_UPDATE_CHART_ID') || '12422';
+
+  var response = ui.prompt(
+    '⚙️ Set URL / Slice ID "SLOC MASTER" (RACK UPDATE)',
+    'Paste URL Explore dari dash.astronauts.id atau form_data_key atau Slice ID chart SLOC MASTER:\n' +
+    '(Contoh: https://dash.astronauts.id/explore/?form_data_key=EOF6Xz2Hw... atau masukkan angka slice_id)\n\n' +
+    'Pengaturan Saat Ini:\n- Chart ID: ' + currentId + '\n- Form Data Key: ' + (currentKey ? (currentKey.substring(0, 25) + '...') : '(Default Chart 12422)'),
+    ui.ButtonSet.OK_CANCEL
+  );
+
+  if (response.getSelectedButton() === ui.Button.OK) {
+    var input = response.getResponseText().trim();
+    if (!input) {
+      ui.alert('⚠️ Input tidak boleh kosong.');
+      return;
+    }
+
+    var props = PropertiesService.getScriptProperties();
+    // Cek jika input adalah URL Superset
+    if (input.indexOf('dash.astronauts.id') !== -1 || input.indexOf('form_data_key=') !== -1 || input.indexOf('slice_id=') !== -1) {
+      var keyMatch = input.match(/form_data_key=([a-zA-Z0-9_\-]+)/);
+      var sliceMatch = input.match(/slice_id=(\d+)/);
+      var pageMatch = input.match(/dashboard_page_id=([a-zA-Z0-9_\-]+)/);
+
+      if (keyMatch && keyMatch[1]) {
+        props.setProperty('RACK_UPDATE_FORM_DATA_KEY', keyMatch[1]);
+      }
+      if (sliceMatch && sliceMatch[1]) {
+        props.setProperty('RACK_UPDATE_CHART_ID', sliceMatch[1]);
+      }
+      if (pageMatch && pageMatch[1]) {
+        props.setProperty('RACK_UPDATE_PAGE_ID', pageMatch[1]);
+      }
+      ui.alert('✅ Konfigurasi RACK UPDATE (SLOC MASTER) berhasil disimpan!\n\nKey: ' + (keyMatch ? keyMatch[1] : '-') + '\nSlice ID: ' + (sliceMatch ? sliceMatch[1] : currentId));
+    } else if (/^\d+$/.test(input)) {
+      props.setProperty('RACK_UPDATE_CHART_ID', input);
+      ui.alert('✅ Chart ID RACK UPDATE berhasil diset ke: ' + input);
+    } else {
+      props.setProperty('RACK_UPDATE_FORM_DATA_KEY', input);
+      ui.alert('✅ form_data_key RACK UPDATE berhasil disimpan!');
+    }
   }
 }
 

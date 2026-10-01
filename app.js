@@ -10,13 +10,14 @@
 
   // ── Config ──
   const SHEET_ID = '1fVQwSOoIU9pT5RHWi6-m8qCf_T0rQPZxEf_WuhlaD2g';
-  // Selective column query for Master Rack (from 'STOCK UPDATE')
-  const MASTER_CSV_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent('STOCK UPDATE')}&tq=SELECT%20A,%20C,%20D,%20E,%20F,%20J`;
+  // Selective column query for Master Rack (from 'RACK UPDATE' - real-time latest SLOC from Superset SLOC MASTER)
+  // Kolom RACK UPDATE: A=location_name, C=sku_number, D=product_name, F=rack_name, H=stock, J=product_type_name
+  const MASTER_CSV_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent('RACK UPDATE')}&tq=${encodeURIComponent("SELECT A, C, D, F, H, J WHERE F IS NOT NULL AND F != ''")}`;
   // CSV Query for MSLTC sheet
   const MSLTC_CSV_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=MSLTC`;
 
   const MAX_HISTORY = 8;
-  const DB_NAME = 'QRSLOC_DB_MTG_V3';
+  const DB_NAME = 'QRSLOC_DB_MTG_V4';
   const DB_VERSION = 1;
   const STORE_NAME = 'master_cache';
 
@@ -88,7 +89,7 @@
       const db = await openDB();
       const tx = db.transaction(STORE_NAME, 'readwrite');
       const store = tx.objectStore(STORE_NAME);
-      store.put({ masterArray, msltcArray, count, timestampIso }, 'masterDataV2');
+      store.put({ masterArray, msltcArray, count, timestampIso }, 'masterDataV4');
       return tx.complete;
     } catch (e) {
       console.warn('IndexedDB save failed:', e);
@@ -101,12 +102,23 @@
       const tx = db.transaction(STORE_NAME, 'readonly');
       const store = tx.objectStore(STORE_NAME);
       return new Promise((resolve) => {
-        const req = store.get('masterDataV2');
+        const req = store.get('masterDataV4');
         req.onsuccess = () => resolve(req.result || null);
         req.onerror = () => resolve(null);
       });
     } catch (e) {
       return null;
+    }
+  }
+
+  async function clearCache() {
+    try {
+      const db = await openDB();
+      const tx = db.transaction(STORE_NAME, 'readwrite');
+      tx.objectStore(STORE_NAME).clear();
+      return tx.complete;
+    } catch (e) {
+      console.warn('IndexedDB clear failed:', e);
     }
   }
 
@@ -316,9 +328,12 @@
     }
 
     try {
+      const fetchTime = Date.now();
+      const masterUrlWithTs = MASTER_CSV_URL + '&_nocache=' + fetchTime;
+      const msltcUrlWithTs = MSLTC_CSV_URL + '&_nocache=' + fetchTime;
       const [masterRes, msltcRes] = await Promise.all([
-        fetch(MASTER_CSV_URL),
-        fetch(MSLTC_CSV_URL)
+        fetch(masterUrlWithTs, { cache: 'no-store' }),
+        fetch(msltcUrlWithTs, { cache: 'no-store' })
       ]);
 
       if (!masterRes.ok || !msltcRes.ok) throw new Error(`HTTP fetch error`);
@@ -2310,7 +2325,8 @@
 
   searchForm.addEventListener('submit', handleSearch);
 
-  refreshBtn.addEventListener('click', function () {
+  refreshBtn.addEventListener('click', async function () {
+    await clearCache();
     fetchSheetData(false);
   });
 
@@ -2800,8 +2816,11 @@
 
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('./sw.js')
-        .then(reg => console.log('[PWA] Service Worker registered:', reg.scope))
+      navigator.serviceWorker.register('./sw.js?v=103')
+        .then(reg => {
+          console.log('[PWA] Service Worker registered:', reg.scope);
+          try { reg.update(); } catch(e) {}
+        })
         .catch(err => console.warn('[PWA] Service Worker registration failed:', err));
     });
   }
@@ -7146,8 +7165,8 @@
   //  IN-APP UPDATE & VERSION CHECKING ENGINE
   // ══════════════════════════════════════════════
 
-  const APP_VERSION_CODE = 23; // Local current version code (v1.2.7 Master OTA)
-  const APP_VERSION_NAME = '1.2.7';
+  const APP_VERSION_CODE = 24; // Local current version code (v1.2.8 Master OTA)
+  const APP_VERSION_NAME = '1.2.8';
   const UPDATE_MANIFEST_URL = 'https://raw.githubusercontent.com/tw1nss/superapp-release/main/version.json';
 
   let currentUpdateData = null;

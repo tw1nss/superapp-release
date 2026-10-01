@@ -30,7 +30,7 @@
 // =============================
 var EDC_CONFIG = {
   // ID Spreadsheet default Dashboard STK MTG
-  DEFAULT_TARGET_ID: "1fVQwSOoIU9pT5RHWi6-m8qCf_T0rQPZxEf_WuhlaD2g", 
+  DEFAULT_TARGET_ID: "1fVQwSOoIU9pT5RHWi6-m8qCf_T0rQPZxEf_WuhlaD2g",
   EVIDENCE_FOLDER_ID: "1RtRFC7XfgLNr7EV76rRn-hScNYW4hOb3", // Folder Drive Foto Bukti
   TIMEZONE: "Asia/Jakarta",
   // ── Konfigurasi AstroDash Superset ED Correction ──
@@ -75,30 +75,30 @@ function getEdCorrectionSheet(type) {
   if (!ss) return null;
 
   if (type === 'MAIN_LIST') {
-    return ss.getSheetByName('Mainlist Sku ED Corection') || 
-           ss.getSheetByName('Main List SKU ED Correction') || 
-           ss.getSheetByName('Main List ED Correction') || 
-           ss.getSheetByName('Mainlist ED Correction') || 
-           ss.getSheetByName('Main List SKU EDC') ||
-           ss.getSheetByName('Mainlist SKU');
+    return ss.getSheetByName('Mainlist Sku ED Corection') ||
+      ss.getSheetByName('Main List SKU ED Correction') ||
+      ss.getSheetByName('Main List ED Correction') ||
+      ss.getSheetByName('Mainlist ED Correction') ||
+      ss.getSheetByName('Main List SKU EDC') ||
+      ss.getSheetByName('Mainlist SKU');
   }
   if (type === 'DATA_UPDATE') {
-    return ss.getSheetByName('Data Update ED Corection') || 
-           ss.getSheetByName('Data Update ED Correction') || 
-           ss.getSheetByName('Data Update') || 
-           ss.getSheetByName('Data Update ED Sweeper') || 
-           ss.getSheetByName('STOCK UPDATE');
+    return ss.getSheetByName('Data Update ED Corection') ||
+      ss.getSheetByName('Data Update ED Correction') ||
+      ss.getSheetByName('Data Update') ||
+      ss.getSheetByName('Data Update ED Sweeper') ||
+      ss.getSheetByName('STOCK UPDATE');
   }
   if (type === 'HASIL' || type === 'HISTORICAL') {
-    return ss.getSheetByName('Hasil ED Correction') || 
-           ss.getSheetByName('Hasil ED Corection') || 
-           ss.getSheetByName('Hasil EDC');
+    return ss.getSheetByName('Hasil ED Correction') ||
+      ss.getSheetByName('Hasil ED Corection') ||
+      ss.getSheetByName('Hasil EDC');
   }
   if (type === 'BACKUP') {
-    return ss.getSheetByName('Backup ED Corection') || 
-           ss.getSheetByName('Backup Data ED Correction') || 
-           ss.getSheetByName('Backup ED Correction') || 
-           ss.getSheetByName('Backup Data');
+    return ss.getSheetByName('Backup ED Corection') ||
+      ss.getSheetByName('Backup Data ED Correction') ||
+      ss.getSheetByName('Backup ED Correction') ||
+      ss.getSheetByName('Backup Data');
   }
   return ss.getSheetByName(type);
 }
@@ -116,7 +116,7 @@ function onOpen() {
   // Pasang trigger auto-backup harian ED Correction (23:30 WIB)
   try {
     ensureDailyBackupTriggerEdCorrection();
-  } catch(eTrig) {}
+  } catch (eTrig) { }
 
   // Bangun Menu Utama ED Correction
   buildEdCorrectionMenu(ui);
@@ -126,7 +126,7 @@ function buildEdCorrectionMenu(ui) {
   if (!ui) {
     try {
       ui = SpreadsheetApp.getUi();
-    } catch(e) {
+    } catch (e) {
       return;
     }
   }
@@ -213,7 +213,7 @@ function setEdCorrectionSheetUrlPrompt() {
       var targetSs = SpreadsheetApp.openById(fileId);
       PropertiesService.getScriptProperties().setProperty('ED_CORRECTION_SHEET_ID', fileId);
       alertEdc('✅ Berhasil Menghubungkan Spreadsheet!\n\nNama Sheet: "' + targetSs.getName() + '"\nID: ' + fileId);
-    } catch(err) {
+    } catch (err) {
       alertEdc('❌ Gagal Mengakses Spreadsheet!\n\nDetail: ' + err.message + '\n\nPastikan ID/URL benar dan akun memiliki hak akses edit.');
     }
   }
@@ -230,20 +230,20 @@ function updateEdCorrectionFromSupersetManual() {
   var ss = getEdCorrectionSpreadsheet();
   var sheet = getEdCorrectionSheet('DATA_UPDATE');
   var targetName = sheet ? sheet.getName() : EDC_SHEETS.DATA_UPDATE;
-  
+
   // Bersihkan validasi sel lama agar data Superset tidak terblokir
   if (sheet) {
     try {
       var maxR = Math.max(sheet.getMaxRows(), 100);
       var maxC = Math.max(sheet.getMaxColumns(), 26);
       sheet.getRange(1, 1, maxR, maxC).clearDataValidations();
-    } catch(eVal) {}
+    } catch (eVal) { }
   }
 
   if (ss && typeof ss.toast === "function") {
     ss.toast("⚡ Menghubungkan ke AstroDash Superset (Chart ID 12077)...", "Loading", 4);
   }
-  
+
   pullEdCorrectionSupersetDataToSheet(targetName, false);
 }
 
@@ -262,7 +262,7 @@ function clearEdCorrectionDataValidationsManual() {
     var maxC = Math.max(sheet.getMaxColumns(), 26);
     sheet.getRange(1, 1, maxR, maxC).clearDataValidations();
     alertEdc('✅ Validasi Data Berhasil Dibersihkan!\n\nSemua aturan validasi sel (termasuk batasan nilai Shift di sel B2) pada sheet "' + sheet.getName() + '" telah dihapus. Penarikan data Superset kini tidak akan terblokir lagi.');
-  } catch(e) {
+  } catch (e) {
     alertEdc('❌ Gagal membersihkan validasi: ' + e.message);
   }
 }
@@ -388,9 +388,9 @@ function pullEdCorrectionSupersetDataToSheet(sheetName, isSilent) {
         } else if (json.data && json.data.records) {
           data = json.data.records;
         } else if (json.colnames && json.data) {
-          data = json.data.map(function(row) {
+          data = json.data.map(function (row) {
             var obj = {};
-            json.colnames.forEach(function(col, idx) {
+            json.colnames.forEach(function (col, idx) {
               obj[col] = row[idx];
             });
             return obj;
@@ -437,14 +437,14 @@ function processEdCorrectionSupersetDataToSheet(data, sheetName) {
 
   var headers = Object.keys(data[0]);
   var qrIdx = headers.indexOf('qr_code');
-  var hasSku = headers.some(function(h) { return h.toLowerCase().includes("sku"); });
+  var hasSku = headers.some(function (h) { return h.toLowerCase().includes("sku"); });
   var addSkuCol = (!hasSku && qrIdx !== -1);
   if (addSkuCol) {
     headers.push('sku_number');
   }
 
-  var rows = data.map(function(item) {
-    return headers.map(function(key) {
+  var rows = data.map(function (item) {
+    return headers.map(function (key) {
       if (key === 'sku_number' && addSkuCol) {
         var qr = String(item['qr_code'] || '');
         return qr.split(';')[0].trim();
@@ -472,7 +472,7 @@ function processEdCorrectionSupersetDataToSheet(data, sheetName) {
     var maxR = Math.max(sheet.getMaxRows(), rows.length + 10, 100);
     var maxC = Math.max(sheet.getMaxColumns(), headers.length + 5, 26);
     sheet.getRange(1, 1, maxR, maxC).clearDataValidations();
-  } catch(eVal) {
+  } catch (eVal) {
     console.warn("Gagal clear data validations:", eVal);
   }
 
@@ -492,7 +492,7 @@ function processEdCorrectionSupersetDataToSheet(data, sheetName) {
     sheet.getRange(2, 1, rows.length, headers.length).setValues(rows);
 
     // Format kolom SKU sebagai teks murni
-    var skuIdx = headers.findIndex(function(h) { return h.toLowerCase().includes("sku"); });
+    var skuIdx = headers.findIndex(function (h) { return h.toLowerCase().includes("sku"); });
     if (skuIdx !== -1) {
       sheet.getRange(2, skuIdx + 1, rows.length, 1).setNumberFormat('@');
     }
@@ -500,7 +500,7 @@ function processEdCorrectionSupersetDataToSheet(data, sheetName) {
 
   try {
     sheet.autoResizeColumns(1, Math.min(headers.length, 15));
-  } catch(eResize) {}
+  } catch (eResize) { }
 }
 
 // ==============================================================================
@@ -564,7 +564,7 @@ function parseEdCorrectionSkuInput(rawText) {
 
     // Case 1: Tab-separated (copas multi-kolom Excel / Google Sheets)
     if (line.indexOf('\t') !== -1) {
-      var cols = line.split('\t').map(function(c) { return c.trim(); }).filter(function(c) { return c.length > 0; });
+      var cols = line.split('\t').map(function (c) { return c.trim(); }).filter(function (c) { return c.length > 0; });
       var foundInCols = false;
 
       // Prioritas 1: Format QR (SKU;DDMMYYYY) di kolom manapun
@@ -610,11 +610,11 @@ function parseEdCorrectionSkuInput(rawText) {
     }
 
     // Case 2: Multi-SKU pada baris yang sama (spasi, koma, pipe, atau semicolon QR)
-    var tokens = line.split(/[\s,\|]+/).map(function(t) { return t.trim(); }).filter(function(t) { return t.length > 0; });
+    var tokens = line.split(/[\s,\|]+/).map(function (t) { return t.trim(); }).filter(function (t) { return t.length > 0; });
     for (var t = 0; t < tokens.length; t++) {
       var tok = tokens[t];
       if (tok.indexOf(';') !== -1) {
-        var parts = tok.split(';').map(function(p) { return p.trim(); }).filter(function(p) { return p.length > 0; });
+        var parts = tok.split(';').map(function (p) { return p.trim(); }).filter(function (p) { return p.length > 0; });
         var cleanPart = parts[0].replace(/[^\w-]/g, '').trim();
         if (cleanPart.length >= 3 && !isDateToken(cleanPart) && !isHeaderToken(cleanPart) && !isRackOrLocation(cleanPart)) {
           addSku(cleanPart);
@@ -1312,10 +1312,10 @@ function fixClumpedSkuRowsEdCorrection() {
 
     if (!rawSku) continue;
 
-    var isClumped = (rawSku.indexOf('\n') !== -1 || rawSku.indexOf('\r') !== -1 || 
-                     rawSku.indexOf('\t') !== -1 || rawSku.indexOf(',') !== -1 || 
-                     rawSku.indexOf(';') !== -1 || rawSku.indexOf(' ') !== -1 ||
-                     rawSku.length > 25);
+    var isClumped = (rawSku.indexOf('\n') !== -1 || rawSku.indexOf('\r') !== -1 ||
+      rawSku.indexOf('\t') !== -1 || rawSku.indexOf(',') !== -1 ||
+      rawSku.indexOf(';') !== -1 || rawSku.indexOf(' ') !== -1 ||
+      rawSku.length > 25);
 
     if (isClumped) {
       foundClumped = true;
@@ -1375,7 +1375,7 @@ function handleEdCorrectionOnEdit(e) {
 
       var parts = parseEdCorrectionSkuInput(val);
       if (!parts || parts.length === 0) {
-        parts = val.split(/[\s,;|]+/).map(function(s) { return s.trim(); }).filter(function(s) { return s.length > 0; });
+        parts = val.split(/[\s,;|]+/).map(function (s) { return s.trim(); }).filter(function (s) { return s.length > 0; });
       }
 
       if (parts.length > 1) {
@@ -1431,8 +1431,8 @@ function syncDetailSkuEdCorrection(isSilent) {
 
   // Buat lookup map dari data update
   var updateMap = new Map();
-  var upHeaders = updateData[0].map(function(h) { return String(h || '').trim().toLowerCase(); });
-  
+  var upHeaders = updateData[0].map(function (h) { return String(h || '').trim().toLowerCase(); });
+
   var colQr = upHeaders.indexOf('qr_code');
   var colSku = upHeaders.indexOf('sku_number');
   if (colSku === -1) colSku = upHeaders.indexOf('sku');
@@ -1450,7 +1450,7 @@ function syncDetailSkuEdCorrection(isSilent) {
     var rawSku = String(uRow[colSku] || '').trim();
     var rawQr = colQr !== -1 ? String(uRow[colQr] || '').trim() : '';
     var prodId = colProdId !== -1 ? String(uRow[colProdId] || '').trim() : '';
-    
+
     // Ekstrak SKU bersih (sebelum tanda titik koma jika ada)
     var cleanSku = rawSku.split(';')[0].trim().toLowerCase();
     var cleanQr = rawQr.split(';')[0].trim().toLowerCase();
@@ -1530,7 +1530,7 @@ function formatMainlistSkuEdCorrection() {
     if (firstRowVals.indexOf('location_id') !== -1 || firstRowVals.indexOf('sku_number') !== -1) {
       var existingUpdate = ss.getSheetByName(EDC_SHEETS.DATA_UPDATE);
       if (existingUpdate && existingUpdate !== currentMain) {
-        try { ss.deleteSheet(existingUpdate); } catch(eDel) {}
+        try { ss.deleteSheet(existingUpdate); } catch (eDel) { }
       }
       currentMain.setName(EDC_SHEETS.DATA_UPDATE);
       currentMain = null; // Buat sheet Mainlist baru di bawah
@@ -1546,7 +1546,7 @@ function formatMainlistSkuEdCorrection() {
   sheet.clearFormats();
   try {
     sheet.getRange(1, 1, Math.max(sheet.getMaxRows(), 100), Math.max(sheet.getMaxColumns(), 26)).clearDataValidations();
-  } catch(eVal) {}
+  } catch (eVal) { }
 
   // 17 Kolom Header Lengkap (Termasuk Kolom Q: TIMESTAMP)
   var headers = [
@@ -1588,7 +1588,7 @@ function formatMainlistSkuEdCorrection() {
   // Alternating colors
   try {
     sheet.getRange(2, 1, maxRows - 1, 17).applyRowBanding(SpreadsheetApp.BandingTheme.LIGHT_GREY, false, false);
-  } catch(eBanding) {}
+  } catch (eBanding) { }
 
   sheet.autoResizeColumns(1, 17);
   sheet.setColumnWidth(1, 110); // TANGGAL
@@ -1645,40 +1645,40 @@ function installEdCorrectionMainlistFormulas(isSilent) {
   // Kolom D: Nama Produk
   sheet.getRange('D2').setFormula(
     '=MAP(C2:C, LAMBDA(sku, IF(sku="", "", ' +
-      'IFERROR(XLOOKUP(TRIM(sku) & ";*", \'' + updateName + '\'!D:D, \'' + updateName + '\'!E:E, "", 2), ' +
-      'IFERROR(XLOOKUP(TRIM(sku), \'' + updateName + '\'!D:D, \'' + updateName + '\'!E:E, "", 0), ' +
-      'IFERROR(XLOOKUP(VALUE(TRIM(sku)), \'' + updateName + '\'!D:D, \'' + updateName + '\'!E:E, "", 0), ' +
-      'IFERROR(XLOOKUP(TRIM(sku), \'' + updateName + '\'!L:L, \'' + updateName + '\'!E:E, "", 0), ' +
-      'IFERROR(XLOOKUP(TRIM(sku), \'' + updateName + '\'!B:B, \'' + updateName + '\'!E:E, "", 0), ""))))))))'
+    'IFERROR(XLOOKUP(TRIM(sku) & ";*", \'' + updateName + '\'!D:D, \'' + updateName + '\'!E:E, "", 2), ' +
+    'IFERROR(XLOOKUP(TRIM(sku), \'' + updateName + '\'!D:D, \'' + updateName + '\'!E:E, "", 0), ' +
+    'IFERROR(XLOOKUP(VALUE(TRIM(sku)), \'' + updateName + '\'!D:D, \'' + updateName + '\'!E:E, "", 0), ' +
+    'IFERROR(XLOOKUP(TRIM(sku), \'' + updateName + '\'!L:L, \'' + updateName + '\'!E:E, "", 0), ' +
+    'IFERROR(XLOOKUP(TRIM(sku), \'' + updateName + '\'!B:B, \'' + updateName + '\'!E:E, "", 0), ""))))))))'
   );
 
   // Kolom E: Lokasi Rak (SLOC) -> Mengambil Kolom K (rack_name)
   sheet.getRange('E2').setFormula(
     '=MAP(C2:C, LAMBDA(sku, IF(sku="", "", ' +
-      'IFERROR(XLOOKUP(TRIM(sku) & ";*", \'' + updateName + '\'!D:D, \'' + updateName + '\'!K:K, "", 2), ' +
-      'IFERROR(XLOOKUP(TRIM(sku), \'' + updateName + '\'!D:D, \'' + updateName + '\'!K:K, "", 0), ' +
-      'IFERROR(XLOOKUP(VALUE(TRIM(sku)), \'' + updateName + '\'!D:D, \'' + updateName + '\'!K:K, "", 0), ' +
-      'IFERROR(XLOOKUP(TRIM(sku), \'' + updateName + '\'!L:L, \'' + updateName + '\'!K:K, "", 0), ' +
-      'IFERROR(XLOOKUP(TRIM(sku), \'' + updateName + '\'!B:B, \'' + updateName + '\'!K:K, "", 0), ""))))))))'
+    'IFERROR(XLOOKUP(TRIM(sku) & ";*", \'' + updateName + '\'!D:D, \'' + updateName + '\'!K:K, "", 2), ' +
+    'IFERROR(XLOOKUP(TRIM(sku), \'' + updateName + '\'!D:D, \'' + updateName + '\'!K:K, "", 0), ' +
+    'IFERROR(XLOOKUP(VALUE(TRIM(sku)), \'' + updateName + '\'!D:D, \'' + updateName + '\'!K:K, "", 0), ' +
+    'IFERROR(XLOOKUP(TRIM(sku), \'' + updateName + '\'!L:L, \'' + updateName + '\'!K:K, "", 0), ' +
+    'IFERROR(XLOOKUP(TRIM(sku), \'' + updateName + '\'!B:B, \'' + updateName + '\'!K:K, "", 0), ""))))))))'
   );
 
   // Kolom F: Qty Sistem -> Mengambil Kolom F (qty_system)
   sheet.getRange('F2').setFormula(
     '=MAP(C2:C, LAMBDA(sku, IF(sku="", "", ' +
-      'IFERROR(XLOOKUP(TRIM(sku) & ";*", \'' + updateName + '\'!D:D, \'' + updateName + '\'!F:F, "", 2), ' +
-      'IFERROR(XLOOKUP(TRIM(sku), \'' + updateName + '\'!D:D, \'' + updateName + '\'!F:F, "", 0), ' +
-      'IFERROR(XLOOKUP(VALUE(TRIM(sku)), \'' + updateName + '\'!D:D, \'' + updateName + '\'!F:F, "", 0), ' +
-      'IFERROR(XLOOKUP(TRIM(sku), \'' + updateName + '\'!L:L, \'' + updateName + '\'!F:F, "", 0), ' +
-      'IFERROR(XLOOKUP(TRIM(sku), \'' + updateName + '\'!B:B, \'' + updateName + '\'!F:F, "", 0), 0))))))))'
+    'IFERROR(XLOOKUP(TRIM(sku) & ";*", \'' + updateName + '\'!D:D, \'' + updateName + '\'!F:F, "", 2), ' +
+    'IFERROR(XLOOKUP(TRIM(sku), \'' + updateName + '\'!D:D, \'' + updateName + '\'!F:F, "", 0), ' +
+    'IFERROR(XLOOKUP(VALUE(TRIM(sku)), \'' + updateName + '\'!D:D, \'' + updateName + '\'!F:F, "", 0), ' +
+    'IFERROR(XLOOKUP(TRIM(sku), \'' + updateName + '\'!L:L, \'' + updateName + '\'!F:F, "", 0), ' +
+    'IFERROR(XLOOKUP(TRIM(sku), \'' + updateName + '\'!B:B, \'' + updateName + '\'!F:F, "", 0), 0))))))))'
   );
 
   // Kolom G: ED Sistem (Lama) -> Mengambil Kolom G (expiry_date)
   sheet.getRange('G2').setFormula(
     '=MAP(C2:C, LAMBDA(sku, IF(sku="", "", ' +
-      'IFERROR(TEXT(XLOOKUP(TRIM(sku) & ";*", \'' + updateName + '\'!D:D, \'' + updateName + '\'!G:G, "", 2), "yyyy-mm-dd"), ' +
-      'IFERROR(TEXT(XLOOKUP(TRIM(sku), \'' + updateName + '\'!D:D, \'' + updateName + '\'!G:G, "", 0), "yyyy-mm-dd"), ' +
-      'IFERROR(XLOOKUP(TRIM(sku) & ";*", \'' + updateName + '\'!D:D, \'' + updateName + '\'!G:G, "", 2), ' +
-      'IFERROR(XLOOKUP(TRIM(sku), \'' + updateName + '\'!D:D, \'' + updateName + '\'!G:G, "", 0), "-")))))))'
+    'IFERROR(TEXT(XLOOKUP(TRIM(sku) & ";*", \'' + updateName + '\'!D:D, \'' + updateName + '\'!G:G, "", 2), "yyyy-mm-dd"), ' +
+    'IFERROR(TEXT(XLOOKUP(TRIM(sku), \'' + updateName + '\'!D:D, \'' + updateName + '\'!G:G, "", 0), "yyyy-mm-dd"), ' +
+    'IFERROR(XLOOKUP(TRIM(sku) & ";*", \'' + updateName + '\'!D:D, \'' + updateName + '\'!G:G, "", 2), ' +
+    'IFERROR(XLOOKUP(TRIM(sku), \'' + updateName + '\'!D:D, \'' + updateName + '\'!G:G, "", 0), "-")))))))'
   );
 
   // 2. HASIL AUDIT & KOREKSI DARI SHEET HASIL (Kolom H - Q)
@@ -1877,9 +1877,9 @@ function setupHasilEdCorrectionSheet() {
 
   var headers = [
     [
-      'TIMESTAMP', 'SKU', 'NAMA PRODUK', 'LOKASI RAK (SLOC)', 'SLOC ACTUAL', 
-      'SLOC MATCH?', 'ED SISTEM (LAMA)', 'ED FISIK / KOREKSI', 'STATUS ED', 
-      'FISIK GOOD', 'FISIK BAD', 'TOTAL FISIK', 'SELISIH', 'PETUGAS', 'SHIFT', 
+      'TIMESTAMP', 'SKU', 'NAMA PRODUK', 'LOKASI RAK (SLOC)', 'SLOC ACTUAL',
+      'SLOC MATCH?', 'ED SISTEM (LAMA)', 'ED FISIK / KOREKSI', 'STATUS ED',
+      'FISIK GOOD', 'FISIK BAD', 'TOTAL FISIK', 'SELISIH', 'PETUGAS', 'SHIFT',
       'BUKTI FOTO (DRIVE)', 'REMARKS'
     ]
   ];
@@ -1898,7 +1898,7 @@ function setupHasilEdCorrectionSheet() {
   sheet.setFrozenColumns(2);
   try {
     sheet.autoResizeColumns(1, 17);
-  } catch(e) {}
+  } catch (e) { }
 
   alertEdc('✅ Sheet "' + sheet.getName() + '" berhasil disetup dengan 17 kolom standar audit!');
 }
@@ -2009,9 +2009,9 @@ function setupBackupEdCorrectionSheet() {
 
   var headers = [
     [
-      'TIMESTAMP', 'SKU', 'NAMA PRODUK', 'LOKASI RAK (SLOC)', 'SLOC ACTUAL', 
-      'SLOC MATCH?', 'ED SISTEM (LAMA)', 'ED FISIK / KOREKSI', 'STATUS ED', 
-      'FISIK GOOD', 'FISIK BAD', 'TOTAL FISIK', 'SELISIH', 'PETUGAS', 'SHIFT', 
+      'TIMESTAMP', 'SKU', 'NAMA PRODUK', 'LOKASI RAK (SLOC)', 'SLOC ACTUAL',
+      'SLOC MATCH?', 'ED SISTEM (LAMA)', 'ED FISIK / KOREKSI', 'STATUS ED',
+      'FISIK GOOD', 'FISIK BAD', 'TOTAL FISIK', 'SELISIH', 'PETUGAS', 'SHIFT',
       'BUKTI FOTO (DRIVE)', 'REMARKS', 'WAKTU BACKUP', 'BATCH ID'
     ]
   ];
@@ -2030,7 +2030,7 @@ function setupBackupEdCorrectionSheet() {
   sheet.setFrozenColumns(2);
   try {
     sheet.autoResizeColumns(1, 19);
-  } catch(e) {}
+  } catch (e) { }
 
   alertEdc('✅ Sheet "' + sheet.getName() + '" berhasil disetup dan siap menyimpan arsip data!');
 }
@@ -2051,9 +2051,9 @@ function backupHasilEdCorrectionToBackupSheet(autoClear) {
 
   var backupSheet = getEdCorrectionSheet('BACKUP');
   var headers = [
-    'TIMESTAMP', 'SKU', 'NAMA PRODUK', 'LOKASI RAK (SLOC)', 'SLOC ACTUAL', 
-    'SLOC MATCH?', 'ED SISTEM (LAMA)', 'ED FISIK / KOREKSI', 'STATUS ED', 
-    'FISIK GOOD', 'FISIK BAD', 'TOTAL FISIK', 'SELISIH', 'PETUGAS', 'SHIFT', 
+    'TIMESTAMP', 'SKU', 'NAMA PRODUK', 'LOKASI RAK (SLOC)', 'SLOC ACTUAL',
+    'SLOC MATCH?', 'ED SISTEM (LAMA)', 'ED FISIK / KOREKSI', 'STATUS ED',
+    'FISIK GOOD', 'FISIK BAD', 'TOTAL FISIK', 'SELISIH', 'PETUGAS', 'SHIFT',
     'BUKTI FOTO (DRIVE)', 'REMARKS', 'WAKTU BACKUP', 'BATCH ID'
   ];
 
@@ -2070,7 +2070,7 @@ function backupHasilEdCorrectionToBackupSheet(autoClear) {
   }
 
   var hasilData = hasilSheet.getDataRange().getValues();
-  var dataRows = hasilData.slice(1).filter(function(r) {
+  var dataRows = hasilData.slice(1).filter(function (r) {
     return String(r[0] || r[1] || '').trim() !== '';
   });
 
@@ -2174,7 +2174,7 @@ function ensureDailyBackupTriggerEdCorrection() {
 function dailyAutoBackupTaskEdCorrection() {
   try {
     backupHasilEdCorrectionToBackupSheet(false);
-  } catch(err) {
+  } catch (err) {
     console.error('Error saat auto-backup harian ED Correction:', err);
   }
 }
@@ -2197,9 +2197,9 @@ function handleEdCorrectionSubmit(payload) {
     if (sheet && (sheet.getLastRow() === 0 || (sheet.getLastRow() === 1 && !sheet.getRange(1, 1).getValue()))) {
       var headerRow = [
         [
-          'TIMESTAMP', 'SKU', 'NAMA PRODUK', 'LOKASI RAK (SLOC)', 'SLOC ACTUAL', 
-          'SLOC MATCH?', 'ED SISTEM (LAMA)', 'ED FISIK / KOREKSI', 'STATUS ED', 
-          'FISIK GOOD', 'FISIK BAD', 'TOTAL FISIK', 'SELISIH', 'PETUGAS', 'SHIFT', 
+          'TIMESTAMP', 'SKU', 'NAMA PRODUK', 'LOKASI RAK (SLOC)', 'SLOC ACTUAL',
+          'SLOC MATCH?', 'ED SISTEM (LAMA)', 'ED FISIK / KOREKSI', 'STATUS ED',
+          'FISIK GOOD', 'FISIK BAD', 'TOTAL FISIK', 'SELISIH', 'PETUGAS', 'SHIFT',
           'BUKTI FOTO (DRIVE)', 'REMARKS'
         ]
       ];
@@ -2246,7 +2246,7 @@ function handleEdCorrectionSubmit(payload) {
         var driveFile = folder.createFile(blob);
         driveFile.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
         photoUrl = driveFile.getUrl();
-      } catch(errPhoto) {
+      } catch (errPhoto) {
         console.warn("Gagal simpan foto EDC ke Drive:", errPhoto);
       }
     }
@@ -2281,7 +2281,7 @@ function handleEdCorrectionSubmit(payload) {
           }
         }
       }
-    } catch(eMain) {}
+    } catch (eMain) { }
 
     return ContentService.createTextOutput(JSON.stringify({
       status: "success",
@@ -2291,7 +2291,7 @@ function handleEdCorrectionSubmit(payload) {
       photoUrl: photoUrl
     })).setMimeType(ContentService.MimeType.JSON);
 
-  } catch(e) {
+  } catch (e) {
     return ContentService.createTextOutput(JSON.stringify({
       status: "error",
       message: e.message
@@ -2324,7 +2324,7 @@ function showEdCorrectionDeployGuidePrompt() {
 function alertEdc(msg) {
   try {
     SpreadsheetApp.getUi().alert(msg);
-  } catch(e) {
+  } catch (e) {
     // Mode headless (Pemicu Waktu / background)
     Logger.log("[ED CORRECTION] " + msg);
     console.log("[ED CORRECTION] " + msg);
@@ -2333,7 +2333,7 @@ function alertEdc(msg) {
       if (ss && typeof ss.toast === "function") {
         ss.toast(String(msg).split("\n")[0], "ED Correction", 5);
       }
-    } catch(errToast) {}
+    } catch (errToast) { }
   }
 }
 
@@ -2437,11 +2437,20 @@ function autoFillEdCorrectionQuickPrompt() {
     ui.ButtonSet.OK_CANCEL
   );
   if (timeResp.getSelectedButton() !== ui.Button.OK) return;
-  var rawTimes = timeResp.getResponseText().trim().split(/[-–s\/d]/);
-  var customStart = rawTimes[0] ? rawTimes[0].trim() : '';
-  var customEnd = rawTimes[1] ? rawTimes[1].trim() : '';
+  var rawTimesInput = timeResp.getResponseText().trim();
+  var customStart = '';
+  var customEnd = '';
+  if (rawTimesInput) {
+    var timeParts = rawTimesInput.split(/\s*(?:s\/d|s\.d|sd|sampai|hingga|to|–|-)\s*/i);
+    if (timeParts.length >= 2) {
+      customStart = timeParts[0].trim();
+      customEnd = timeParts[timeParts.length - 1].trim();
+    } else {
+      customStart = timeParts[0].trim();
+    }
+  }
 
-  var res = executeAutoFillEdCorrectionTask(picName, maxCount, 45, 110, 90, customEnd, customStart);
+  var res = executeAutoFillEdCorrectionTask(picName, maxCount, 45, 110, 90, customStart, customEnd);
   if (res.success) {
     alertEdc('✅ ' + res.message);
   } else {
@@ -2450,10 +2459,121 @@ function autoFillEdCorrectionQuickPrompt() {
 }
 
 /**
+ * Helper fleksibel untuk mem-parsing format jam input user
+ * Menerima: titik (09.30), titik dua (09:30), koma (09,30), jam saja (9), tanpa separator (0930), dsb.
+ */
+function parseEdcTime(timeStr, baseDate) {
+  if (!timeStr) return null;
+  var s = String(timeStr).trim();
+  if (!s) return null;
+
+  // Normalisasi separator: titik, koma, slash → titik dua
+  s = s.replace(/[\.\,\/]/g, ':').replace(/\s+/g, '');
+
+  // Format standar HH:MM atau HH:MM:SS atau H:MM
+  var m = s.match(/^(\d{1,2})(?::(\d{1,2}))?(?::(\d{1,2}))?$/);
+
+  // Fallback: format HHMM tanpa separator (contoh: 0930 → 09:30)
+  if (!m && /^\d{3,4}$/.test(s)) {
+    var padded = s.length === 3 ? '0' + s : s;
+    m = [padded, padded.substring(0, 2), padded.substring(2, 4), undefined];
+  }
+
+  if (!m) return null;
+
+  var h = parseInt(m[1], 10);
+  var min = m[2] !== undefined ? parseInt(m[2], 10) : 0;
+  var sec = m[3] !== undefined ? parseInt(m[3], 10) : 0;
+
+  if (isNaN(h) || h < 0 || h > 23) return null;
+  if (isNaN(min) || min < 0 || min > 59) return null;
+  if (isNaN(sec) || sec < 0 || sec > 59) return null;
+
+  var d = baseDate ? new Date(baseDate.getTime()) : new Date();
+  d.setHours(h, min, sec, 0);
+  return d;
+}
+
+/**
+ * Helper terpadu untuk menghitung rentang jam audit (Start & End) yang realistis dan proporsional.
+ * Menjamin tidak pernah terjadi kompresi waktu berlebihan (minimal 35-45 detik per SKU).
+ */
+function calculateAuditTimeWindow(rawTimeA, rawTimeB, itemCount, minSec, maxSec, now) {
+  var count = Math.max(1, itemCount || 1);
+  var todayY = now.getFullYear();
+  var todayM = now.getMonth();
+  var todayD = now.getDate();
+
+  var p1 = parseEdcTime(rawTimeA, now);
+  var p2 = parseEdcTime(rawTimeB, now);
+
+  var tStart = null;
+  var tEnd = null;
+  var userSpecified = false;
+
+  var avgSecPerItem = Math.max(35, Math.floor(((minSec || 45) + (maxSec || 110)) / 2));
+  var naturalSpanSec = Math.max(600, count * avgSecPerItem);
+
+  if (p1 && p2) {
+    userSpecified = true;
+    if (p1.getTime() <= p2.getTime()) {
+      tStart = p1;
+      tEnd = p2;
+    } else {
+      tStart = p2;
+      tEnd = p1;
+    }
+    // Jika start == end
+    if (tStart.getTime() === tEnd.getTime()) {
+      tEnd = new Date(tStart.getTime() + (naturalSpanSec * 1000));
+    }
+  } else if (p1 && !p2) {
+    userSpecified = true;
+    tStart = p1;
+    var estEndMs = tStart.getTime() + (naturalSpanSec * 1000);
+    if (estEndMs <= now.getTime()) {
+      tEnd = new Date(estEndMs);
+    } else {
+      tEnd = new Date(Math.max(tStart.getTime() + (count * 30 * 1000), now.getTime()));
+    }
+  } else if (!p1 && p2) {
+    userSpecified = true;
+    tEnd = p2;
+    tStart = new Date(tEnd.getTime() - (naturalSpanSec * 1000));
+  } else {
+    // Keduanya kosong: target end = sekarang, start dihitung mundur proporsional
+    tEnd = new Date(now.getTime());
+    tStart = new Date(tEnd.getTime() - (naturalSpanSec * 1000));
+    var floorTime = new Date(todayY, todayM, todayD, 7, 0, 0);
+    if (tStart.getTime() < floorTime.getTime()) {
+      tStart = floorTime;
+    }
+  }
+
+  // Kunci ke tanggal hari ini
+  tStart.setFullYear(todayY, todayM, todayD);
+  tEnd.setFullYear(todayY, todayM, todayD);
+
+  // Pastikan rentang waktu tidak minus dan punya jeda manusiawi (minimal 35 detik/item)
+  var diffSec = Math.floor((tEnd.getTime() - tStart.getTime()) / 1000);
+  var minAllowedSpanSec = Math.max(300, count * 35);
+  if (diffSec < minAllowedSpanSec) {
+    tStart = new Date(tEnd.getTime() - (minAllowedSpanSec * 1000));
+  }
+
+  return {
+    start: tStart,
+    end: tEnd,
+    userSpecified: userSpecified,
+    durationMinutes: Math.round((tEnd.getTime() - tStart.getTime()) / 60000)
+  };
+}
+
+/**
  * Backend eksekutor penyelesaian task list dengan timestamp bertahap yang realistis
  * TERIKAT SECARA KETAT PADA HARI INI & MENDUKUNG JAM MULAI KUSTOM
  */
-function executeAutoFillEdCorrectionTask(picName, maxCount, minSeconds, maxSeconds, rackDelaySeconds, endTimeStr, startTimeStr) {
+function executeAutoFillEdCorrectionTask(picName, maxCount, minSeconds, maxSeconds, rackDelaySeconds, timeStrA, timeStrB) {
   try {
     var ss = getEdCorrectionSpreadsheet();
     var mainSheet = getEdCorrectionSheet('MAIN_LIST');
@@ -2548,66 +2668,11 @@ function executeAutoFillEdCorrectionTask(picName, maxCount, minSeconds, maxSecon
       return { success: false, message: 'Tidak ada task PENDING yang perlu diselesaikan.' };
     }
 
-    // ── HITUNG TIMESTAMP BERTAHAP & REALISTIS (TERIKAT DALAM HARI INI) ──
+    // ── HITUNG RENTANG TIMESTAMP MENGGUNAKAN WINDOW HELPER ──
     var now = new Date();
-    var endTarget = new Date(now.getTime());
-
-    if (endTimeStr && /^\d{1,2}:\d{2}(:\d{2})?$/.test(endTimeStr.trim())) {
-      var pTime = endTimeStr.trim().split(':');
-      endTarget.setHours(parseInt(pTime[0], 10));
-      endTarget.setMinutes(parseInt(pTime[1], 10));
-      endTarget.setSeconds(pTime[2] ? parseInt(pTime[2], 10) : 0);
-      if (endTarget.getTime() > now.getTime()) {
-        endTarget = new Date(now.getTime());
-      }
-    }
-
-    // Tentukan waktu mulai (bisa diatur manual oleh user via startTimeStr)
-    var shiftStart = new Date(endTarget.getTime());
-    var userStartSpecified = false;
-
-    if (startTimeStr && /^\d{1,2}:\d{2}(:\d{2})?$/.test(startTimeStr.trim())) {
-      var sParts = startTimeStr.trim().split(':');
-      shiftStart.setHours(parseInt(sParts[0], 10));
-      shiftStart.setMinutes(parseInt(sParts[1], 10));
-      shiftStart.setSeconds(sParts[2] ? parseInt(sParts[2], 10) : 0);
-      userStartSpecified = true;
-    } else {
-      var sampleShiftLower = (pendingItems[0].shift || '').toLowerCase();
-      var isSiang = sampleShiftLower.indexOf('siang') !== -1 || sampleShiftLower.indexOf('shift 2') !== -1;
-
-      if (isSiang) {
-        shiftStart.setHours(15, 0, 0, 0); // Shift Siang mulai 15:00
-      } else {
-        // Shift Pagi default 08:00 (atau 07:30 jika endTarget sangat pagi)
-        if (endTarget.getHours() < 8 || (endTarget.getHours() === 8 && endTarget.getMinutes() < 30)) {
-          shiftStart.setHours(7, 30, 0, 0);
-        } else {
-          shiftStart.setHours(8, 0, 0, 0);
-        }
-      }
-    }
-    // Pastikan tanggal, bulan, tahun SAMA PERSIS dengan endTarget (HARI INI)
-    shiftStart.setFullYear(endTarget.getFullYear(), endTarget.getMonth(), endTarget.getDate());
-
-    // Jika shiftStart >= endTarget, sesuaikan sedikit agar tidak minus
-    if (shiftStart.getTime() >= endTarget.getTime()) {
-      if (userStartSpecified) {
-        shiftStart = new Date(endTarget.getTime() - (pendingItems.length * 15 * 1000));
-      } else {
-        var minBackMs = Math.min(endTarget.getHours() * 3600000 + endTarget.getMinutes() * 60000, pendingItems.length * 15 * 1000);
-        shiftStart = new Date(endTarget.getTime() - minBackMs);
-      }
-    }
-
-    // Hitung rentang detik yang tersedia antara shiftStart dan endTarget
-    var availableSec = Math.floor((endTarget.getTime() - shiftStart.getTime()) / 1000);
-    if (availableSec < pendingItems.length * 10) {
-      availableSec = Math.max(availableSec, pendingItems.length * 10);
-      var earliestPossible = new Date(endTarget.getFullYear(), endTarget.getMonth(), endTarget.getDate(), 6, 0, 0);
-      shiftStart = new Date(Math.max(earliestPossible.getTime(), endTarget.getTime() - (availableSec * 1000)));
-      availableSec = Math.floor((endTarget.getTime() - shiftStart.getTime()) / 1000);
-    }
+    var timeWindow = calculateAuditTimeWindow(timeStrA, timeStrB, pendingItems.length, minSec, maxSec, now);
+    var shiftStart = timeWindow.start;
+    var endTarget = timeWindow.end;
 
     // Buat bobot jeda dinamis proporsional
     var weights = [];
@@ -2621,11 +2686,7 @@ function executeAutoFillEdCorrectionTask(picName, maxCount, minSeconds, maxSecon
       if (k > 0) totalWeight += w;
     }
 
-    // Jeda acak di awal setelah shift start (jika user specify, mulai tepat waktu + 3-12 dtk)
-    var startBufferSec = userStartSpecified
-      ? Math.min(Math.floor(Math.random() * 12) + 3, Math.floor(availableSec * 0.03))
-      : Math.min(Math.floor(Math.random() * 60) + 20, Math.floor(availableSec * 0.05));
-    var actualStartMs = shiftStart.getTime() + (startBufferSec * 1000);
+    var actualStartMs = shiftStart.getTime();
     var availableMs = Math.max(1000, endTarget.getTime() - actualStartMs);
 
     var rowsHasilToAppend = [];
@@ -2713,13 +2774,14 @@ function executeAutoFillEdCorrectionTask(picName, maxCount, minSeconds, maxSecon
       lastTimestamp: lastTs,
       pic: pic,
       message: 'Berhasil memproses ' + pendingItems.length + ' task ED Correction!\n\n' +
-               '• Petugas (PIC): ' + pic + '\n' +
-               '• Rentang Waktu: ' + firstTs + ' s/d ' + lastTs + '\n' +
-               '• Tanggal: Terkunci di hari ini (' + Utilities.formatDate(endTarget, EDC_CONFIG.TIMEZONE, "dd/MM/yyyy") + ')\n' +
-               '• Kolom TIMESTAMP (Kolom Q) terisi!\n' +
-               '• Status: Seluruh data tercatat ke sheet Hasil ED Correction & Mainlist terupdate DONE.'
+        '• Petugas (PIC): ' + pic + '\n' +
+        '• Rentang Waktu: ' + firstTs + ' s/d ' + lastTs + ' (' + timeWindow.durationMinutes + ' menit)\n' +
+        '• Tanggal: Terkunci di hari ini (' + Utilities.formatDate(endTarget, EDC_CONFIG.TIMEZONE, "dd/MM/yyyy") + ')\n' +
+        '• Status Jam: ' + (timeWindow.userSpecified ? 'Mengikuti Jam Input User ✓' : 'Otomatis Realistis') + '\n' +
+        '• Kolom TIMESTAMP (Kolom Q) terisi!\n' +
+        '• Status: Seluruh data tercatat ke sheet Hasil ED Correction & Mainlist terupdate DONE.'
     };
-  } catch(err) {
+  } catch (err) {
     return {
       success: false,
       message: 'Terjadi kesalahan: ' + err.message
@@ -2763,9 +2825,10 @@ function fixTimestampsInMainlistPrompt() {
     '🔧 Atur Jam Audit Hari Ini (' + todayStr + ')',
     'Ditemukan ' + targetRowIndices.length + ' baris tugas DONE di Mainlist.\n\n' +
     'Tentukan rentang jam audit yang Anda inginkan:\n' +
-    'Format: Jam Mulai - Jam Selesai (Contoh: 08:30 - 09:58)\n\n' +
-    '• Atau ketik Jam Mulai saja (Contoh: 08:45)\n' +
-    '• Jika dikosongkan, default jam mulai dari 08:00 s/d jam sekarang.',
+    '• Format Rentang: Jam Mulai - Jam Selesai (Contoh: 08:30 - 10:15 atau 08.30 s/d 10.15)\n' +
+    '• Format Jam Mulai saja: (Contoh: 08:30)\n' +
+    '• Jika dikosongkan: Otomatis dihitung mundur wajar hingga jam sekarang.\n\n' +
+    'Masukkan Jam Audit:',
     ui.ButtonSet.OK_CANCEL
   );
 
@@ -2774,12 +2837,16 @@ function fixTimestampsInMainlistPrompt() {
   var customStart = '';
   var customEnd = '';
   if (rawInput) {
-    var parts = rawInput.split(/[-–s\/d]/);
-    customStart = parts[0] ? parts[0].trim() : '';
-    customEnd = parts[1] ? parts[1].trim() : '';
+    var tParts = rawInput.split(/\s*(?:s\/d|s\.d|sd|sampai|hingga|to|–|-)\s*/i);
+    if (tParts.length >= 2) {
+      customStart = tParts[0].trim();
+      customEnd = tParts[tParts.length - 1].trim();
+    } else {
+      customStart = tParts[0].trim();
+    }
   }
 
-  var res = executeFixTodayTimestamps(targetRowIndices, customEnd, customStart);
+  var res = executeFixTodayTimestamps(targetRowIndices, customStart, customEnd);
   if (res.success) {
     alertEdc('✅ ' + res.message);
   } else {
@@ -2790,7 +2857,7 @@ function fixTimestampsInMainlistPrompt() {
 /**
  * Eksekutor perbaikan timestamp hari ini untuk baris-baris yang sudah berstatus DONE
  */
-function executeFixTodayTimestamps(targetRowIndices, targetEndTimeStr, targetStartTimeStr) {
+function executeFixTodayTimestamps(targetRowIndices, targetStartTimeStr, targetEndTimeStr) {
   try {
     var ss = getEdCorrectionSpreadsheet();
     var mainSheet = getEdCorrectionSheet('MAIN_LIST');
@@ -2832,60 +2899,11 @@ function executeFixTodayTimestamps(targetRowIndices, targetEndTimeStr, targetSta
       return { success: false, message: 'Tidak ada baris DONE yang ditemukan di Mainlist.' };
     }
 
+    // ── HITUNG RENTANG TIMESTAMP MENGGUNAKAN WINDOW HELPER ──
     var now = new Date();
-    var endTarget = new Date(now.getTime());
-    if (targetEndTimeStr && /^\d{1,2}:\d{2}(:\d{2})?$/.test(targetEndTimeStr.trim())) {
-      var pTime = targetEndTimeStr.trim().split(':');
-      endTarget.setHours(parseInt(pTime[0], 10));
-      endTarget.setMinutes(parseInt(pTime[1], 10));
-      endTarget.setSeconds(pTime[2] ? parseInt(pTime[2], 10) : 0);
-      if (endTarget.getTime() > now.getTime()) {
-        endTarget = new Date(now.getTime());
-      }
-    }
-
-    // Tentukan waktu shift mulai hari ini (bisa diset manual via targetStartTimeStr)
-    var shiftStart = new Date(endTarget.getTime());
-    var userStartSpecified = false;
-
-    if (targetStartTimeStr && /^\d{1,2}:\d{2}(:\d{2})?$/.test(targetStartTimeStr.trim())) {
-      var sParts = targetStartTimeStr.trim().split(':');
-      shiftStart.setHours(parseInt(sParts[0], 10));
-      shiftStart.setMinutes(parseInt(sParts[1], 10));
-      shiftStart.setSeconds(sParts[2] ? parseInt(sParts[2], 10) : 0);
-      userStartSpecified = true;
-    } else {
-      var firstRowShift = String(values[targetRowIndices[0]][1] || '').toLowerCase();
-      var isSiang = firstRowShift.indexOf('siang') !== -1 || firstRowShift.indexOf('shift 2') !== -1;
-
-      if (isSiang) {
-        shiftStart.setHours(15, 0, 0, 0);
-      } else {
-        if (endTarget.getHours() < 8 || (endTarget.getHours() === 8 && endTarget.getMinutes() < 30)) {
-          shiftStart.setHours(7, 30, 0, 0);
-        } else {
-          shiftStart.setHours(8, 0, 0, 0);
-        }
-      }
-    }
-    shiftStart.setFullYear(endTarget.getFullYear(), endTarget.getMonth(), endTarget.getDate());
-
-    if (shiftStart.getTime() >= endTarget.getTime()) {
-      if (userStartSpecified) {
-        shiftStart = new Date(endTarget.getTime() - (targetRowIndices.length * 15 * 1000));
-      } else {
-        var minBackMs = Math.min(endTarget.getHours() * 3600000 + endTarget.getMinutes() * 60000, targetRowIndices.length * 15 * 1000);
-        shiftStart = new Date(endTarget.getTime() - minBackMs);
-      }
-    }
-
-    var availableSec = Math.floor((endTarget.getTime() - shiftStart.getTime()) / 1000);
-    if (availableSec < targetRowIndices.length * 10) {
-      availableSec = Math.max(availableSec, targetRowIndices.length * 10);
-      var earliest = new Date(endTarget.getFullYear(), endTarget.getMonth(), endTarget.getDate(), 6, 0, 0);
-      shiftStart = new Date(Math.max(earliest.getTime(), endTarget.getTime() - (availableSec * 1000)));
-      availableSec = Math.floor((endTarget.getTime() - shiftStart.getTime()) / 1000);
-    }
+    var timeWindow = calculateAuditTimeWindow(targetStartTimeStr, targetEndTimeStr, targetRowIndices.length, 45, 110, now);
+    var shiftStart = timeWindow.start;
+    var endTarget = timeWindow.end;
 
     var weights = [];
     var totalWeight = 0;
@@ -2901,12 +2919,10 @@ function executeFixTodayTimestamps(targetRowIndices, targetEndTimeStr, targetSta
       if (k > 0) totalWeight += w;
     }
 
-    var startBufferSec = Math.min(Math.floor(Math.random() * 60) + 20, Math.floor(availableSec * 0.05));
-    var actualStartMs = shiftStart.getTime() + (startBufferSec * 1000);
+    var actualStartMs = shiftStart.getTime();
     var availableMs = Math.max(1000, endTarget.getTime() - actualStartMs);
 
     var cumulativeWeight = 0;
-    var skuToTimestampMap = new Map();
     var firstTs = "";
     var lastTs = "";
 
@@ -2929,17 +2945,12 @@ function executeFixTodayTimestamps(targetRowIndices, targetEndTimeStr, targetSta
 
       var rowIdx = targetRowIndices[m];
       values[rowIdx][16] = timestampStr; // Kolom Q di Mainlist
-
-      var sku = String(values[rowIdx][2] || '').trim().toLowerCase();
-      if (sku) {
-        skuToTimestampMap.set(sku, timestampStr);
-      }
     }
 
     // 1. Simpan update ke Mainlist
     range.setValues(values);
 
-    // 2. Sinkronkan ke sheet Hasil ED Correction (Kolom A)
+    // 2. Sinkronkan ke sheet Hasil ED Correction (Kolom A) menggunakan queue agar SKU duplikat unik
     var updatedHasilCount = 0;
     if (hasilSheet && hasilSheet.getLastRow() > 1) {
       var hLast = hasilSheet.getLastRow();
@@ -2947,12 +2958,27 @@ function executeFixTodayTimestamps(targetRowIndices, targetEndTimeStr, targetSta
       var hValues = hRange.getValues();
       var hModified = false;
 
+      // Buat queue timestamp per SKU agar SKU duplikat mendapat timestamp berbeda & berurutan
+      var skuQueues = new Map();
+      for (var q = 0; q < targetRowIndices.length; q++) {
+        var rIdx = targetRowIndices[q];
+        var sKey = String(values[rIdx][2] || '').trim().toLowerCase();
+        var tsVal = values[rIdx][16];
+        if (sKey && tsVal) {
+          if (!skuQueues.has(sKey)) skuQueues.set(sKey, []);
+          skuQueues.get(sKey).push(tsVal);
+        }
+      }
+
       for (var h = 0; h < hValues.length; h++) {
         var hSku = String(hValues[h][1] || '').trim().toLowerCase();
-        if (skuToTimestampMap.has(hSku)) {
-          hValues[h][0] = skuToTimestampMap.get(hSku);
-          updatedHasilCount++;
-          hModified = true;
+        if (skuQueues.has(hSku)) {
+          var qList = skuQueues.get(hSku);
+          if (qList && qList.length > 0) {
+            hValues[h][0] = qList.shift();
+            updatedHasilCount++;
+            hModified = true;
+          }
         }
       }
 
@@ -2968,12 +2994,13 @@ function executeFixTodayTimestamps(targetRowIndices, targetEndTimeStr, targetSta
       lastTimestamp: lastTs,
       updatedHasilCount: updatedHasilCount,
       message: 'Berhasil memperbarui timestamp untuk ' + targetRowIndices.length + ' task!\n\n' +
-               '• Rentang Baru: ' + firstTs + ' s/d ' + lastTs + '\n' +
-               '• Tanggal: Terkunci di hari ini (' + Utilities.formatDate(endTarget, EDC_CONFIG.TIMEZONE, "dd/MM/yyyy") + ')\n' +
-               '• Kolom Q (TIMESTAMP) di Mainlist terisi!\n' +
-               '• ' + updatedHasilCount + ' baris di sheet Hasil ED Correction ikut diperbarui.'
+        '• Rentang Baru: ' + firstTs + ' s/d ' + lastTs + ' (' + timeWindow.durationMinutes + ' menit)\n' +
+        '• Tanggal: Terkunci di hari ini (' + Utilities.formatDate(endTarget, EDC_CONFIG.TIMEZONE, "dd/MM/yyyy") + ')\n' +
+        '• Status Jam: ' + (timeWindow.userSpecified ? 'Mengikuti Jam Input User ✓' : 'Otomatis Realistis') + '\n' +
+        '• Kolom Q (TIMESTAMP) di Mainlist terisi!\n' +
+        '• ' + updatedHasilCount + ' baris di sheet Hasil ED Correction ikut disinkronkan.'
     };
-  } catch(err) {
+  } catch (err) {
     return {
       success: false,
       message: 'Gagal memperbarui timestamp: ' + err.message
@@ -2990,12 +3017,18 @@ function getAutoFillDialogHtml(pendingCount, samplePic, sampleShift) {
   var minutes = String(now.getMinutes()).padStart(2, '0');
   var currentTimeStr = hours + ':' + minutes;
 
-  var defaultStartStr = "08:00";
-  if (sampleShift && (sampleShift.toLowerCase().includes("siang") || sampleShift.toLowerCase().includes("shift 2"))) {
-    defaultStartStr = "15:00";
-  } else if (now.getHours() < 8) {
-    defaultStartStr = "07:30";
+  // Default start time: dihitung mundur realistis (~1.1 menit per SKU pending)
+  var count = Math.max(1, pendingCount || 1);
+  var minutesAgo = Math.max(25, Math.min(180, Math.round(count * 1.1)));
+  var defaultStartDate = new Date(now.getTime() - (minutesAgo * 60 * 1000));
+  var morningFloor = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 7, 30, 0);
+  if (defaultStartDate.getTime() < morningFloor.getTime()) {
+    defaultStartDate = morningFloor;
   }
+
+  var sHours = String(defaultStartDate.getHours()).padStart(2, '0');
+  var sMinutes = String(defaultStartDate.getMinutes()).padStart(2, '0');
+  var defaultStartStr = sHours + ':' + sMinutes;
 
   var html = [
     '<!DOCTYPE html>',
@@ -3089,6 +3122,18 @@ function getAutoFillDialogHtml(pendingCount, samplePic, sampleShift) {
     '      grid-template-columns: 1fr 1fr;',
     '      gap: 10px;',
     '    }',
+    '    .time-preview-box {',
+    '      background: rgba(16, 185, 129, 0.12);',
+    '      border: 1px dashed rgba(16, 185, 129, 0.45);',
+    '      border-radius: 8px;',
+    '      padding: 8px 12px;',
+    '      margin-top: 4px;',
+    '      margin-bottom: 10px;',
+    '      font-size: 12px;',
+    '      color: #34d399;',
+    '      text-align: center;',
+    '      font-weight: 600;',
+    '    }',
     '    .card-tip {',
     '      background: #0f172a;',
     '      border: 1px solid rgba(148, 163, 184, 0.15);',
@@ -3096,7 +3141,7 @@ function getAutoFillDialogHtml(pendingCount, samplePic, sampleShift) {
     '      padding: 10px 12px;',
     '      font-size: 11.5px;',
     '      color: #94a3b8;',
-    '      margin-top: 12px;',
+    '      margin-top: 8px;',
     '      line-height: 1.5;',
     '    }',
     '    .card-tip b { color: #f1f5f9; }',
@@ -3173,13 +3218,16 @@ function getAutoFillDialogHtml(pendingCount, samplePic, sampleShift) {
     '  </div>',
     '  <div class="grid-2">',
     '    <div class="form-group">',
-    '      <label class="form-label">⏱️ Jam Mulai (Start)</label>',
-    '      <input type="text" id="startTime" class="form-input" value="' + defaultStartStr + '" placeholder="HH:mm (Contoh: 08:30)">',
+    '      <label class="form-label">⏱️ Jam Mulai (Bebas Diatur)</label>',
+    '      <input type="text" id="startTime" class="form-input" value="' + defaultStartStr + '" placeholder="Contoh: 09:30 atau 09.30" oninput="updateTimePreview()">',
     '    </div>',
     '    <div class="form-group">',
     '      <label class="form-label">🏁 Jam Selesai (Target)</label>',
-    '      <input type="text" id="endTime" class="form-input" value="' + currentTimeStr + '" placeholder="HH:mm (Contoh: 09:58)">',
+    '      <input type="text" id="endTime" class="form-input" value="' + currentTimeStr + '" placeholder="Contoh: 10:10 atau 10.10" oninput="updateTimePreview()">',
     '    </div>',
+    '  </div>',
+    '  <div id="timePreviewBox" class="time-preview-box">',
+    '    ⏱️ Rentang Waktu: ' + defaultStartStr + ' s/d ' + currentTimeStr + ' (Hari Ini)',
     '  </div>',
     '  <div class="grid-2">',
     '    <div class="form-group">',
@@ -3192,7 +3240,7 @@ function getAutoFillDialogHtml(pendingCount, samplePic, sampleShift) {
     '    </div>',
     '  </div>',
     '  <div class="card-tip">',
-    '    💡 <b>Timestamp Alami & Bebas Diatur:</b> Anda bebas menentukan Jam Mulai & Jam Selesai. Seluruh SKU akan otomatis dibagi rata secara realistis dengan jeda dinamis antar item & delay perpindahan rak.',
+    '    💡 <b>Bebas Tentukan Jam Mulai & Selesai:</b> Format bisa menggunakan titik (misal <code>09.30</code>) maupun titik dua (<code>09:30</code>). Seluruh task akan diratakan secara alami.',
     '  </div>',
     '  <div class="btn-container">',
     '    <button type="button" class="btn btn-cancel" onclick="google.script.host.close()">Batal</button>',
@@ -3203,13 +3251,23 @@ function getAutoFillDialogHtml(pendingCount, samplePic, sampleShift) {
     '    <div style="font-weight:600; color:#f8fafc;" id="loadingText">Memproses task & menghitung timestamp...</div>',
     '  </div>',
     '  <script>',
+    '    function cleanTimeInput(val) {',
+    '      if (!val) return "";',
+    '      return val.trim().replace(/\\./g, ":").replace(/\\s+/g, "");',
+    '    }',
+    '    function updateTimePreview() {',
+    '      var st = cleanTimeInput(document.getElementById("startTime").value);',
+    '      var et = cleanTimeInput(document.getElementById("endTime").value);',
+    '      var box = document.getElementById("timePreviewBox");',
+    '      box.innerHTML = "⏱️ Rentang Waktu: <b>" + (st || "08:00") + "</b> s/d <b>" + (et || "Sekarang") + "</b> (Hari Ini)";',
+    '    }',
     '    function submitAutoFill() {',
     '      var pic = document.getElementById("picName").value.trim() || "Staff MTG";',
     '      var count = parseInt(document.getElementById("maxCount").value, 10) || 9999;',
     '      var minS = parseInt(document.getElementById("minSec").value, 10) || 45;',
     '      var maxS = parseInt(document.getElementById("maxSec").value, 10) || 110;',
-    '      var startTime = document.getElementById("startTime").value.trim();',
-    '      var endTime = document.getElementById("endTime").value.trim();',
+    '      var startTime = cleanTimeInput(document.getElementById("startTime").value);',
+    '      var endTime = cleanTimeInput(document.getElementById("endTime").value);',
     '      document.getElementById("loadingOverlay").style.display = "flex";',
     '      document.getElementById("submitBtn").disabled = true;',
     '      google.script.run',
@@ -3228,7 +3286,7 @@ function getAutoFillDialogHtml(pendingCount, samplePic, sampleShift) {
     '          document.getElementById("submitBtn").disabled = false;',
     '          alert("❌ Terjadi kesalahan: " + err.message);',
     '        })',
-    '        .executeAutoFillEdCorrectionTask(pic, count, minS, maxS, 90, endTime, startTime);',
+    '        .executeAutoFillEdCorrectionTask(pic, count, minS, maxS, 90, startTime, endTime);',
     '    }',
     '  </script>',
     '</body>',
@@ -3264,7 +3322,7 @@ function doPost(e) {
     }
 
     return handleEdCorrectionSubmit(payload);
-  } catch(err) {
+  } catch (err) {
     return ContentService.createTextOutput(JSON.stringify({
       status: "error",
       message: err.message
