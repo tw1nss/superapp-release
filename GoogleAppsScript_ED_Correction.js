@@ -2431,7 +2431,17 @@ function autoFillEdCorrectionQuickPrompt() {
   var rawCount = countResp.getResponseText().trim().toUpperCase();
   var maxCount = (rawCount === 'ALL' || rawCount === '') ? 9999 : parseInt(rawCount, 10) || 9999;
 
-  var res = executeAutoFillEdCorrectionTask(picName, maxCount, 45, 110, 90, '');
+  var timeResp = ui.prompt(
+    'Jam Pengerjaan (Start & Selesai)',
+    'Masukkan Jam Mulai dan Jam Selesai (format: HH:mm - HH:mm, contoh: 08:30 - 09:58):\n\n(Kosongkan untuk otomatis dari jam shift pagi/siang):',
+    ui.ButtonSet.OK_CANCEL
+  );
+  if (timeResp.getSelectedButton() !== ui.Button.OK) return;
+  var rawTimes = timeResp.getResponseText().trim().split(/[-–s\/d]/);
+  var customStart = rawTimes[0] ? rawTimes[0].trim() : '';
+  var customEnd = rawTimes[1] ? rawTimes[1].trim() : '';
+
+  var res = executeAutoFillEdCorrectionTask(picName, maxCount, 45, 110, 90, customEnd, customStart);
   if (res.success) {
     alertEdc('✅ ' + res.message);
   } else {
@@ -2441,9 +2451,9 @@ function autoFillEdCorrectionQuickPrompt() {
 
 /**
  * Backend eksekutor penyelesaian task list dengan timestamp bertahap yang realistis
- * TERIKAT SECARA KETAT PADA HARI INI (TIDAK PERNAH MUNDUR KE TANGGAL KEMARIN)
+ * TERIKAT SECARA KETAT PADA HARI INI & MENDUKUNG JAM MULAI KUSTOM
  */
-function executeAutoFillEdCorrectionTask(picName, maxCount, minSeconds, maxSeconds, rackDelaySeconds, endTimeStr) {
+function executeAutoFillEdCorrectionTask(picName, maxCount, minSeconds, maxSeconds, rackDelaySeconds, endTimeStr, startTimeStr) {
   try {
     var ss = getEdCorrectionSpreadsheet();
     var mainSheet = getEdCorrectionSheet('MAIN_LIST');
@@ -2552,35 +2562,49 @@ function executeAutoFillEdCorrectionTask(picName, maxCount, minSeconds, maxSecon
       }
     }
 
-    // Batasi waktu mulai strictly pada shift hari ini (TIDAK BOLEH mundur ke tanggal kemarin!)
+    // Tentukan waktu mulai (bisa diatur manual oleh user via startTimeStr)
     var shiftStart = new Date(endTarget.getTime());
-    var sampleShiftLower = (pendingItems[0].shift || '').toLowerCase();
-    var isSiang = sampleShiftLower.indexOf('siang') !== -1 || sampleShiftLower.indexOf('shift 2') !== -1;
+    var userStartSpecified = false;
 
-    if (isSiang) {
-      shiftStart.setHours(15, 0, 0, 0); // Shift Siang mulai 15:00
+    if (startTimeStr && /^\d{1,2}:\d{2}(:\d{2})?$/.test(startTimeStr.trim())) {
+      var sParts = startTimeStr.trim().split(':');
+      shiftStart.setHours(parseInt(sParts[0], 10));
+      shiftStart.setMinutes(parseInt(sParts[1], 10));
+      shiftStart.setSeconds(sParts[2] ? parseInt(sParts[2], 10) : 0);
+      userStartSpecified = true;
     } else {
-      // Shift Pagi mulai 08:00 (atau 07:30 jika endTarget sangat pagi)
-      if (endTarget.getHours() < 8 || (endTarget.getHours() === 8 && endTarget.getMinutes() < 30)) {
-        shiftStart.setHours(7, 30, 0, 0);
+      var sampleShiftLower = (pendingItems[0].shift || '').toLowerCase();
+      var isSiang = sampleShiftLower.indexOf('siang') !== -1 || sampleShiftLower.indexOf('shift 2') !== -1;
+
+      if (isSiang) {
+        shiftStart.setHours(15, 0, 0, 0); // Shift Siang mulai 15:00
       } else {
-        shiftStart.setHours(8, 0, 0, 0);
+        // Shift Pagi default 08:00 (atau 07:30 jika endTarget sangat pagi)
+        if (endTarget.getHours() < 8 || (endTarget.getHours() === 8 && endTarget.getMinutes() < 30)) {
+          shiftStart.setHours(7, 30, 0, 0);
+        } else {
+          shiftStart.setHours(8, 0, 0, 0);
+        }
       }
     }
-    // Pastikan tanggal, bulan, tahun SAMA PERSIS dengan endTarget
+    // Pastikan tanggal, bulan, tahun SAMA PERSIS dengan endTarget (HARI INI)
     shiftStart.setFullYear(endTarget.getFullYear(), endTarget.getMonth(), endTarget.getDate());
 
-    // Jika endTarget lebih awal dari shiftStart (misal run jam 07:45), mundurkan shiftStart secukupnya tapi tetap hari ini
+    // Jika shiftStart >= endTarget, sesuaikan sedikit agar tidak minus
     if (shiftStart.getTime() >= endTarget.getTime()) {
-      var minBackMs = Math.min(endTarget.getHours() * 3600000 + endTarget.getMinutes() * 60000, pendingItems.length * 15 * 1000);
-      shiftStart = new Date(endTarget.getTime() - minBackMs);
+      if (userStartSpecified) {
+        shiftStart = new Date(endTarget.getTime() - (pendingItems.length * 15 * 1000));
+      } else {
+        var minBackMs = Math.min(endTarget.getHours() * 3600000 + endTarget.getMinutes() * 60000, pendingItems.length * 15 * 1000);
+        shiftStart = new Date(endTarget.getTime() - minBackMs);
+      }
     }
 
     // Hitung rentang detik yang tersedia antara shiftStart dan endTarget
     var availableSec = Math.floor((endTarget.getTime() - shiftStart.getTime()) / 1000);
     if (availableSec < pendingItems.length * 10) {
       availableSec = Math.max(availableSec, pendingItems.length * 10);
-      var earliestPossible = new Date(endTarget.getFullYear(), endTarget.getMonth(), endTarget.getDate(), 7, 0, 0);
+      var earliestPossible = new Date(endTarget.getFullYear(), endTarget.getMonth(), endTarget.getDate(), 6, 0, 0);
       shiftStart = new Date(Math.max(earliestPossible.getTime(), endTarget.getTime() - (availableSec * 1000)));
       availableSec = Math.floor((endTarget.getTime() - shiftStart.getTime()) / 1000);
     }
@@ -2597,8 +2621,10 @@ function executeAutoFillEdCorrectionTask(picName, maxCount, minSeconds, maxSecon
       if (k > 0) totalWeight += w;
     }
 
-    // Jeda acak di awal setelah shift start (20-60 detik)
-    var startBufferSec = Math.min(Math.floor(Math.random() * 60) + 20, Math.floor(availableSec * 0.05));
+    // Jeda acak di awal setelah shift start (jika user specify, mulai tepat waktu + 3-12 dtk)
+    var startBufferSec = userStartSpecified
+      ? Math.min(Math.floor(Math.random() * 12) + 3, Math.floor(availableSec * 0.03))
+      : Math.min(Math.floor(Math.random() * 60) + 20, Math.floor(availableSec * 0.05));
     var actualStartMs = shiftStart.getTime() + (startBufferSec * 1000);
     var availableMs = Math.max(1000, endTarget.getTime() - actualStartMs);
 
@@ -2733,20 +2759,27 @@ function fixTimestampsInMainlistPrompt() {
   }
 
   var todayStr = Utilities.formatDate(new Date(), EDC_CONFIG.TIMEZONE, "dd/MM/yyyy");
-  var confirm = ui.alert(
-    '🔧 Perbaiki Timestamp ke Hari Ini (' + todayStr + ')',
+  var timeResp = ui.prompt(
+    '🔧 Atur Jam Audit Hari Ini (' + todayStr + ')',
     'Ditemukan ' + targetRowIndices.length + ' baris tugas DONE di Mainlist.\n\n' +
-    'Fitur ini akan:\n' +
-    '1. Menghitung ulang timestamp realistis strictly pada HARI INI (08:00 s/d sekarang).\n' +
-    '2. Mengisi Kolom Q (TIMESTAMP) di sheet "Mainlist Sku ED Corection".\n' +
-    '3. Memperbarui Kolom A (TIMESTAMP) di sheet "Hasil ED Correction" agar sinkron hari ini (tidak ada lagi tanggal kemarin 30).\n\n' +
-    'Lanjutkan perbaikan?',
-    ui.ButtonSet.YES_NO
+    'Tentukan rentang jam audit yang Anda inginkan:\n' +
+    'Format: Jam Mulai - Jam Selesai (Contoh: 08:30 - 09:58)\n\n' +
+    '• Atau ketik Jam Mulai saja (Contoh: 08:45)\n' +
+    '• Jika dikosongkan, default jam mulai dari 08:00 s/d jam sekarang.',
+    ui.ButtonSet.OK_CANCEL
   );
 
-  if (confirm !== ui.Button.YES) return;
+  if (timeResp.getSelectedButton() !== ui.Button.OK) return;
+  var rawInput = timeResp.getResponseText().trim();
+  var customStart = '';
+  var customEnd = '';
+  if (rawInput) {
+    var parts = rawInput.split(/[-–s\/d]/);
+    customStart = parts[0] ? parts[0].trim() : '';
+    customEnd = parts[1] ? parts[1].trim() : '';
+  }
 
-  var res = executeFixTodayTimestamps(targetRowIndices, '');
+  var res = executeFixTodayTimestamps(targetRowIndices, customEnd, customStart);
   if (res.success) {
     alertEdc('✅ ' + res.message);
   } else {
@@ -2757,7 +2790,7 @@ function fixTimestampsInMainlistPrompt() {
 /**
  * Eksekutor perbaikan timestamp hari ini untuk baris-baris yang sudah berstatus DONE
  */
-function executeFixTodayTimestamps(targetRowIndices, targetEndTimeStr) {
+function executeFixTodayTimestamps(targetRowIndices, targetEndTimeStr, targetStartTimeStr) {
   try {
     var ss = getEdCorrectionSpreadsheet();
     var mainSheet = getEdCorrectionSheet('MAIN_LIST');
@@ -2811,31 +2844,45 @@ function executeFixTodayTimestamps(targetRowIndices, targetEndTimeStr) {
       }
     }
 
-    // Tentukan waktu shift mulai hari ini
+    // Tentukan waktu shift mulai hari ini (bisa diset manual via targetStartTimeStr)
     var shiftStart = new Date(endTarget.getTime());
-    var firstRowShift = String(values[targetRowIndices[0]][1] || '').toLowerCase();
-    var isSiang = firstRowShift.indexOf('siang') !== -1 || firstRowShift.indexOf('shift 2') !== -1;
+    var userStartSpecified = false;
 
-    if (isSiang) {
-      shiftStart.setHours(15, 0, 0, 0);
+    if (targetStartTimeStr && /^\d{1,2}:\d{2}(:\d{2})?$/.test(targetStartTimeStr.trim())) {
+      var sParts = targetStartTimeStr.trim().split(':');
+      shiftStart.setHours(parseInt(sParts[0], 10));
+      shiftStart.setMinutes(parseInt(sParts[1], 10));
+      shiftStart.setSeconds(sParts[2] ? parseInt(sParts[2], 10) : 0);
+      userStartSpecified = true;
     } else {
-      if (endTarget.getHours() < 8 || (endTarget.getHours() === 8 && endTarget.getMinutes() < 30)) {
-        shiftStart.setHours(7, 30, 0, 0);
+      var firstRowShift = String(values[targetRowIndices[0]][1] || '').toLowerCase();
+      var isSiang = firstRowShift.indexOf('siang') !== -1 || firstRowShift.indexOf('shift 2') !== -1;
+
+      if (isSiang) {
+        shiftStart.setHours(15, 0, 0, 0);
       } else {
-        shiftStart.setHours(8, 0, 0, 0);
+        if (endTarget.getHours() < 8 || (endTarget.getHours() === 8 && endTarget.getMinutes() < 30)) {
+          shiftStart.setHours(7, 30, 0, 0);
+        } else {
+          shiftStart.setHours(8, 0, 0, 0);
+        }
       }
     }
     shiftStart.setFullYear(endTarget.getFullYear(), endTarget.getMonth(), endTarget.getDate());
 
     if (shiftStart.getTime() >= endTarget.getTime()) {
-      var minBackMs = Math.min(endTarget.getHours() * 3600000 + endTarget.getMinutes() * 60000, targetRowIndices.length * 15 * 1000);
-      shiftStart = new Date(endTarget.getTime() - minBackMs);
+      if (userStartSpecified) {
+        shiftStart = new Date(endTarget.getTime() - (targetRowIndices.length * 15 * 1000));
+      } else {
+        var minBackMs = Math.min(endTarget.getHours() * 3600000 + endTarget.getMinutes() * 60000, targetRowIndices.length * 15 * 1000);
+        shiftStart = new Date(endTarget.getTime() - minBackMs);
+      }
     }
 
     var availableSec = Math.floor((endTarget.getTime() - shiftStart.getTime()) / 1000);
     if (availableSec < targetRowIndices.length * 10) {
       availableSec = Math.max(availableSec, targetRowIndices.length * 10);
-      var earliest = new Date(endTarget.getFullYear(), endTarget.getMonth(), endTarget.getDate(), 7, 0, 0);
+      var earliest = new Date(endTarget.getFullYear(), endTarget.getMonth(), endTarget.getDate(), 6, 0, 0);
       shiftStart = new Date(Math.max(earliest.getTime(), endTarget.getTime() - (availableSec * 1000)));
       availableSec = Math.floor((endTarget.getTime() - shiftStart.getTime()) / 1000);
     }
@@ -2942,6 +2989,13 @@ function getAutoFillDialogHtml(pendingCount, samplePic, sampleShift) {
   var hours = String(now.getHours()).padStart(2, '0');
   var minutes = String(now.getMinutes()).padStart(2, '0');
   var currentTimeStr = hours + ':' + minutes;
+
+  var defaultStartStr = "08:00";
+  if (sampleShift && (sampleShift.toLowerCase().includes("siang") || sampleShift.toLowerCase().includes("shift 2"))) {
+    defaultStartStr = "15:00";
+  } else if (now.getHours() < 8) {
+    defaultStartStr = "07:30";
+  }
 
   var html = [
     '<!DOCTYPE html>',
@@ -3107,18 +3161,24 @@ function getAutoFillDialogHtml(pendingCount, samplePic, sampleShift) {
     '    <span style="color:#94a3b8;">Task Pending Terdeteksi:</span>',
     '    <span class="info-badge">' + pendingCount + ' SKU</span>',
     '  </div>',
-    '  <div class="form-group">',
-    '    <label class="form-label">Nama Petugas (PIC)</label>',
-    '    <input type="text" id="picName" class="form-input" value="' + samplePic + '" placeholder="Contoh: Bintang / Staff MTG">',
-    '  </div>',
     '  <div class="grid-2">',
+    '    <div class="form-group">',
+    '      <label class="form-label">Nama Petugas (PIC)</label>',
+    '      <input type="text" id="picName" class="form-input" value="' + samplePic + '" placeholder="Contoh: Bintang / Staff MTG">',
+    '    </div>',
     '    <div class="form-group">',
     '      <label class="form-label">Jumlah Task Selesai</label>',
     '      <input type="number" id="maxCount" class="form-input" value="' + pendingCount + '" min="1" max="' + pendingCount + '">',
     '    </div>',
+    '  </div>',
+    '  <div class="grid-2">',
     '    <div class="form-group">',
-    '      <label class="form-label">Waktu Selesai (Target)</label>',
-    '      <input type="text" id="endTime" class="form-input" value="' + currentTimeStr + '" placeholder="HH:mm">',
+    '      <label class="form-label">⏱️ Jam Mulai (Start)</label>',
+    '      <input type="text" id="startTime" class="form-input" value="' + defaultStartStr + '" placeholder="HH:mm (Contoh: 08:30)">',
+    '    </div>',
+    '    <div class="form-group">',
+    '      <label class="form-label">🏁 Jam Selesai (Target)</label>',
+    '      <input type="text" id="endTime" class="form-input" value="' + currentTimeStr + '" placeholder="HH:mm (Contoh: 09:58)">',
     '    </div>',
     '  </div>',
     '  <div class="grid-2">',
@@ -3132,7 +3192,7 @@ function getAutoFillDialogHtml(pendingCount, samplePic, sampleShift) {
     '    </div>',
     '  </div>',
     '  <div class="card-tip">',
-    '    💡 <b>Timestamp Alami:</b> Setiap item akan dicatat dengan waktu unik bertahap (jeda 45–110 detik + delay antar rak). Waktu tidak akan seragam sehingga masuk akal seperti hasil audit nyata.',
+    '    💡 <b>Timestamp Alami & Bebas Diatur:</b> Anda bebas menentukan Jam Mulai & Jam Selesai. Seluruh SKU akan otomatis dibagi rata secara realistis dengan jeda dinamis antar item & delay perpindahan rak.',
     '  </div>',
     '  <div class="btn-container">',
     '    <button type="button" class="btn btn-cancel" onclick="google.script.host.close()">Batal</button>',
@@ -3148,6 +3208,7 @@ function getAutoFillDialogHtml(pendingCount, samplePic, sampleShift) {
     '      var count = parseInt(document.getElementById("maxCount").value, 10) || 9999;',
     '      var minS = parseInt(document.getElementById("minSec").value, 10) || 45;',
     '      var maxS = parseInt(document.getElementById("maxSec").value, 10) || 110;',
+    '      var startTime = document.getElementById("startTime").value.trim();',
     '      var endTime = document.getElementById("endTime").value.trim();',
     '      document.getElementById("loadingOverlay").style.display = "flex";',
     '      document.getElementById("submitBtn").disabled = true;',
@@ -3167,7 +3228,7 @@ function getAutoFillDialogHtml(pendingCount, samplePic, sampleShift) {
     '          document.getElementById("submitBtn").disabled = false;',
     '          alert("❌ Terjadi kesalahan: " + err.message);',
     '        })',
-    '        .executeAutoFillEdCorrectionTask(pic, count, minS, maxS, 90, endTime);',
+    '        .executeAutoFillEdCorrectionTask(pic, count, minS, maxS, 90, endTime, startTime);',
     '    }',
     '  </script>',
     '</body>',
@@ -3196,7 +3257,8 @@ function doPost(e) {
         payload.minSeconds,
         payload.maxSeconds,
         payload.rackDelaySeconds,
-        payload.endTimeStr
+        payload.endTimeStr || payload.endTime,
+        payload.startTimeStr || payload.startTime || payload.jamMulai
       );
       return ContentService.createTextOutput(JSON.stringify(res)).setMimeType(ContentService.MimeType.JSON);
     }
@@ -3209,4 +3271,5 @@ function doPost(e) {
     })).setMimeType(ContentService.MimeType.JSON);
   }
 }
+
 

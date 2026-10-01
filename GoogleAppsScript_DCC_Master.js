@@ -364,7 +364,8 @@ function doPost(e) {
           payload.minSeconds,
           payload.maxSeconds,
           payload.rackDelaySeconds,
-          payload.endTimeStr
+          payload.endTimeStr || payload.endTime,
+          payload.startTimeStr || payload.startTime || payload.jamMulai
         );
         return ContentService.createTextOutput(JSON.stringify(res)).setMimeType(ContentService.MimeType.JSON);
       }
