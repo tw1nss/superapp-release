@@ -2,12 +2,12 @@
  * Service Worker for QR SLOC & MSLTC Generator MTG (Android PWA)
  */
 
-const CACHE_NAME = 'superapp-pwa-v106';
+const CACHE_NAME = 'superapp-pwa-v108';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
-  './style.css?v=106',
-  './app.js?v=106',
+  './style.css?v=108',
+  './app.js?v=108',
   './qrcode.min.js',
   './manifest.json',
   './app-logo.jpg',
@@ -19,47 +19,54 @@ const ASSETS_TO_CACHE = [
 
 // Install Event
 self.addEventListener('install', (event) => {
+  self.skipWaiting();
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
-      console.log('[SW] Pre-caching app assets');
+      console.log('[SW] Pre-caching app assets v108');
       return cache.addAll(ASSETS_TO_CACHE);
-    }).then(() => self.skipWaiting())
+    })
   );
 });
 
-// Activate Event
+// Activate Event - Wipes all old caches immediately
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((keys) => {
       return Promise.all(
         keys.map((key) => {
           if (key !== CACHE_NAME) {
-            console.log('[SW] Removing old cache', key);
+            console.log('[SW] Removing old obsolete cache:', key);
             return caches.delete(key);
           }
         })
       );
-    }).then(() => self.clients.claim())
+    }).then(() => {
+      return self.clients.claim();
+    })
   );
 });
 
 // Fetch Event (Network-First Strategy for Instant Live Updates)
 self.addEventListener('fetch', (event) => {
-  if (event.request.method !== 'GET' || event.request.url.includes('google.com')) {
+  if (event.request.method !== 'GET' || event.request.url.includes('google.com') || event.request.url.includes('googleapis.com')) {
     return;
   }
 
+  // Network-first: Always try network to get newest OTA changes
   event.respondWith(
-    fetch(event.request).then((networkResponse) => {
-      if (networkResponse && networkResponse.status === 200 && networkResponse.type === 'basic') {
-        const responseToCache = networkResponse.clone();
-        caches.open(CACHE_NAME).then((cache) => {
-          cache.put(event.request, responseToCache);
-        });
-      }
-      return networkResponse;
-    }).catch(() => {
-      return caches.match(event.request);
-    })
+    fetch(event.request)
+      .then((networkResponse) => {
+        if (networkResponse && networkResponse.status === 200 && networkResponse.type === 'basic') {
+          const responseToCache = networkResponse.clone();
+          caches.open(CACHE_NAME).then((cache) => {
+            cache.put(event.request, responseToCache);
+          });
+        }
+        return networkResponse;
+      })
+      .catch(() => {
+        // Fallback to cache if offline
+        return caches.match(event.request);
+      })
   );
 });

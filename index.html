@@ -9,6 +9,9 @@
     content="Super App MTG — Sistem integrasi warehouse: Barcode SLOC, Barcode Produk, dan Cek Masa MSLTC.">
   <meta name="theme-color" content="#0a0e17">
   <meta name="robots" content="noindex, nofollow">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
   <title>Super App MTG</title>
 
   <!-- Favicon -->
@@ -29,7 +32,7 @@
   <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/id.js"></script>
 
   <!-- Stylesheets -->
-  <link rel="stylesheet" href="style.css?v=104">
+  <link rel="stylesheet" href="style.css?v=108">
 
   <!-- QR Code & Barcode Libraries -->
   <script src="qrcode.min.js"></script>
@@ -85,7 +88,7 @@
       <div class="home-version-wrap">
         <button type="button" class="home-version-chip" onclick="checkForAppUpdates(true)" title="Klik untuk memeriksa pembaruan aplikasi">
           <span class="home-version-dot"></span>
-          <span id="homeAppVersionText">v1.3.0</span> • Cek Update
+          <span id="homeAppVersionText">v1.3.1</span> • Cek Update
         </button>
       </div>
     </header>
@@ -3005,24 +3008,27 @@
         <h3 class="app-update-title" style="color: #4ade80;">Versi Anda Terbaru!</h3>
         <p class="app-update-subtitle" id="alreadyLatestSubtitle">Aplikasi Super App MTG sudah diperbarui</p>
         <div class="app-update-version-row">
-          <span class="app-update-badge current" id="alreadyLatestBadge">Versi Aktif: v1.3.0 (Build 26)</span>
+          <span class="app-update-badge current" id="alreadyLatestBadge">Versi Aktif: v1.3.1 (Build 27)</span>
         </div>
       </div>
       <div class="app-update-body">
         <div id="alreadyLatestLiveTitle" style="font-size: 0.88rem; color: #a7f3d0; font-weight: 600; margin-bottom: 6px; text-align: center;">
-          🚀 Pembaruan Sistem v1.3.0 Sudah Aktif (Live OTA)
+          🚀 Pembaruan Sistem v1.3.1 Sudah Aktif (Live OTA)
         </div>
         <ul class="app-update-changelog" id="alreadyLatestChangelog" style="font-size: 0.82rem; color: #cbd5e1; margin: 0 0 10px 0; padding-left: 18px; text-align: left;">
-          <li>Menu baru: Pinjaman &amp; Pengembalian Barang MTG terintegrasi ke Dashboard STK MTG 2K26</li>
-          <li>Formulir Peminjaman Barang ke HUB (MGR, SAL, SLP, GPL, Custom) dengan auto-fill SKU &amp; Nama Produk</li>
-          <li>Formulir Pengembalian Barang dengan auto-lookup SLOC dan upload bukti foto Google Drive</li>
-          <li>Riwayat transaksi live, sinkronisasi Superset &amp; perapian backend DCC Master</li>
+          <li>Menu baru: MTG Pinjemin ke Hub Lain (catat stok keluar)</li>
+          <li>Menu baru: MTG Terima Pengembalian dari Hub Lain (catat stok masuk kembali)</li>
+          <li>Perbaikan routing universal backend Google Apps Script: transaksi Pinjaman &amp; Pengembalian tersimpan akurat ke spreadsheet</li>
+          <li>Filter riwayat transaksi 5 flow (Semua, MTG Pinjam, MTG Kembalikan, MTG Pinjemin, Terima Kembali)</li>
         </ul>
       </div>
       <div class="app-update-actions" style="flex-direction: column; gap: 8px;">
         <button type="button" class="btn-primary" style="width: 100%;" onclick="closeAppAlreadyLatestModal()">Oke, Mengerti</button>
         <button type="button" class="btn-secondary" id="alreadyLatestDownloadBtn" style="width: 100%; font-size: 0.85rem; border-color: rgba(6,214,160,0.3); color: #06d6a0;" onclick="forceDownloadLatestApk()">
-          📥 Unduh &amp; Pasang APK v1.3.0 Terbaru
+          📥 Unduh &amp; Pasang APK v1.3.1 Terbaru
+        </button>
+        <button type="button" class="btn-secondary" style="width: 100%; font-size: 0.82rem; border-color: rgba(239,68,68,0.3); color: #f87171;" onclick="purgeAppCacheAndReload()">
+          🧹 Bersihkan Cache &amp; Muat Ulang
         </button>
       </div>
     </div>
@@ -3109,7 +3115,7 @@
   </div>
 
   <!-- App Logic -->
-  <script src="app.js?v=104"></script>
+  <script src="app.js?v=108"></script>
 </body>
 
 </html>

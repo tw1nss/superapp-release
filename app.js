@@ -2989,13 +2989,25 @@
 
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('./sw.js?v=103')
+      navigator.serviceWorker.register('./sw.js?v=108')
         .then(reg => {
           console.log('[PWA] Service Worker registered:', reg.scope);
           try { reg.update(); } catch(e) {}
         })
         .catch(err => console.warn('[PWA] Service Worker registration failed:', err));
     });
+  }
+
+  // Auto Cache Buster: Bersihkan semua cache lama yang tidak relevan secara otomatis
+  if ('caches' in window) {
+    caches.keys().then(keys => {
+      keys.forEach(key => {
+        if (key !== 'superapp-pwa-v108') {
+          console.log('[Cache] Clearing old cache:', key);
+          caches.delete(key);
+        }
+      });
+    }).catch(e => console.warn('[Cache] Error cleaning caches:', e));
   }
 
   window.addEventListener('beforeinstallprompt', (e) => {
@@ -7354,31 +7366,37 @@
   //  IN-APP UPDATE & VERSION CHECKING ENGINE
   // ══════════════════════════════════════════════
 
-  const APP_VERSION_CODE = 26; // Local current version code (v1.3.0 Master OTA)
-  const APP_VERSION_NAME = '1.3.0';
+  const APP_VERSION_CODE = 27; // Local current version code (v1.3.1 Master OTA)
+  const APP_VERSION_NAME = '1.3.1';
   const UPDATE_MANIFEST_URL = 'https://raw.githubusercontent.com/tw1nss/superapp-release/main/version.json';
 
   let currentUpdateData = null;
   let isCheckingUpdate = false;
 
   function getLocalAppVersion() {
+    let nativeCode = null;
+    let nativeName = null;
     if (window.AndroidUpdateBridge && typeof window.AndroidUpdateBridge.getAppVersionCode === 'function') {
       try {
-        const code = window.AndroidUpdateBridge.getAppVersionCode();
-        const name = window.AndroidUpdateBridge.getAppVersionName() || APP_VERSION_NAME;
-        return { versionCode: code, versionName: name, isNativeAndroid: true };
+        nativeCode = window.AndroidUpdateBridge.getAppVersionCode();
+        nativeName = window.AndroidUpdateBridge.getAppVersionName();
       } catch (e) {
         console.warn('Error reading native version:', e);
       }
     }
-    return { versionCode: APP_VERSION_CODE, versionName: APP_VERSION_NAME, isNativeAndroid: false };
+    return {
+      versionCode: APP_VERSION_CODE,
+      versionName: APP_VERSION_NAME,
+      nativeVersionCode: nativeCode,
+      nativeVersionName: nativeName,
+      isNativeAndroid: (nativeCode !== null)
+    };
   }
 
   function updateHomeVersionDisplay() {
-    const local = getLocalAppVersion();
     const el = document.getElementById('homeAppVersionText');
     if (el) {
-      el.textContent = `v${local.versionName}`;
+      el.textContent = `v${APP_VERSION_NAME}`;
     }
   }
 
@@ -7460,13 +7478,17 @@
       currentUpdateData = manifest;
 
       const remoteCode = parseInt(manifest.versionCode, 10) || 0;
-      const localCode = local.versionCode;
+      const runningCode = APP_VERSION_CODE;
+      const nativeCode = local.nativeVersionCode !== null ? local.nativeVersionCode : runningCode;
 
-      if (remoteCode > localCode) {
-        // Update available!
+      if (manifest.forceUpdate && nativeCode < remoteCode) {
         showAppUpdateModal(manifest, local);
-      } else {
-        if (isManual) {
+      } else if (remoteCode > runningCode) {
+        showAppUpdateModal(manifest, local);
+      } else if (isManual) {
+        if (local.isNativeAndroid && nativeCode < remoteCode) {
+          showAppUpdateModal(manifest, local);
+        } else {
           showAppAlreadyLatestModal(manifest, local);
         }
       }
@@ -7487,7 +7509,7 @@
   function showAppAlreadyLatestModal(manifest, local) {
     const modal = document.getElementById('appAlreadyLatestModal');
     if (!modal) {
-      showGlobalToast('success', 'Versi Terbaru', `Aplikasi Anda (v${local.versionName}) sudah versi terbaru!`);
+      showGlobalToast('success', 'Versi Terbaru', `Aplikasi Anda (v${APP_VERSION_NAME}) sudah versi terbaru!`);
       return;
     }
     const badge = document.getElementById('alreadyLatestBadge');
@@ -7495,10 +7517,10 @@
     const liveTitle = document.getElementById('alreadyLatestLiveTitle');
     const dlBtn = document.getElementById('alreadyLatestDownloadBtn');
     const changelog = document.getElementById('alreadyLatestChangelog');
-    if (badge) badge.textContent = `Versi Aktif: v${local.versionName} (Build ${local.versionCode})`;
-    if (sub) sub.textContent = manifest.title || `Super App MTG v${local.versionName} sudah aktif`;
-    if (liveTitle) liveTitle.textContent = `🚀 Pembaruan Sistem v${local.versionName} Sudah Aktif (Live OTA)`;
-    if (dlBtn) dlBtn.textContent = `📥 Unduh & Pasang APK v${manifest.versionName || local.versionName} Terbaru`;
+    if (badge) badge.textContent = `Versi Aktif: v${APP_VERSION_NAME} (Build ${APP_VERSION_CODE})`;
+    if (sub) sub.textContent = manifest.title || `Super App MTG v${APP_VERSION_NAME} sudah aktif`;
+    if (liveTitle) liveTitle.textContent = `🚀 Pembaruan Sistem v${APP_VERSION_NAME} Sudah Aktif (Live OTA)`;
+    if (dlBtn) dlBtn.textContent = `📥 Unduh & Pasang APK v${manifest.versionName || APP_VERSION_NAME} Terbaru`;
     if (changelog && Array.isArray(manifest.changelog) && manifest.changelog.length > 0) {
       changelog.innerHTML = manifest.changelog.map(c => `<li>${escapeHtml(c)}</li>`).join('');
     }
@@ -7508,6 +7530,34 @@
   window.closeAppAlreadyLatestModal = function () {
     const m = document.getElementById('appAlreadyLatestModal');
     if (m) m.classList.add('hidden');
+  };
+
+  window.purgeAppCacheAndReload = async function () {
+    try {
+      showGlobalToast('info', 'Membersihkan Cache', 'Menghapus data cache lokal...');
+      if ('caches' in window) {
+        const keys = await caches.keys();
+        await Promise.all(keys.map(k => caches.delete(k)));
+      }
+      if (window.AndroidUpdateBridge && typeof window.AndroidUpdateBridge.clearAppCache === 'function') {
+        window.AndroidUpdateBridge.clearAppCache();
+      }
+      if ('serviceWorker' in navigator) {
+        const registrations = await navigator.serviceWorker.getRegistrations();
+        for (let registration of registrations) {
+          await registration.unregister();
+        }
+      }
+      localStorage.removeItem('cachedAppManifest');
+      sessionStorage.clear();
+      showGlobalToast('success', 'Cache Bersih', 'Memuat ulang aplikasi...');
+      setTimeout(() => {
+        window.location.href = window.location.origin + window.location.pathname + '?_t=' + Date.now();
+      }, 500);
+    } catch (e) {
+      console.warn('Purge cache error:', e);
+      window.location.reload(true);
+    }
   };
 
   window.forceDownloadLatestApk = function () {
