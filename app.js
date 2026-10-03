@@ -3152,7 +3152,7 @@
         pnjWs.scrollTop = 0;
       }
       const bBtn = document.getElementById('backToMenuBtn');
-      if (bBtn) bBtn.classList.remove('hidden');
+      if (bBtn) bBtn.classList.add('hidden'); // Pinjaman workspace memiliki top-bar back button tersendiri
 
       if (typeof window.initPinjamanModule === 'function') {
         window.initPinjamanModule();
@@ -3324,6 +3324,16 @@
     if (edcWorkspace && !edcWorkspace.classList.contains('hidden')) {
       if (typeof currentEdcTab !== 'undefined' && currentEdcTab !== 'main') {
         if (typeof switchEdcTab === 'function') switchEdcTab('main');
+        return true;
+      }
+      goBackToMenu();
+      return true;
+    }
+
+    const pnjWorkspace = document.getElementById('pinjamanWorkspace');
+    if (pnjWorkspace && !pnjWorkspace.classList.contains('hidden')) {
+      if (typeof currentPinjamanTab !== 'undefined' && currentPinjamanTab !== 'pinjam') {
+        if (typeof switchPinjamanTab === 'function') switchPinjamanTab('pinjam');
         return true;
       }
       goBackToMenu();

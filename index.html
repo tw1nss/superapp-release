@@ -32,7 +32,7 @@
   <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/id.js"></script>
 
   <!-- Stylesheets -->
-  <link rel="stylesheet" href="style.css?v=108">
+  <link rel="stylesheet" href="style.css?v=109">
 
   <!-- QR Code & Barcode Libraries -->
   <script src="qrcode.min.js"></script>
@@ -88,7 +88,7 @@
       <div class="home-version-wrap">
         <button type="button" class="home-version-chip" onclick="checkForAppUpdates(true)" title="Klik untuk memeriksa pembaruan aplikasi">
           <span class="home-version-dot"></span>
-          <span id="homeAppVersionText">v1.3.1</span> • Cek Update
+          <span id="homeAppVersionText">v1.3.2</span> • Cek Update
         </button>
       </div>
     </header>
@@ -2121,7 +2121,7 @@
             </svg>
             <span>Pinjaman MTG</span>
           </h2>
-          <p class="pinjaman-subtitle">Peminjaman &amp; Pengembalian Hub MTG</p>
+          <p class="pinjaman-subtitle">Hub MTG • 4 Alur Transaksi</p>
         </div>
 
         <button type="button" class="pinjaman-refresh-btn" onclick="refreshPinjamanData(true)" title="Muat Ulang / Sinkronisasi">
@@ -2136,16 +2136,16 @@
       <!-- Segmented Nav Tabs (5 Flows) -->
       <nav class="pinjaman-nav">
         <button type="button" class="pinjaman-tab-btn active" id="tabPinjamBtn" onclick="switchPinjamanTab('pinjam')">
-          <span>📤 Pinjam ke Hub</span>
+          <span>📤 Pinjam</span>
         </button>
         <button type="button" class="pinjaman-tab-btn kembali-tab" id="tabKembaliBtn" onclick="switchPinjamanTab('kembali')">
-          <span>🔄 Kembalikan ke Hub</span>
+          <span>🔄 Kembali</span>
         </button>
         <button type="button" class="pinjaman-tab-btn pinjemin-tab" id="tabPinjeminBtn" onclick="switchPinjamanTab('pinjemin')">
-          <span>🤝 Pinjemin ke Hub</span>
+          <span>🤝 Pinjemin</span>
         </button>
         <button type="button" class="pinjaman-tab-btn terima-tab" id="tabTerimaBtn" onclick="switchPinjamanTab('terima')">
-          <span>📦 Terima Kembali</span>
+          <span>📦 Terima</span>
         </button>
         <button type="button" class="pinjaman-tab-btn history-tab" id="tabHistoryBtn" onclick="switchPinjamanTab('history')">
           <span>📋 Riwayat</span>
@@ -2156,10 +2156,10 @@
       <div id="tabContentPinjam" class="pinjaman-tab-panel">
         <div class="pinjaman-form-card accent-pinjam">
           <div class="pinjaman-card-header">
-            <div class="pinjaman-badge-icon pinjam">📦</div>
+            <div class="pinjaman-badge-icon pinjam">📤</div>
             <div>
-              <h3 class="pinjaman-card-title">Form Peminjaman Barang</h3>
-              <p class="pinjaman-card-desc">Catat barang MTG yang dipinjamkan ke HUB lain</p>
+              <h3 class="pinjaman-card-title">MTG Pinjam ke Hub Lain</h3>
+              <p class="pinjaman-card-desc">Catat barang yang dipinjam MTG dari Hub lain</p>
             </div>
           </div>
 
@@ -2271,8 +2271,8 @@
           <div class="pinjaman-card-header">
             <div class="pinjaman-badge-icon kembali">🔄</div>
             <div>
-              <h3 class="pinjaman-card-title">Form Pengembalian Barang</h3>
-              <p class="pinjaman-card-desc">Pengembalian barang ke HUB dengan verifikasi foto &amp; SLOC</p>
+              <h3 class="pinjaman-card-title">MTG Kembalikan ke Hub Lain</h3>
+              <p class="pinjaman-card-desc">Catat pengembalian barang pinjaman MTG ke Hub asal</p>
             </div>
           </div>
 
@@ -2595,7 +2595,7 @@
             <div class="pinjaman-badge-icon terima">📦</div>
             <div>
               <h3 class="pinjaman-card-title">MTG Terima Pengembalian</h3>
-              <p class="pinjaman-card-desc">Terima kembali barang MTG yang dipinjamkan ke HUB luar</p>
+              <p class="pinjaman-card-desc">Catat barang yang dikembalikan oleh Hub peminjam ke MTG</p>
             </div>
           </div>
 

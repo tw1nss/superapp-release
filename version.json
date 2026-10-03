@@ -1,14 +1,15 @@
 {
-  "versionCode": 27,
-  "versionName": "1.3.1",
+  "versionCode": 28,
+  "versionName": "1.3.2",
   "apkUrl": "https://github.com/tw1nss/superapp-release/raw/main/app-debug.apk",
   "forceUpdate": false,
-  "title": "Pembaruan Superapp MTG v1.3.1",
+  "title": "Pembaruan Superapp MTG v1.3.2",
   "changelog": [
-    "Fitur baru: Menu MTG Pinjemin ke Hub Lain (catat stok keluar)",
-    "Fitur baru: Menu MTG Terima Pengembalian dari Hub Lain (catat stok masuk kembali)",
-    "Perbaikan routing backend Google Apps Script: transaksi Pinjaman & Pengembalian tersimpan akurat ke spreadsheet",
-    "Filter riwayat transaksi 5 flow (Semua, MTG Pinjam, MTG Kembalikan, MTG Pinjemin, Terima Kembali)"
+    "Perbaikan UI/UX Android: Layout 5 tab navigasi responsive 2 baris (tidak terpotong)",
+    "Perbaikan input QTY: Stepper (-) dan (+) simetris rapi, tidak terlempar keluar layar",
+    "Perbaikan header: Menghilangkan tombol back ganda yang bertumpuk",
+    "Integrasi hardware back button Android untuk navigasi tab pinjaman",
+    "Penyempurnaan label flow transaksi & deskripsi kartu formulir"
   ],
   "releasedAt": "2026-10-03"
 }
