@@ -195,8 +195,19 @@ function removeSupersetAutoSyncTriggerPrompt() {
 // 📡 API GET DATA UNTUK FRONTEND (BULK READ SUPER CEPAT)
 // ============================================================
 function doGet(e) {
+  var param = (e && e.parameter) ? e.parameter : {};
+
+  // Setup 4 sheet pinjaman jika dipanggil via URL / webhook (?action=setupPinjamanSheets)
+  if (param.action === 'setupPinjamanSheets' || param.action === 'setupSheets') {
+    setupPinjamanSheets();
+    return ContentService.createTextOutput(JSON.stringify({
+      status: "success",
+      message: "4 Sheet Pinjaman & Pengembalian MTG berhasil dibuat & diformat!"
+    })).setMimeType(ContentService.MimeType.JSON);
+  }
+
   // Ambil sheet berdasarkan parameter URL (contoh: ?sheet=STOCK UPDATE). Jika kosong, default ke "Hasil DCC"
-  var sheetName = (e && e.parameter && e.parameter.sheet) ? e.parameter.sheet : "Hasil DCC"; 
+  var sheetName = param.sheet || "Hasil DCC"; 
   
   var ss = getSpreadsheet();
   var sheet = ss.getSheetByName(sheetName);
@@ -352,18 +363,37 @@ function doPost(e) {
       payload = e.parameter;
     }
 
-    // Router jika request adalah audit ED Sweeper
-    if (payload.action === 'saveEdsResult' || payload.module === 'eds' || payload.module === 'ed_sweeper') {
-      if (typeof handleEdsSubmit === 'function') {
-        return handleEdsSubmit(payload);
-      }
+    // ==========================================================
+    // 📦 1. ROUTER PINJAMAN & PENGEMBALIAN BARANG MTG (4 ALUR LENGKAP)
+    // ==========================================================
+    if (
+      payload.module === 'pinjaman' ||
+      payload.action === 'savePinjamKeHub' ||
+      payload.action === 'saveKembalikanKeHub' ||
+      payload.action === 'savePinjeminKeHub' ||
+      payload.action === 'saveTerimaKembali' ||
+      payload.action === 'savePinjamanBarang' ||
+      payload.action === 'savePengembalianBarang' ||
+      payload.formType === 'pinjam' ||
+      payload.formType === 'kembali' ||
+      payload.formType === 'pinjemin' ||
+      payload.formType === 'terima' ||
+      payload.type === 'pinjam' ||
+      payload.type === 'kembali' ||
+      payload.type === 'pinjemin' ||
+      payload.type === 'terima'
+    ) {
+      return handlePinjamanSubmit(payload);
     }
 
-    // Router jika request adalah auto-complete Perbaiki Rumus ED
-    if (payload.action === 'autoFillEdCorrection' || payload.action === 'perbaikiRumusEd') {
-      if (typeof executeAutoFillEdCorrectionTask === 'function') {
-        var res = executeAutoFillEdCorrectionTask(
+    // ==========================================================
+    // 📊 2. ROUTER DCC AUTOFILL SUPERVISOR TASK
+    // ==========================================================
+    if (payload.action === 'autoFillSupervisorTask' || payload.action === 'autoFillDcc') {
+      if (typeof executeAutoFillTask === 'function') {
+        var res = executeAutoFillTask(
           payload.picName || payload.petugas || payload.pic,
+          payload.shift,
           payload.maxCount,
           payload.minSeconds,
           payload.maxSeconds,
@@ -373,19 +403,6 @@ function doPost(e) {
         );
         return ContentService.createTextOutput(JSON.stringify(res)).setMimeType(ContentService.MimeType.JSON);
       }
-    }
-
-    // Router jika request adalah audit ED Correction
-    if (payload.action === 'saveEdCorrectionResult' || payload.module === 'ed_correction' || payload.module === 'edc') {
-      if (typeof handleEdCorrectionSubmit === 'function') {
-        return handleEdCorrectionSubmit(payload);
-      }
-      return handleEdCorrectionSubmitDccFallback(payload);
-    }
-
-    // Router jika request adalah Pinjaman / Pengembalian Barang MTG
-    if (payload.action === 'savePinjamanBarang' || payload.action === 'savePengembalianBarang' || payload.module === 'pinjaman') {
-      return handlePinjamanSubmit(payload);
     }
 
     var ss = getSpreadsheet();
@@ -2187,112 +2204,6 @@ function alertUser(msg) {
         ss.toast(String(msg).split("\n")[0], "DCC / Superset Auto-Sync", 5);
       }
     } catch (errToast) {}
-  }
-}
-
-/**
- * Fallback handler untuk ED Correction submit ke Backup ED Corection
- */
-function handleEdCorrectionSubmitDccFallback(payload) {
-  try {
-    var ss = getSpreadsheet();
-    var sheet = ss.getSheetByName('Hasil ED Correction') || 
-                ss.getSheetByName('Hasil ED Corection') || 
-                ss.getSheetByName('Hasil EDC') || 
-                ss.getSheetByName('Backup ED Corection') || 
-                ss.getSheetByName('Backup Data ED Correction');
-
-    if (!sheet) {
-      sheet = ss.insertSheet('Hasil ED Correction');
-    }
-
-    if (sheet && (sheet.getLastRow() === 0 || (sheet.getLastRow() === 1 && !sheet.getRange(1, 1).getValue()))) {
-      var headerRow = [
-        [
-          'TIMESTAMP', 'SKU', 'NAMA PRODUK', 'LOKASI RAK (SLOC)', 'SLOC ACTUAL', 
-          'SLOC MATCH?', 'ED SISTEM (LAMA)', 'ED FISIK / KOREKSI', 'STATUS ED', 
-          'FISIK GOOD', 'FISIK BAD', 'TOTAL FISIK', 'SELISIH', 'PETUGAS', 'SHIFT', 
-          'BUKTI FOTO (DRIVE)', 'REMARKS'
-        ]
-      ];
-      sheet.getRange(1, 1, 1, 17).setValues(headerRow);
-      sheet.getRange(1, 1, 1, 17)
-        .setBackground('#581C87')
-        .setFontColor('#FFFFFF')
-        .setFontWeight('bold')
-        .setHorizontalAlignment('center');
-      sheet.setRowHeight(1, 35);
-    }
-
-    var now = new Date();
-    var timestamp = Utilities.formatDate(now, CONFIG.TIMEZONE || "Asia/Jakarta", "dd/MM/yyyy HH:mm:ss");
-
-    var sku = String(payload.sku || payload.skuNo || '').trim();
-    var productName = String(payload.productName || payload.namaSku || '').trim();
-    var rackSystem = String(payload.rackSystem || payload.slocExisting || '').trim();
-    var rackActual = String(payload.rackActual || payload.slocActual || rackSystem).trim();
-    var rackMatch = (rackSystem.toUpperCase() === rackActual.toUpperCase()) ? "MATCH" : "UNMATCH";
-
-    var edSystem = String(payload.edSystem || payload.edLama || payload.expiredDateSystem || '-').trim();
-    var edActual = String(payload.edActual || payload.edBaru || payload.expiredDateActual || payload.expiredDate || '').trim();
-    var edStatus = String(payload.edStatus || (edSystem === edActual ? "MATCH" : "REVISI")).trim();
-
-    var fisikGood = Number(payload.fisikGood || 0);
-    var fisikBad = Number(payload.fisikBad || 0);
-    var totalFisik = fisikGood + fisikBad;
-    var qtySystem = Number(payload.qtySystem || 0);
-    var selisih = totalFisik - qtySystem;
-
-    var petugas = String(payload.petugas || payload.pic || payload.inputBy || '').trim();
-    var shift = String(payload.shift || '').trim();
-    var photoUrl = String(payload.photoUrl || payload.evidenceUrl || '').trim();
-    var remarks = String(payload.remarks || payload.keterangan || '').trim();
-
-    var rowData = [
-      timestamp, sku, productName, rackSystem, rackActual,
-      rackMatch, edSystem, edActual, edStatus,
-      fisikGood, fisikBad, totalFisik, selisih, petugas, shift,
-      photoUrl, remarks
-    ];
-
-    sheet.appendRow(rowData);
-
-    // Auto update status di Main List jika ada
-    try {
-      var mainSheet = ss.getSheetByName('Mainlist Sku ED Corection') || 
-                      ss.getSheetByName('Main List SKU ED Correction') || 
-                      ss.getSheetByName('Main List ED Correction');
-      if (mainSheet && mainSheet.getLastRow() > 1) {
-        var mainData = mainSheet.getRange(2, 3, mainSheet.getLastRow() - 1, 1).getValues();
-        for (var m = 0; m < mainData.length; m++) {
-          if (String(mainData[m][0]).trim().toLowerCase() === sku.toLowerCase()) {
-            mainSheet.getRange(m + 2, 8).setValue(edActual); // Kolom H: ED Fisik / Koreksi
-            mainSheet.getRange(m + 2, 9).setValue(edStatus); // Kolom I: Status ED
-            mainSheet.getRange(m + 2, 10).setValue(fisikGood); // Kolom J: Fisik Good
-            mainSheet.getRange(m + 2, 11).setValue(fisikBad); // Kolom K: Fisik Bad
-            mainSheet.getRange(m + 2, 12).setValue(totalFisik); // Kolom L: Total Fisik
-            mainSheet.getRange(m + 2, 13).setValue(selisih); // Kolom M: Selisih
-            mainSheet.getRange(m + 2, 14).setValue(petugas); // Kolom N: Petugas
-            mainSheet.getRange(m + 2, 15).setValue("DONE");   // Kolom O: Status
-            if (remarks) mainSheet.getRange(m + 2, 16).setValue(remarks); // Kolom P: Remarks
-            break;
-          }
-        }
-      }
-    } catch(eMain) {}
-
-    return ContentService.createTextOutput(JSON.stringify({
-      status: "success",
-      message: "Data koreksi ED berhasil disimpan di Backup ED Corection!",
-      sku: sku,
-      timestamp: timestamp
-    })).setMimeType(ContentService.MimeType.JSON);
-
-  } catch (err) {
-    return ContentService.createTextOutput(JSON.stringify({
-      status: "error",
-      message: "Gagal menyimpan data EDC: " + err.toString()
-    })).setMimeType(ContentService.MimeType.JSON);
   }
 }
 
