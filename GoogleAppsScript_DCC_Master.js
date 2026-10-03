@@ -59,6 +59,11 @@ var CHARTS = [
 // Helper: Ambil spreadsheet target (Bisa bound atau standalone ID)
 function getSpreadsheet() {
   try {
+    var active = SpreadsheetApp.getActiveSpreadsheet();
+    if (active) return active;
+  } catch (eActive) {}
+
+  try {
     if (CONFIG.TARGET_FILE_ID) {
       return SpreadsheetApp.openById(CONFIG.TARGET_FILE_ID);
     }
@@ -2444,69 +2449,60 @@ function writePinjamanRowByHeaders(sheet, headerDefs, rowObj, headerBgColor) {
 function setupPinjamanSheets() {
   var ss = getSpreadsheet();
   
-  // 1. Setup Pinjaman Barang MTG (12 Kolom)
-  var pSheet = ss.getSheetByName('Pinjaman Barang MTG') || ss.insertSheet('Pinjaman Barang MTG');
-  var headerP = [[
-    'TIMESTAMP', 'JENIS TRANSAKSI', 'NOMOR SKU', 'NAMA PRODUK', 'SLOC (LOKASI RAK)', 
-    'QTY', 'HUB TARGET PINJAM', 'PIC PETUGAS MTG', 'PIC / DRIVER HUB', 'BUKTI FOTO (DRIVE)', 'STATUS', 'CATATAN'
-  ]];
-  pSheet.getRange(1, 1, 1, 12).setValues(headerP);
-  pSheet.getRange(1, 1, 1, 12)
-    .setBackground('#0284c7')
-    .setFontColor('#FFFFFF')
-    .setFontWeight('bold')
-    .setHorizontalAlignment('center')
-    .setVerticalAlignment('middle');
-  pSheet.setRowHeight(1, 36);
-  pSheet.setFrozenRows(1);
+  var sheetConfigs = [
+    {
+      name: 'Pinjaman Barang MTG',
+      color: '#0284c7',
+      headers: [
+        'TIMESTAMP', 'JENIS TRANSAKSI', 'NOMOR SKU', 'NAMA PRODUK', 'SLOC (LOKASI RAK)', 
+        'QTY', 'HUB TARGET PINJAM', 'PIC PETUGAS MTG', 'PIC / DRIVER HUB', 'BUKTI FOTO (DRIVE)', 'STATUS', 'CATATAN'
+      ]
+    },
+    {
+      name: 'Pengembalian Barang MTG',
+      color: '#059669',
+      headers: [
+        'TIMESTAMP', 'JENIS TRANSAKSI', 'NOMOR SKU', 'NAMA PRODUK', 'SLOC (LOKASI RAK)', 
+        'QTY', 'HUB TARGET PENGEMBALIAN', 'KONDISI BARANG', 'PIC PETUGAS MTG', 'PIC / DRIVER HUB', 'BUKTI FOTO (DRIVE)', 'STATUS', 'CATATAN'
+      ]
+    },
+    {
+      name: 'Pinjemin ke Hub Lain',
+      color: '#D97706',
+      headers: [
+        'TIMESTAMP', 'JENIS TRANSAKSI', 'NOMOR SKU', 'NAMA PRODUK', 'SLOC (LOKASI RAK)', 
+        'QTY', 'HUB PEMINJAM (TUJUAN)', 'PIC PETUGAS MTG', 'PIC / DRIVER HUB', 'BUKTI FOTO (DRIVE)', 'STATUS', 'CATATAN'
+      ]
+    },
+    {
+      name: 'Terima Pengembalian Hub',
+      color: '#7C3AED',
+      headers: [
+        'TIMESTAMP', 'JENIS TRANSAKSI', 'NOMOR SKU', 'NAMA PRODUK', 'SLOC (LOKASI RAK)', 
+        'QTY', 'HUB ASAL PENGEMBALIAN', 'KONDISI BARANG', 'PIC PETUGAS MTG', 'PIC / DRIVER HUB', 'BUKTI FOTO (DRIVE)', 'STATUS', 'CATATAN'
+      ]
+    }
+  ];
 
-  // 2. Setup Pengembalian Barang MTG (13 Kolom)
-  var kSheet = ss.getSheetByName('Pengembalian Barang MTG') || ss.insertSheet('Pengembalian Barang MTG');
-  var headerK = [[
-    'TIMESTAMP', 'JENIS TRANSAKSI', 'NOMOR SKU', 'NAMA PRODUK', 'SLOC (LOKASI RAK)', 
-    'QTY', 'HUB TARGET PENGEMBALIAN', 'KONDISI BARANG', 'PIC PETUGAS MTG', 'PIC / DRIVER HUB', 'BUKTI FOTO (DRIVE)', 'STATUS', 'CATATAN'
-  ]];
-  kSheet.getRange(1, 1, 1, 13).setValues(headerK);
-  kSheet.getRange(1, 1, 1, 13)
-    .setBackground('#059669')
-    .setFontColor('#FFFFFF')
-    .setFontWeight('bold')
-    .setHorizontalAlignment('center')
-    .setVerticalAlignment('middle');
-  kSheet.setRowHeight(1, 36);
-  kSheet.setFrozenRows(1);
-
-  // 3. Setup Pinjemin ke Hub Lain (12 Kolom)
-  var pinjeminSheet = ss.getSheetByName('Pinjemin ke Hub Lain') || ss.insertSheet('Pinjemin ke Hub Lain');
-  var headerPinjemin = [[
-    'TIMESTAMP', 'JENIS TRANSAKSI', 'NOMOR SKU', 'NAMA PRODUK', 'SLOC (LOKASI RAK)', 
-    'QTY', 'HUB PEMINJAM (TUJUAN)', 'PIC PETUGAS MTG', 'PIC / DRIVER HUB', 'BUKTI FOTO (DRIVE)', 'STATUS', 'CATATAN'
-  ]];
-  pinjeminSheet.getRange(1, 1, 1, 12).setValues(headerPinjemin);
-  pinjeminSheet.getRange(1, 1, 1, 12)
-    .setBackground('#D97706')
-    .setFontColor('#FFFFFF')
-    .setFontWeight('bold')
-    .setHorizontalAlignment('center')
-    .setVerticalAlignment('middle');
-  pinjeminSheet.setRowHeight(1, 36);
-  pinjeminSheet.setFrozenRows(1);
-
-  // 4. Setup Terima Pengembalian Hub (13 Kolom)
-  var terimaSheet = ss.getSheetByName('Terima Pengembalian Hub') || ss.insertSheet('Terima Pengembalian Hub');
-  var headerTerima = [[
-    'TIMESTAMP', 'JENIS TRANSAKSI', 'NOMOR SKU', 'NAMA PRODUK', 'SLOC (LOKASI RAK)', 
-    'QTY', 'HUB ASAL PENGEMBALIAN', 'KONDISI BARANG', 'PIC PETUGAS MTG', 'PIC / DRIVER HUB', 'BUKTI FOTO (DRIVE)', 'STATUS', 'CATATAN'
-  ]];
-  terimaSheet.getRange(1, 1, 1, 13).setValues(headerTerima);
-  terimaSheet.getRange(1, 1, 1, 13)
-    .setBackground('#7C3AED')
-    .setFontColor('#FFFFFF')
-    .setFontWeight('bold')
-    .setHorizontalAlignment('center')
-    .setVerticalAlignment('middle');
-  terimaSheet.setRowHeight(1, 36);
-  terimaSheet.setFrozenRows(1);
+  for (var i = 0; i < sheetConfigs.length; i++) {
+    var conf = sheetConfigs[i];
+    var sheet = ss.getSheetByName(conf.name);
+    if (!sheet) {
+      sheet = ss.insertSheet(conf.name);
+      SpreadsheetApp.flush();
+    }
+    var numCols = conf.headers.length;
+    sheet.getRange(1, 1, 1, numCols).setValues([conf.headers]);
+    sheet.getRange(1, 1, 1, numCols)
+      .setBackground(conf.color)
+      .setFontColor('#FFFFFF')
+      .setFontWeight('bold')
+      .setHorizontalAlignment('center')
+      .setVerticalAlignment('middle');
+    sheet.setRowHeight(1, 36);
+    try { sheet.setFrozenRows(1); } catch (eF) {}
+    SpreadsheetApp.flush();
+  }
 
   alertUser('✅ 4 Sheet Transaksi Pinjaman & Pengembalian MTG berhasil dibuat & diformat:\n1. Pinjaman Barang MTG (Biru)\n2. Pengembalian Barang MTG (Hijau)\n3. Pinjemin ke Hub Lain (Oranye)\n4. Terima Pengembalian Hub (Ungu)');
 }
