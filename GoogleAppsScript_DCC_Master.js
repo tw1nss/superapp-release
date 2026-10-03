@@ -111,13 +111,20 @@ function buildDccMenu(ui) {
     .addItem('📦 Backup DCC ke Historical', 'copyDccToHistorical')
     .addItem('🗑️ Clear Kolom Sheet "Hasil DCC"', 'hapus')
     .addItem('🔄 Kosongkan / Reset "Mainlist SKU"', 'resetMainlistSkuPrompt')
+    .addSeparator()
+    .addItem('📋 Siapkan 4 Sheet Pinjaman & Pengembalian', 'setupPinjamanSheets')
     .addToUi();
+
+  // Panggil menu Pinjaman MTG tersendiri agar selalu muncul
+  try {
+    buildPinjamanMenu(ui);
+  } catch (ePinjam) {}
 }
 
 function buildPinjamanMenu(ui) {
   if (!ui) ui = SpreadsheetApp.getUi();
   ui.createMenu('📦 Pinjaman MTG')
-    .addItem('📋 Siapkan Format Sheet Pinjaman & Pengembalian', 'setupPinjamanSheets')
+    .addItem('📋 Siapkan Format 4 Sheet Pinjaman & Pengembalian', 'setupPinjamanSheets')
     .addToUi();
 }
 

@@ -87,9 +87,10 @@ function onOpen() {
   }
 
   var ui = SpreadsheetApp.getUi();
-  // Bangun menu Superset & DCC jika function-nya ada
+  // Bangun menu Superset, DCC, dan Pinjaman jika function-nya ada
   if (typeof buildSupersetMenu === 'function') buildSupersetMenu(ui);
   if (typeof buildDccMenu === 'function') buildDccMenu(ui);
+  if (typeof buildPinjamanMenu === 'function') buildPinjamanMenu(ui);
   // Bangun menu ED Sweeper
   buildEdSweeperMenu(ui);
   // Bangun menu ED Correction jika ada

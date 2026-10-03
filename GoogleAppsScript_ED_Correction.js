@@ -108,9 +108,10 @@ function getEdCorrectionSheet(type) {
 // ==============================================================================
 function onOpen() {
   var ui = SpreadsheetApp.getUi();
-  // Panggil menu Superset, DCC, dan EDS jika terintegrasi dalam 1 file
+  // Panggil menu Superset, DCC, EDS, dan Pinjaman jika terintegrasi dalam 1 project
   if (typeof buildSupersetMenu === 'function') buildSupersetMenu(ui);
   if (typeof buildDccMenu === 'function') buildDccMenu(ui);
+  if (typeof buildPinjamanMenu === 'function') buildPinjamanMenu(ui);
   if (typeof buildEdSweeperMenu === 'function') buildEdSweeperMenu(ui);
 
   // Pasang trigger auto-backup harian ED Correction (23:30 WIB)
