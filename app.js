@@ -12783,6 +12783,35 @@
   let stockUpdateCacheMap = new Map();
   let isStockUpdateFetching = false;
   let pinjamanAutocompleteTimer = null;
+  const PINJAMAN_DEFAULT_WEBAPP_URL = 'https://script.google.com/macros/s/AKfycbzRhVQZEv3TJwTfUhKKV0QtzexKvMS8mfz-iE72LiVRLKulE4_IlU4IW10rII8k7ICpLQ/exec';
+
+  function getPinjamanWebappUrl() {
+    return (localStorage.getItem('SUPERAPP_PINJAMAN_WEBAPP_URL') || PINJAMAN_DEFAULT_WEBAPP_URL).trim();
+  }
+
+  window.openPinjamanSettingsModal = function () {
+    const cur = localStorage.getItem('SUPERAPP_PINJAMAN_WEBAPP_URL') || PINJAMAN_DEFAULT_WEBAPP_URL;
+    const input = prompt(
+      '⚙️ KONFIGURASI WEB APP PINJAMAN MTG\n\n' +
+      'Masukkan URL Web App hasil deploy dari file "GoogleAppsScript_Pinjaman.js":\n' +
+      '(Format: https://script.google.com/macros/s/.../exec)',
+      cur
+    );
+    if (input !== null) {
+      const clean = input.trim();
+      if (clean && clean.startsWith('http')) {
+        localStorage.setItem('SUPERAPP_PINJAMAN_WEBAPP_URL', clean);
+        alert('✅ URL Web App Pinjaman berhasil disimpan!\n\n' + clean);
+        if (typeof fetchPinjamanHistory === 'function') fetchPinjamanHistory();
+      } else if (!clean) {
+        localStorage.removeItem('SUPERAPP_PINJAMAN_WEBAPP_URL');
+        alert('ℹ️ Menggunakan URL Web App default.');
+        if (typeof fetchPinjamanHistory === 'function') fetchPinjamanHistory();
+      } else {
+        alert('⚠️ URL tidak valid. Pastikan diawali https://');
+      }
+    }
+  };
 
   // ── 1. Fetch & Cache Data dari Sheet 'STOCK UPDATE' ──
   async function fetchStockUpdateSheet() {
@@ -13856,7 +13885,7 @@
     }
 
     try {
-      await fetch(DCC_WEBAPP_URL, {
+      await fetch(getPinjamanWebappUrl(), {
         method: 'POST',
         mode: 'no-cors',
         headers: { 'Content-Type': 'text/plain' },
@@ -13985,7 +14014,7 @@
     }
 
     try {
-      await fetch(DCC_WEBAPP_URL, {
+      await fetch(getPinjamanWebappUrl(), {
         method: 'POST',
         mode: 'no-cors',
         headers: { 'Content-Type': 'text/plain' },
@@ -14114,7 +14143,7 @@
     }
 
     try {
-      await fetch(DCC_WEBAPP_URL, {
+      await fetch(getPinjamanWebappUrl(), {
         method: 'POST',
         mode: 'no-cors',
         headers: { 'Content-Type': 'text/plain' },
@@ -14247,7 +14276,7 @@
     }
 
     try {
-      await fetch(DCC_WEBAPP_URL, {
+      await fetch(getPinjamanWebappUrl(), {
         method: 'POST',
         mode: 'no-cors',
         headers: { 'Content-Type': 'text/plain' },
@@ -14314,10 +14343,11 @@
     `;
 
     try {
-      const pUrl = `${DCC_WEBAPP_URL}?sheet=${encodeURIComponent('Pinjaman Barang MTG')}&_ts=${Date.now()}`;
-      const kUrl = `${DCC_WEBAPP_URL}?sheet=${encodeURIComponent('Pengembalian Barang MTG')}&_ts=${Date.now()}`;
-      const pinjeminUrl = `${DCC_WEBAPP_URL}?sheet=${encodeURIComponent('Pinjemin ke Hub Lain')}&_ts=${Date.now()}`;
-      const terimaUrl = `${DCC_WEBAPP_URL}?sheet=${encodeURIComponent('Terima Pengembalian Hub')}&_ts=${Date.now()}`;
+      const baseUrl = getPinjamanWebappUrl();
+      const pUrl = `${baseUrl}?sheet=${encodeURIComponent('Pinjaman Barang MTG')}&_ts=${Date.now()}`;
+      const kUrl = `${baseUrl}?sheet=${encodeURIComponent('Pengembalian Barang MTG')}&_ts=${Date.now()}`;
+      const pinjeminUrl = `${baseUrl}?sheet=${encodeURIComponent('Pinjemin ke Hub Lain')}&_ts=${Date.now()}`;
+      const terimaUrl = `${baseUrl}?sheet=${encodeURIComponent('Terima Pengembalian Hub')}&_ts=${Date.now()}`;
 
       const [resP, resK, resPinjemin, resTerima] = await Promise.all([
         fetch(pUrl).catch(() => null),

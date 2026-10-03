@@ -10531,8 +10531,15 @@ select.dcc-field-input option {
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
 }
 
+.pinjaman-top-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
 .pinjaman-top-back-btn,
-.pinjaman-refresh-btn {
+.pinjaman-refresh-btn,
+.pinjaman-settings-btn {
   width: 42px;
   height: 42px;
   display: inline-flex;
@@ -10547,7 +10554,8 @@ select.dcc-field-input option {
 }
 
 .pinjaman-top-back-btn:hover,
-.pinjaman-refresh-btn:hover {
+.pinjaman-refresh-btn:hover,
+.pinjaman-settings-btn:hover {
   background: rgba(56, 189, 248, 0.15);
   border-color: rgba(56, 189, 248, 0.4);
   color: #38bdf8;

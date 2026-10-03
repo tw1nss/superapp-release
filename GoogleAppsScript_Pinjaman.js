@@ -331,7 +331,35 @@ function doGet(e) {
   }
 }
 
-// Menu Action / Setup Helperfunction setupPinjamanSheetsManual() {
+// ============================================================
+// 🛠️ SETUP SHEET & MENU GOOGLE SPREADSHEET
+// ============================================================
+
+function onOpenPinjamanMenu() {
+  try {
+    var ui = SpreadsheetApp.getUi();
+    ui.createMenu('📦 PINJAMAN MTG')
+      .addItem('⚡ Setup 4 Sheet Pinjaman & Pengembalian', 'setupPinjamanSheetsManual')
+      .addItem('ℹ️ Cek Status & Panduan WebApp', 'showPinjamanDeployGuide')
+      .addToUi();
+  } catch (e) {}
+}
+
+function showPinjamanDeployGuide() {
+  var ui = SpreadsheetApp.getUi();
+  ui.alert(
+    '📖 PANDUAN DEPLOY WEB APP PINJAMAN MTG\n\n' +
+    '1. Klik tombol biru "Terapkan" (Deploy) di kanan atas editor Apps Script.\n' +
+    '2. Pilih "Penerapan baru" (New deployment) atau "Kelola penerapan" (Manage deployments).\n' +
+    '3. Pilih jenis: Aplikasi Web (Web App).\n' +
+    '4. Jalankan sebagai: "Saya" (User me).\n' +
+    '5. Siapa yang memiliki akses: "Siapa saja" (Anyone).\n' +
+    '6. Klik "Terapkan" lalu salin URL Web App (/exec).\n' +
+    '7. Masukkan URL tersebut ke konfigurasi Superapp MTG.'
+  );
+}
+
+function setupPinjamanSheetsManual() {
   var ss = getPinjamanSpreadsheet();
 
   var sheetConfigs = [
