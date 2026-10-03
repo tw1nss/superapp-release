@@ -3395,19 +3395,19 @@ function handlePinjamanSubmitDirect(payload) {
     if (isPinjamKeHub) {
       jenisLabel = 'MTG Pinjam ke Hub Lain';
       statusLabel = payload.status || 'DIPINJAM';
-      sheetTargetName = 'Pinjaman Barang MTG';
+      sheetTargetName = ss.getSheetByName('Pinjam ke Hub Lain') ? 'Pinjam ke Hub Lain' : 'Pinjaman Barang MTG';
     } else if (isKembalikanKeHub) {
       jenisLabel = 'MTG Kembalikan ke Hub Lain';
       statusLabel = payload.status || 'DIKEMBALIKAN';
-      sheetTargetName = 'Pengembalian Barang MTG';
+      sheetTargetName = ss.getSheetByName('Kembalikan ke Hub Lain') ? 'Kembalikan ke Hub Lain' : 'Pengembalian Barang MTG';
     } else if (isPinjeminKeHub) {
       jenisLabel = 'MTG Pinjemin ke Hub Lain';
       statusLabel = payload.status || 'DIPINJAMKAN';
-      sheetTargetName = 'Pinjaman Barang MTG';
+      sheetTargetName = 'Pinjemin ke Hub Lain';
     } else if (isTerimaKembali) {
       jenisLabel = 'MTG Terima Pengembalian dari Hub Lain';
       statusLabel = payload.status || 'DITERIMA KEMBALI';
-      sheetTargetName = 'Pengembalian Barang MTG';
+      sheetTargetName = 'Terima Pengembalian Hub';
     }
 
     var sheet = ss.getSheetByName(sheetTargetName) || ss.insertSheet(sheetTargetName);
@@ -3468,14 +3468,34 @@ function handlePinjamanSubmitDirect(payload) {
       remarks: remarks
     };
 
-    var headerColor = (sheetTargetName === 'Pinjaman Barang MTG') ? '#0284C7' : '#059669';
-    var defaultHeaders = (sheetTargetName === 'Pinjaman Barang MTG') ? [
-      'TIMESTAMP', 'JENIS TRANSAKSI', 'NOMOR SKU', 'NAMA PRODUK', 'SLOC (LOKASI RAK)', 
-      'QTY', 'HUB TARGET / ASAL', 'PIC PETUGAS MTG', 'PIC / DRIVER HUB', 'BUKTI FOTO (DRIVE)', 'STATUS', 'CATATAN'
-    ] : [
-      'TIMESTAMP', 'JENIS TRANSAKSI', 'NOMOR SKU', 'NAMA PRODUK', 'SLOC (LOKASI RAK)', 
-      'QTY', 'HUB TARGET / ASAL', 'KONDISI BARANG', 'PIC PETUGAS MTG', 'PIC / DRIVER HUB', 'BUKTI FOTO (DRIVE)', 'STATUS', 'CATATAN'
-    ];
+    var headerColor = '#0284C7';
+    var defaultHeaders = [];
+
+    if (sheetTargetName === 'Pinjemin ke Hub Lain') {
+      headerColor = '#D97706'; // Amber / Oranye
+      defaultHeaders = [
+        'TIMESTAMP', 'JENIS TRANSAKSI', 'NOMOR SKU', 'NAMA PRODUK', 'SLOC (LOKASI RAK)', 
+        'QTY', 'HUB PEMINJAM (TUJUAN)', 'PIC PETUGAS MTG', 'PIC / DRIVER HUB', 'BUKTI FOTO (DRIVE)', 'STATUS', 'CATATAN'
+      ];
+    } else if (sheetTargetName === 'Terima Pengembalian Hub') {
+      headerColor = '#7C3AED'; // Ungu / Violet
+      defaultHeaders = [
+        'TIMESTAMP', 'JENIS TRANSAKSI', 'NOMOR SKU', 'NAMA PRODUK', 'SLOC (LOKASI RAK)', 
+        'QTY', 'HUB ASAL PENGEMBALIAN', 'KONDISI BARANG', 'PIC PETUGAS MTG', 'PIC / DRIVER HUB', 'BUKTI FOTO (DRIVE)', 'STATUS', 'CATATAN'
+      ];
+    } else if (sheetTargetName.indexOf('Pengembalian') !== -1 || sheetTargetName.indexOf('Kembalikan') !== -1) {
+      headerColor = '#059669'; // Hijau Emerald
+      defaultHeaders = [
+        'TIMESTAMP', 'JENIS TRANSAKSI', 'NOMOR SKU', 'NAMA PRODUK', 'SLOC (LOKASI RAK)', 
+        'QTY', 'HUB TARGET PENGEMBALIAN', 'KONDISI BARANG', 'PIC PETUGAS MTG', 'PIC / DRIVER HUB', 'BUKTI FOTO (DRIVE)', 'STATUS', 'CATATAN'
+      ];
+    } else {
+      headerColor = '#0284C7'; // Biru Sky
+      defaultHeaders = [
+        'TIMESTAMP', 'JENIS TRANSAKSI', 'NOMOR SKU', 'NAMA PRODUK', 'SLOC (LOKASI RAK)', 
+        'QTY', 'HUB TARGET PINJAM', 'PIC PETUGAS MTG', 'PIC / DRIVER HUB', 'BUKTI FOTO (DRIVE)', 'STATUS', 'CATATAN'
+      ];
+    }
 
     if (sheet.getLastRow() === 0 || (sheet.getLastRow() === 1 && !sheet.getRange(1, 1).getValue())) {
       sheet.getRange(1, 1, 1, defaultHeaders.length).setValues([defaultHeaders]);

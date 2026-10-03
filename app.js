@@ -14306,28 +14306,30 @@
     try {
       const pUrl = `${DCC_WEBAPP_URL}?sheet=${encodeURIComponent('Pinjaman Barang MTG')}&_ts=${Date.now()}`;
       const kUrl = `${DCC_WEBAPP_URL}?sheet=${encodeURIComponent('Pengembalian Barang MTG')}&_ts=${Date.now()}`;
+      const pinjeminUrl = `${DCC_WEBAPP_URL}?sheet=${encodeURIComponent('Pinjemin ke Hub Lain')}&_ts=${Date.now()}`;
+      const terimaUrl = `${DCC_WEBAPP_URL}?sheet=${encodeURIComponent('Terima Pengembalian Hub')}&_ts=${Date.now()}`;
 
-      const [resP, resK] = await Promise.all([
+      const [resP, resK, resPinjemin, resTerima] = await Promise.all([
         fetch(pUrl).catch(() => null),
-        fetch(kUrl).catch(() => null)
+        fetch(kUrl).catch(() => null),
+        fetch(pinjeminUrl).catch(() => null),
+        fetch(terimaUrl).catch(() => null)
       ]);
 
       const dataP = resP && resP.ok ? await resP.json() : [];
       const dataK = resK && resK.ok ? await resK.json() : [];
+      const dataPinjemin = resPinjemin && resPinjemin.ok ? await resPinjemin.json() : [];
+      const dataTerima = resTerima && resTerima.ok ? await resTerima.json() : [];
 
       const combined = [];
 
+      // 1. Data Sheet Pinjaman Barang MTG (Pinjam ke Hub Lain)
       if (Array.isArray(dataP)) {
         dataP.forEach(row => {
           if (row['NOMOR SKU'] || row['TIMESTAMP']) {
             const jenis = String(row['JENIS TRANSAKSI'] || '').trim();
             const status = String(row['STATUS'] || '').trim().toUpperCase();
-            let type = 'pinjam';
-            if (jenis.includes('Pinjemin') || status === 'DIPINJAMKAN') {
-              type = 'pinjemin';
-            } else {
-              type = 'pinjam';
-            }
+            let type = (jenis.includes('Pinjemin') || status === 'DIPINJAMKAN') ? 'pinjemin' : 'pinjam';
 
             combined.push({
               type: type,
@@ -14336,7 +14338,7 @@
               sku: row['NOMOR SKU'] || '',
               productName: row['NAMA PRODUK'] || '',
               qty: row['QTY'] || row['QTY PINJAM'] || '1',
-              hub: row['HUB TARGET / ASAL'] || row['PINJAM KE HUB'] || '-',
+              hub: row['HUB TARGET / ASAL'] || row['HUB TARGET PINJAM'] || row['PINJAM KE HUB'] || '-',
               pic: row['PIC PETUGAS MTG'] || row['PIC PEMINJAM'] || '-',
               picHub: row['PIC / DRIVER HUB'] || '',
               sloc: row['SLOC (LOKASI RAK)'] || '',
@@ -14348,17 +14350,13 @@
         });
       }
 
+      // 2. Data Sheet Pengembalian Barang MTG (Kembalikan ke Hub Lain)
       if (Array.isArray(dataK)) {
         dataK.forEach(row => {
           if (row['NOMOR SKU'] || row['TIMESTAMP']) {
             const jenis = String(row['JENIS TRANSAKSI'] || '').trim();
             const status = String(row['STATUS'] || '').trim().toUpperCase();
-            let type = 'kembali';
-            if (jenis.includes('Terima') || status === 'DITERIMA KEMBALI') {
-              type = 'terima';
-            } else {
-              type = 'kembali';
-            }
+            let type = (jenis.includes('Terima') || status === 'DITERIMA KEMBALI') ? 'terima' : 'kembali';
 
             combined.push({
               type: type,
@@ -14367,13 +14365,60 @@
               sku: row['NOMOR SKU'] || '',
               productName: row['NAMA PRODUK'] || '',
               qty: row['QTY'] || row['QTY KEMBALI'] || '1',
-              hub: row['HUB TARGET / ASAL'] || row['KEMBALIKAN KE HUB'] || '-',
+              hub: row['HUB TARGET / ASAL'] || row['HUB TARGET PENGEMBALIAN'] || row['KEMBALIKAN KE HUB'] || '-',
               kondisi: row['KONDISI BARANG'] || 'Good',
               pic: row['PIC PETUGAS MTG'] || row['PIC PENGEMBALIAN'] || '-',
               picHub: row['PIC / DRIVER HUB'] || '',
               sloc: row['SLOC (LOKASI RAK)'] || '',
               photoUrl: row['BUKTI FOTO (DRIVE)'] || row['FOTO PRODUK (DRIVE)'] || '',
               status: row['STATUS'] || (type === 'terima' ? 'DITERIMA KEMBALI' : 'DIKEMBALIKAN'),
+              remarks: row['CATATAN'] || ''
+            });
+          }
+        });
+      }
+
+      // 3. Data Sheet Pinjemin ke Hub Lain (MTG Pinjemin Stok Keluar)
+      if (Array.isArray(dataPinjemin)) {
+        dataPinjemin.forEach(row => {
+          if (row['NOMOR SKU'] || row['TIMESTAMP']) {
+            combined.push({
+              type: 'pinjemin',
+              timestamp: row['TIMESTAMP'] || '',
+              jenis: row['JENIS TRANSAKSI'] || 'MTG Pinjemin ke Hub Lain',
+              sku: row['NOMOR SKU'] || '',
+              productName: row['NAMA PRODUK'] || '',
+              qty: row['QTY'] || '1',
+              hub: row['HUB PEMINJAM (TUJUAN)'] || row['HUB TARGET / ASAL'] || '-',
+              pic: row['PIC PETUGAS MTG'] || '-',
+              picHub: row['PIC / DRIVER HUB'] || '',
+              sloc: row['SLOC (LOKASI RAK)'] || '',
+              photoUrl: row['BUKTI FOTO (DRIVE)'] || '',
+              status: row['STATUS'] || 'DIPINJAMKAN',
+              remarks: row['CATATAN'] || ''
+            });
+          }
+        });
+      }
+
+      // 4. Data Sheet Terima Pengembalian Hub (MTG Terima Stok Masuk Kembali)
+      if (Array.isArray(dataTerima)) {
+        dataTerima.forEach(row => {
+          if (row['NOMOR SKU'] || row['TIMESTAMP']) {
+            combined.push({
+              type: 'terima',
+              timestamp: row['TIMESTAMP'] || '',
+              jenis: row['JENIS TRANSAKSI'] || 'MTG Terima Pengembalian dari Hub Lain',
+              sku: row['NOMOR SKU'] || '',
+              productName: row['NAMA PRODUK'] || '',
+              qty: row['QTY'] || '1',
+              hub: row['HUB ASAL PENGEMBALIAN'] || row['HUB TARGET / ASAL'] || '-',
+              kondisi: row['KONDISI BARANG'] || 'Good',
+              pic: row['PIC PETUGAS MTG'] || '-',
+              picHub: row['PIC / DRIVER HUB'] || '',
+              sloc: row['SLOC (LOKASI RAK)'] || '',
+              photoUrl: row['BUKTI FOTO (DRIVE)'] || '',
+              status: row['STATUS'] || 'DITERIMA KEMBALI',
               remarks: row['CATATAN'] || ''
             });
           }
