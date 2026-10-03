@@ -1,6 +1,6 @@
 /**
  * =========================================================================
- * 🚀 FINAL COMBINED SCRIPT: DCC MASTER ALL-IN-ONE (CARA 2) + SUPERSET + API
+ * 🚀 FINAL COMBINED SCRIPT: DCC MASTER ALL-IN-ONE (CARA 2) + SUPERSET + API + PINJAMAN MTG
  * =========================================================================
  * Spreadsheet: Dashboard STK MTG 2K26
  * URL: https://docs.google.com/spreadsheets/d/1fVQwSOoIU9pT5RHWi6-m8qCf_T0rQPZxEf_WuhlaD2g/edit
@@ -21,7 +21,11 @@
  *      catat 21 kolom ke 'Hasil DCC', dan langsung update status 'DONE' di 'Mainlist SKU'.
  *    - doGet: Bulk read super cepat untuk konsumsi data API frontend (?sheet=...).
  *
- * 4. 📦 BACKUP & MAINTENANCE:
+ * 4. 📦 PINJAMAN & PENGEMBALIAN BARANG MTG:
+ *    - Form Peminjaman Barang MTG -> Sheet 'Pinjaman Barang MTG' (8 Kolom)
+ *    - Form Pengembalian Barang MTG -> Sheet 'Pengembalian Barang MTG' (10 Kolom + Bukti Foto Drive)
+ *
+ * 5. 📦 BACKUP & MAINTENANCE:
  *    - copyDccToHistorical: Backup otomatis data 'Hasil DCC' (Kolom G terisi) ke 'Historical Data'.
  *    - bersihkanBarisKosong: Bersihkan baris kosong berlebih di 'Historical Data'.
  *    - hapus: Reset/bersihkan data kolom di 'Hasil DCC'.
@@ -35,7 +39,7 @@
 var CONFIG = {
   BASE_URL: "https://dash.astronauts.id/",
   TARGET_FILE_ID: "1fVQwSOoIU9pT5RHWi6-m8qCf_T0rQPZxEf_WuhlaD2g",
-  EVIDENCE_FOLDER_ID: "1RtRFC7XfgLNr7EV76rRn-hScNYW4hOb3", // 📁 Folder Google Drive Bukti Foto DCC
+  EVIDENCE_FOLDER_ID: "1RtRFC7XfgLNr7EV76rRn-hScNYW4hOb3", // 📁 Folder Google Drive Bukti Foto DCC & Pinjaman
   MAX_RETRY: 3,
   RETRY_DELAY: 2000,
   TIMEZONE: "Asia/Jakarta"
@@ -71,6 +75,7 @@ function onOpen() {
   var ui = SpreadsheetApp.getUi();
   buildSupersetMenu(ui);
   buildDccMenu(ui);
+  buildPinjamanMenu(ui);
   if (typeof buildEdSweeperMenu === 'function') {
     buildEdSweeperMenu(ui);
   }
@@ -88,9 +93,7 @@ function buildSupersetMenu(ui) {
     .addItem('2. BAD & LOST', 'menu_bad_lost')
     .addItem('3. MSLTC', 'menu_msltc')
     .addItem('4. RACK UPDATE', 'Menu_rack_update')
-    .addItem('5. ED CORRECTION (Chart 12077)', 'menu_ed_correction')
     .addSeparator()
-    .addItem('⚙️ Set URL / Slice ID "SLOC MASTER" (RACK UPDATE)', 'setRackUpdateChartPrompt')
     .addItem('🔑 Set / Ganti Cookie Superset', 'setSupersetCookiePrompt')
     .addSeparator()
     .addItem('⏰ Aktifkan Pemicu Auto-Sync (Setiap Jam)', 'setupSupersetHourlyTrigger')
@@ -104,17 +107,17 @@ function buildDccMenu(ui) {
     .addItem('🎨 Rapikan & Format Tampilan "Mainlist SKU"', 'formatMainlistSkuDcc')
     .addSeparator()
     .addItem('📥 Assign Tugas Baru (Multi-SKU Modal)', 'assignDccTaskPrompt')
-    .addItem('💬 Assign Tugas (Input Box Cepat)', 'assignDccTaskQuickPrompt')
-    .addItem('🔧 Pecah / Perbaiki SKU Menumpuk di Cell C', 'fixClumpedSkuRows')
-    .addItem('⚡ Pasang Rumus Otomatis "Mainlist SKU"', 'installDccMainlistFormulas')
-    .addItem('📋 Tarik Detail SKU dari "STOCK UPDATE"', 'syncDetailSkuMainlist')
     .addSeparator()
-    .addItem('📸 Generate Link Bukti Foto Drive', 'generateEvidenceLinksDCC')
     .addItem('📦 Backup DCC ke Historical', 'copyDccToHistorical')
-    .addItem('🧹 Bersihkan Baris Kosong Historical', 'bersihkanBarisKosong')
-    .addItem('🔧 Bersihkan Kolom Formula (Cegah #REF!)', 'repairDccFormulaColumnsManual')
     .addItem('🗑️ Clear Kolom Sheet "Hasil DCC"', 'hapus')
     .addItem('🔄 Kosongkan / Reset "Mainlist SKU"', 'resetMainlistSkuPrompt')
+    .addToUi();
+}
+
+function buildPinjamanMenu(ui) {
+  if (!ui) ui = SpreadsheetApp.getUi();
+  ui.createMenu('📦 Pinjaman MTG')
+    .addItem('📋 Siapkan Format Sheet Pinjaman & Pengembalian', 'setupPinjamanSheets')
     .addToUi();
 }
 
@@ -378,6 +381,11 @@ function doPost(e) {
         return handleEdCorrectionSubmit(payload);
       }
       return handleEdCorrectionSubmitDccFallback(payload);
+    }
+
+    // Router jika request adalah Pinjaman / Pengembalian Barang MTG
+    if (payload.action === 'savePinjamanBarang' || payload.action === 'savePengembalianBarang' || payload.module === 'pinjaman') {
+      return handlePinjamanSubmit(payload);
     }
 
     var ss = getSpreadsheet();
@@ -2288,3 +2296,197 @@ function handleEdCorrectionSubmitDccFallback(payload) {
   }
 }
 
+// ==============================================================================
+// 📦 PINJAMAN & PENGEMBALIAN BARANG MTG
+// ==============================================================================
+function handlePinjamanSubmit(payload) {
+  try {
+    var ss = getSpreadsheet();
+    var timezone = (CONFIG && CONFIG.TIMEZONE) ? CONFIG.TIMEZONE : "Asia/Jakarta";
+    var timestamp = Utilities.formatDate(new Date(), timezone, "dd/MM/yyyy HH:mm:ss");
+
+    var isPengembalian = (payload.action === 'savePengembalianBarang') || 
+                         (payload.formType === 'pengembalian') || 
+                         (payload.type === 'pengembalian');
+
+    if (isPengembalian) {
+      // ── 1. FORM PENGEMBALIAN BARANG MTG ──
+      var sheetKembali = ss.getSheetByName('Pengembalian Barang MTG');
+      if (!sheetKembali) {
+        sheetKembali = ss.insertSheet('Pengembalian Barang MTG');
+      }
+
+      // Pastikan header rapi jika sheet baru / kosong
+      if (sheetKembali.getLastRow() === 0 || (sheetKembali.getLastRow() === 1 && !sheetKembali.getRange(1, 1).getValue())) {
+        var headerK = [[
+          'TIMESTAMP', 'NOMOR SKU', 'NAMA PRODUK', 'SLOC (LOKASI RAK)', 
+          'QTY KEMBALI', 'KEMBALIKAN KE HUB', 'PIC PENGEMBALIAN', 'FOTO PRODUK (DRIVE)', 'STATUS', 'CATATAN'
+        ]];
+        sheetKembali.getRange(1, 1, 1, 10).setValues(headerK);
+        sheetKembali.getRange(1, 1, 1, 10)
+          .setBackground('#059669')
+          .setFontColor('#FFFFFF')
+          .setFontWeight('bold')
+          .setHorizontalAlignment('center')
+          .setVerticalAlignment('middle');
+        sheetKembali.setRowHeight(1, 36);
+        sheetKembali.setFrozenRows(1);
+      }
+
+      // Upload Bukti Foto Produk jika ada
+      var drivePhotoUrl = '';
+      if (payload.imageBase64) {
+        try {
+          var folder;
+          if (CONFIG && CONFIG.EVIDENCE_FOLDER_ID) {
+            try {
+              folder = DriveApp.getFolderById(CONFIG.EVIDENCE_FOLDER_ID);
+            } catch (errF) {
+              console.warn('Folder ID fallback:', errF);
+            }
+          }
+          if (!folder) {
+            var folderName = 'PINJAMAN_MTG_EVIDENCE';
+            var folders = DriveApp.getFoldersByName(folderName);
+            folder = folders.hasNext() ? folders.next() : DriveApp.createFolder(folderName);
+            folder.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+          }
+
+          var dateStr = Utilities.formatDate(new Date(), timezone, "yyyyMMdd_HHmmss");
+          var skuClean = String(payload.sku || payload.skuNo || 'NOSKU').trim();
+          var fileName = 'KEMBALI_' + skuClean + '_' + dateStr + '.jpg';
+          var cleanBase64 = payload.imageBase64.replace(/^data:image\/(png|jpeg|jpg);base64,/, "");
+          var decoded = Utilities.base64Decode(cleanBase64);
+          var blob = Utilities.newBlob(decoded, 'image/jpeg', fileName);
+          var file = folder.createFile(blob);
+          file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+          drivePhotoUrl = file.getUrl();
+        } catch (errUpload) {
+          console.warn('Gagal upload foto pengembalian:', errUpload);
+        }
+      }
+
+      var sku = String(payload.sku || payload.skuNo || '').trim();
+      var productName = String(payload.productName || payload.namaProduk || '').trim();
+      var sloc = String(payload.sloc || payload.rack || '').trim();
+      var qty = Number(payload.qty || 1);
+      var hub = String(payload.hub || payload.hubTujuan || '').trim();
+      var pic = String(payload.pic || payload.picPengembalian || payload.petugas || '').trim();
+      var status = String(payload.status || 'DIKEMBALIKAN').trim();
+      var remarks = String(payload.remarks || payload.catatan || '').trim();
+
+      var newRowK = [
+        timestamp, sku, productName, sloc, qty, hub, pic, drivePhotoUrl, status, remarks
+      ];
+
+      appendToFirstEmptyRow(sheetKembali, newRowK);
+
+      return ContentService.createTextOutput(JSON.stringify({
+        status: 'success',
+        message: 'Pengembalian barang berhasil dicatat ke sheet "Pengembalian Barang MTG"!',
+        sku: sku,
+        productName: productName,
+        sloc: sloc,
+        qty: qty,
+        hub: hub,
+        pic: pic,
+        photoUrl: drivePhotoUrl,
+        timestamp: timestamp
+      })).setMimeType(ContentService.MimeType.JSON);
+
+    } else {
+      // ── 2. FORM PEMINJAMAN BARANG MTG ──
+      var sheetPinjam = ss.getSheetByName('Pinjaman Barang MTG');
+      if (!sheetPinjam) {
+        sheetPinjam = ss.insertSheet('Pinjaman Barang MTG');
+      }
+
+      // Pastikan header rapi jika sheet baru / kosong
+      if (sheetPinjam.getLastRow() === 0 || (sheetPinjam.getLastRow() === 1 && !sheetPinjam.getRange(1, 1).getValue())) {
+        var headerP = [[
+          'TIMESTAMP', 'NOMOR SKU', 'NAMA PRODUK', 'QTY PINJAM', 
+          'PINJAM KE HUB', 'PIC PEMINJAM', 'STATUS', 'CATATAN'
+        ]];
+        sheetPinjam.getRange(1, 1, 1, 8).setValues(headerP);
+        sheetPinjam.getRange(1, 1, 1, 8)
+          .setBackground('#0284c7')
+          .setFontColor('#FFFFFF')
+          .setFontWeight('bold')
+          .setHorizontalAlignment('center')
+          .setVerticalAlignment('middle');
+        sheetPinjam.setRowHeight(1, 36);
+        sheetPinjam.setFrozenRows(1);
+      }
+
+      var pSku = String(payload.sku || payload.skuNo || '').trim();
+      var pProductName = String(payload.productName || payload.namaProduk || '').trim();
+      var pQty = Number(payload.qty || 1);
+      var pHub = String(payload.hub || payload.hubTujuan || '').trim();
+      var pPic = String(payload.pic || payload.picPeminjam || payload.petugas || '').trim();
+      var pStatus = String(payload.status || 'DIPINJAM').trim();
+      var pRemarks = String(payload.remarks || payload.catatan || '').trim();
+
+      var newRowP = [
+        timestamp, pSku, pProductName, pQty, pHub, pPic, pStatus, pRemarks
+      ];
+
+      appendToFirstEmptyRow(sheetPinjam, newRowP);
+
+      return ContentService.createTextOutput(JSON.stringify({
+        status: 'success',
+        message: 'Peminjaman barang berhasil dicatat ke sheet "Pinjaman Barang MTG"!',
+        sku: pSku,
+        productName: pProductName,
+        qty: pQty,
+        hub: pHub,
+        pic: pPic,
+        timestamp: timestamp
+      })).setMimeType(ContentService.MimeType.JSON);
+    }
+
+  } catch (err) {
+    return ContentService.createTextOutput(JSON.stringify({
+      status: 'error',
+      message: 'Gagal memproses data pinjaman: ' + err.toString()
+    })).setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
+// Helper Setup Header Manual jika dibutuhkan dari Menu Google Sheets
+function setupPinjamanSheets() {
+  var ss = getSpreadsheet();
+  
+  // 1. Setup Pinjaman Barang MTG
+  var pSheet = ss.getSheetByName('Pinjaman Barang MTG') || ss.insertSheet('Pinjaman Barang MTG');
+  var headerP = [[
+    'TIMESTAMP', 'NOMOR SKU', 'NAMA PRODUK', 'QTY PINJAM', 
+    'PINJAM KE HUB', 'PIC PEMINJAM', 'STATUS', 'CATATAN'
+  ]];
+  pSheet.getRange(1, 1, 1, 8).setValues(headerP);
+  pSheet.getRange(1, 1, 1, 8)
+    .setBackground('#0284c7')
+    .setFontColor('#FFFFFF')
+    .setFontWeight('bold')
+    .setHorizontalAlignment('center')
+    .setVerticalAlignment('middle');
+  pSheet.setRowHeight(1, 36);
+  pSheet.setFrozenRows(1);
+
+  // 2. Setup Pengembalian Barang MTG
+  var kSheet = ss.getSheetByName('Pengembalian Barang MTG') || ss.insertSheet('Pengembalian Barang MTG');
+  var headerK = [[
+    'TIMESTAMP', 'NOMOR SKU', 'NAMA PRODUK', 'SLOC (LOKASI RAK)', 
+    'QTY KEMBALI', 'KEMBALIKAN KE HUB', 'PIC PENGEMBALIAN', 'FOTO PRODUK (DRIVE)', 'STATUS', 'CATATAN'
+  ]];
+  kSheet.getRange(1, 1, 1, 10).setValues(headerK);
+  kSheet.getRange(1, 1, 1, 10)
+    .setBackground('#059669')
+    .setFontColor('#FFFFFF')
+    .setFontWeight('bold')
+    .setHorizontalAlignment('center')
+    .setVerticalAlignment('middle');
+  kSheet.setRowHeight(1, 36);
+  kSheet.setFrozenRows(1);
+
+  alertUser('✅ Berhasil menyiapkan format header untuk sheet "Pinjaman Barang MTG" dan "Pengembalian Barang MTG"!');
+}

@@ -1031,8 +1031,19 @@ function backupHasilEdsToBackupSheet(autoClear) {
 
   if (autoClear) {
     const lastRow = hasilSheet.getLastRow();
-    if (lastRow > 1) {
-      hasilSheet.deleteRows(2, lastRow - 1);
+    const maxRows = hasilSheet.getMaxRows();
+    const frozenRows = Math.max(hasilSheet.getFrozenRows(), 1);
+
+    if (lastRow > frozenRows) {
+      hasilSheet.getRange(frozenRows + 1, 1, lastRow - frozenRows, Math.max(hasilSheet.getLastColumn(), 20)).clearContent();
+      const keepRows = frozenRows + 1;
+      if (maxRows > keepRows) {
+        try {
+          hasilSheet.deleteRows(keepRows + 1, maxRows - keepRows);
+        } catch (eDel) {
+          console.warn('Gagal deleteRows saat autoClear Hasil EDS:', eDel);
+        }
+      }
     }
   }
 

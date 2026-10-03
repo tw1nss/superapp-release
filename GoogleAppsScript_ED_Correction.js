@@ -1957,8 +1957,19 @@ function clearHasilEdCorrectionPrompt() {
   if (!sheet) return;
 
   var lastRow = sheet.getLastRow();
-  if (lastRow > 1) {
-    sheet.deleteRows(2, lastRow - 1);
+  var maxRows = sheet.getMaxRows();
+  var frozenRows = Math.max(sheet.getFrozenRows(), 1);
+
+  if (lastRow > frozenRows) {
+    sheet.getRange(frozenRows + 1, 1, lastRow - frozenRows, Math.max(sheet.getLastColumn(), 17)).clearContent();
+    var keepRows = frozenRows + 1;
+    if (maxRows > keepRows) {
+      try {
+        sheet.deleteRows(keepRows + 1, maxRows - keepRows);
+      } catch (eDel) {
+        console.warn('Gagal deleteRows di Hasil ED Correction:', eDel);
+      }
+    }
     alertEdc('✅ Data di sheet "Hasil ED Correction" telah berhasil dibersihkan.');
   } else {
     alertEdc('ℹ️ Sheet "Hasil ED Correction" memang sudah kosong.');
@@ -2129,8 +2140,19 @@ function backupHasilEdCorrectionToBackupSheet(autoClear) {
   if (autoClear) {
     // 1. Kosongkan Hasil ED Correction
     var lastH = hasilSheet.getLastRow();
-    if (lastH > 1) {
-      hasilSheet.deleteRows(2, lastH - 1);
+    var maxH = hasilSheet.getMaxRows();
+    var frozenH = Math.max(hasilSheet.getFrozenRows(), 1);
+
+    if (lastH > frozenH) {
+      hasilSheet.getRange(frozenH + 1, 1, lastH - frozenH, Math.max(hasilSheet.getLastColumn(), 17)).clearContent();
+      var keepH = frozenH + 1;
+      if (maxH > keepH) {
+        try {
+          hasilSheet.deleteRows(keepH + 1, maxH - keepH);
+        } catch (eDelH) {
+          console.warn('Gagal deleteRows saat autoClear Hasil ED Correction:', eDelH);
+        }
+      }
     }
     msg += '\n\n✅ Sheet "Hasil ED Correction" telah dikosongkan.';
 

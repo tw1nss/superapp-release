@@ -2771,6 +2771,7 @@
   };
 
   async function openUniversalScanner(onSuccess) {
+    window.openUniversalScanner = openUniversalScanner;
     if (typeof Html5Qrcode === 'undefined') {
       alert('Kamera Scanner library gagal dimuat. Periksa koneksi internet Anda.');
       return;
@@ -3044,7 +3045,8 @@
         'edSweeperWorkspace',
         'complainWorkspace',
         'koliInboundWorkspace',
-        'edCorrectionWorkspace'
+        'edCorrectionWorkspace',
+        'pinjamanWorkspace'
       ];
       workspaces.forEach(id => {
         const el = document.getElementById(id);
@@ -3130,6 +3132,19 @@
       if (typeof window.initEdcFlatpickr === 'function') window.initEdcFlatpickr();
       if (typeof window.initEdcInputListeners === 'function') window.initEdcInputListeners();
       if (typeof window.fetchEdCorrectionData === 'function') window.fetchEdCorrectionData(true);
+    } else if (menu === 'pinjaman') {
+      hideAllWorkspaces();
+      const pnjWs = document.getElementById('pinjamanWorkspace');
+      if (pnjWs) {
+        pnjWs.classList.remove('hidden');
+        pnjWs.scrollTop = 0;
+      }
+      const bBtn = document.getElementById('backToMenuBtn');
+      if (bBtn) bBtn.classList.remove('hidden');
+
+      if (typeof window.initPinjamanModule === 'function') {
+        window.initPinjamanModule();
+      }
     } else if (menu === 'retur') {
       alert('Fitur Retur Task sedang disiapkan.');
     } else {
@@ -3156,6 +3171,8 @@
     document.getElementById('complainWorkspace').classList.add('hidden');
     const koliWs = document.getElementById('koliInboundWorkspace');
     if (koliWs) koliWs.classList.add('hidden');
+    const pnjWs = document.getElementById('pinjamanWorkspace');
+    if (pnjWs) pnjWs.classList.add('hidden');
     document.getElementById('backToMenuBtn').classList.add('hidden');
     closeComplainDetail();
     if (typeof window.closeKoliDetailModal === 'function') {
@@ -7337,8 +7354,8 @@
   //  IN-APP UPDATE & VERSION CHECKING ENGINE
   // ══════════════════════════════════════════════
 
-  const APP_VERSION_CODE = 25; // Local current version code (v1.2.9 Master OTA)
-  const APP_VERSION_NAME = '1.2.9';
+  const APP_VERSION_CODE = 26; // Local current version code (v1.3.0 Master OTA)
+  const APP_VERSION_NAME = '1.3.0';
   const UPDATE_MANIFEST_URL = 'https://raw.githubusercontent.com/tw1nss/superapp-release/main/version.json';
 
   let currentUpdateData = null;
@@ -12693,6 +12710,987 @@
     }, { passive: true });
   }
 
+  // ══════════════════════════════════════════════════════════════════
+  //  📦 PINJAMAN & PENGEMBALIAN BARANG MTG MODULE
+  // ══════════════════════════════════════════════════════════════════
+
+  let currentPinjamanTab = 'pinjam';
+  let kembaliPhotoBase64 = '';
+  let pinjamanHistoryData = [];
+  let pinjamanHistoryFilter = 'all';
+  let stockUpdateCacheMap = new Map();
+  let isStockUpdateFetching = false;
+  let pinjamanAutocompleteTimer = null;
+
+  // ── 1. Fetch & Cache Data dari Sheet 'STOCK UPDATE' ──
+  async function fetchStockUpdateSheet() {
+    if (isStockUpdateFetching || stockUpdateCacheMap.size > 0) return;
+    isStockUpdateFetching = true;
+    try {
+      const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent('STOCK UPDATE')}&tq=${encodeURIComponent('SELECT C, D, E, F WHERE C IS NOT NULL')}`;
+      const res = await fetch(url, { cache: 'no-store' });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const csvText = await res.text();
+      const rows = parseCSV(csvText);
+      for (let i = 1; i < rows.length; i++) {
+        const row = rows[i];
+        const sku = String(row[0] || '').trim();
+        const sloc = String(row[1] || '').trim();
+        const productName = String(row[2] || '').trim();
+        const qty = String(row[3] || '0').trim();
+        if (sku) {
+          stockUpdateCacheMap.set(sku.toLowerCase(), { sku, sloc, productName, qty });
+          stockUpdateCacheMap.set(sku, { sku, sloc, productName, qty });
+        }
+      }
+    } catch (e) {
+      console.warn('Notice: Background STOCK UPDATE fetch:', e);
+    } finally {
+      isStockUpdateFetching = false;
+    }
+  }
+
+  // ── 2. SKU Lookup Engine (O(1) Memory First, fallback to Stock Update & MSLTC) ──
+  function lookupSkuDetails(rawSku) {
+    if (!rawSku) return null;
+    const clean = String(rawSku).trim();
+    if (!clean) return null;
+    const cleanLower = clean.toLowerCase();
+
+    // 1. Cek di Stock Update Cache jika sudah terisi
+    if (stockUpdateCacheMap.has(clean)) {
+      return stockUpdateCacheMap.get(clean);
+    }
+    if (stockUpdateCacheMap.has(cleanLower)) {
+      return stockUpdateCacheMap.get(cleanLower);
+    }
+
+    // 2. Cek di dataMap (Master Rack & Stock dari RACK UPDATE)
+    if (dataMap && dataMap.has(clean)) {
+      const list = dataMap.get(clean);
+      if (list && list.length > 0) {
+        const it = list[0];
+        return {
+          sku: clean,
+          productName: it.productName || '',
+          sloc: it.sloc || it.masterSloc || '',
+          qty: it.qty || '0'
+        };
+      }
+    }
+    if (dataMap) {
+      for (const [k, list] of dataMap.entries()) {
+        if (k.toLowerCase() === cleanLower && list && list.length > 0) {
+          const it = list[0];
+          return {
+            sku: k,
+            productName: it.productName || '',
+            sloc: it.sloc || it.masterSloc || '',
+            qty: it.qty || '0'
+          };
+        }
+      }
+    }
+
+    // 3. Cek di MSLTC Map
+    if (msltcMap && msltcMap.has(clean)) {
+      const mList = msltcMap.get(clean);
+      if (mList && mList.length > 0) {
+        const it = mList[0];
+        return {
+          sku: clean,
+          productName: it.productName || '',
+          sloc: it.rackName || '',
+          qty: '0'
+        };
+      }
+    }
+
+    return null;
+  }
+
+  // ── 3. Search SKU & Produk untuk Autocomplete Dropdown ──
+  function searchSkuCandidates(query, limit = 8) {
+    const q = (query || '').trim().toLowerCase();
+    if (!q || q.length < 2) return [];
+
+    const results = [];
+    const seen = new Set();
+
+    // Prioritaskan cek di dataMap
+    if (dataMap) {
+      for (const [sku, items] of dataMap.entries()) {
+        if (!items || items.length === 0) continue;
+        const it = items[0];
+        const pName = (it.productName || '').toLowerCase();
+        const sLower = sku.toLowerCase();
+        const slocLower = (it.sloc || it.masterSloc || '').toLowerCase();
+
+        if (sLower.includes(q) || pName.includes(q) || slocLower.includes(q)) {
+          if (!seen.has(sku)) {
+            seen.add(sku);
+            results.push({
+              sku: sku,
+              productName: it.productName || 'Tanpa Nama',
+              sloc: it.sloc || it.masterSloc || 'Belum Ada Rak',
+              qty: it.qty || '0'
+            });
+            if (results.length >= limit) return results;
+          }
+        }
+      }
+    }
+
+    // Cek di stockUpdateCacheMap jika belum cukup
+    if (results.length < limit && stockUpdateCacheMap.size > 0) {
+      for (const [, item] of stockUpdateCacheMap.entries()) {
+        const sLower = item.sku.toLowerCase();
+        const pName = item.productName.toLowerCase();
+        if (sLower.includes(q) || pName.includes(q)) {
+          if (!seen.has(item.sku)) {
+            seen.add(item.sku);
+            results.push(item);
+            if (results.length >= limit) return results;
+          }
+        }
+      }
+    }
+
+    return results;
+  }
+
+  // ── 4. Inisialisasi Modul Pinjaman ──
+  window.initPinjamanModule = function () {
+    // Muat data stock update di background jika belum
+    fetchStockUpdateSheet();
+
+    // Restore PIC peminjam & pengembalian terakhir
+    const lastPicPinjam = localStorage.getItem('SUPERAPP_LAST_PIC_PINJAM') || '';
+    const lastPicKembali = localStorage.getItem('SUPERAPP_LAST_PIC_KEMBALI') || '';
+
+    const picPinjamInput = document.getElementById('pinjamPicInput');
+    if (picPinjamInput && !picPinjamInput.value && lastPicPinjam) {
+      picPinjamInput.value = lastPicPinjam;
+    }
+
+    const picKembaliInput = document.getElementById('kembaliPicInput');
+    if (picKembaliInput && !picKembaliInput.value && lastPicKembali) {
+      picKembaliInput.value = lastPicKembali;
+    }
+
+    // Pasang input listeners untuk autocomplete
+    initPinjamSkuAutocomplete();
+    initKembaliSkuAutocomplete();
+
+    // Default ke tab pinjam
+    switchPinjamanTab(currentPinjamanTab || 'pinjam');
+  };
+
+  // ── 5. Tab Switcher ──
+  window.switchPinjamanTab = function (tabName) {
+    currentPinjamanTab = tabName;
+
+    const btnPinjam = document.getElementById('tabPinjamBtn');
+    const btnKembali = document.getElementById('tabKembaliBtn');
+    const btnHistory = document.getElementById('tabHistoryBtn');
+
+    const panelPinjam = document.getElementById('tabContentPinjam');
+    const panelKembali = document.getElementById('tabContentKembali');
+    const panelHistory = document.getElementById('tabContentHistory');
+
+    [btnPinjam, btnKembali, btnHistory].forEach(b => b && b.classList.remove('active'));
+    [panelPinjam, panelKembali, panelHistory].forEach(p => p && p.classList.add('hidden'));
+
+    if (tabName === 'pinjam') {
+      if (btnPinjam) btnPinjam.classList.add('active');
+      if (panelPinjam) panelPinjam.classList.remove('hidden');
+    } else if (tabName === 'kembali') {
+      if (btnKembali) btnKembali.classList.add('active');
+      if (panelKembali) panelKembali.classList.remove('hidden');
+    } else if (tabName === 'history') {
+      if (btnHistory) btnHistory.classList.add('active');
+      if (panelHistory) panelHistory.classList.remove('hidden');
+      fetchPinjamanHistory();
+    }
+  };
+
+  // ── 6. Setup Autocomplete untuk Form Peminjaman ──
+  function initPinjamSkuAutocomplete() {
+    const input = document.getElementById('pinjamSkuInput');
+    const dropdown = document.getElementById('pinjamSkuDropdown');
+    const clearBtn = document.getElementById('pinjamClearSkuBtn');
+    if (!input || !dropdown) return;
+
+    input.oninput = function () {
+      const val = input.value.trim();
+      if (clearBtn) clearBtn.classList.toggle('hidden', !val);
+
+      clearTimeout(pinjamanAutocompleteTimer);
+      if (val.length < 2) {
+        dropdown.classList.add('hidden');
+        dropdown.innerHTML = '';
+        return;
+      }
+
+      pinjamanAutocompleteTimer = setTimeout(() => {
+        const matches = searchSkuCandidates(val);
+        if (matches.length === 0) {
+          dropdown.classList.add('hidden');
+          dropdown.innerHTML = '';
+          return;
+        }
+
+        dropdown.innerHTML = matches.map(m => `
+          <div class="pinjaman-autocomplete-item" onclick="selectPinjamSkuCandidate('${encodeURIComponent(JSON.stringify(m))}')">
+            <div class="pinjaman-ac-name">${escapeHtml(m.productName)}</div>
+            <div class="pinjaman-ac-meta">
+              <span>SKU: ${escapeHtml(m.sku)}</span>
+              <span>•</span>
+              <span>📍 SLOC: ${escapeHtml(m.sloc)}</span>
+            </div>
+          </div>
+        `).join('');
+        dropdown.classList.remove('hidden');
+      }, 140);
+    };
+
+    input.onchange = function () {
+      applyPinjamSku(input.value.trim());
+    };
+
+    // Close dropdown on outside click
+    document.addEventListener('click', (e) => {
+      if (!input.contains(e.target) && !dropdown.contains(e.target)) {
+        dropdown.classList.add('hidden');
+      }
+    });
+  }
+
+  window.selectPinjamSkuCandidate = function (encodedItem) {
+    try {
+      const item = JSON.parse(decodeURIComponent(encodedItem));
+      const input = document.getElementById('pinjamSkuInput');
+      const dropdown = document.getElementById('pinjamSkuDropdown');
+      if (input) input.value = item.sku;
+      if (dropdown) dropdown.classList.add('hidden');
+      applyPinjamSku(item.sku, item);
+    } catch (e) {
+      console.warn('selectPinjamSkuCandidate error:', e);
+    }
+  };
+
+  function applyPinjamSku(sku, preloadedItem = null) {
+    if (!sku) return;
+    const item = preloadedItem || lookupSkuDetails(sku);
+    const clearBtn = document.getElementById('pinjamClearSkuBtn');
+    if (clearBtn) clearBtn.classList.remove('hidden');
+
+    const nameInput = document.getElementById('pinjamNamaProdukInput');
+    const previewBox = document.getElementById('pinjamProductPreview');
+    const previewName = document.getElementById('pinjamPreviewName');
+    const previewSku = document.getElementById('pinjamPreviewSku');
+    const previewSloc = document.getElementById('pinjamPreviewSloc');
+    const previewStock = document.getElementById('pinjamPreviewStock');
+
+    if (item) {
+      if (nameInput) nameInput.value = item.productName || '';
+      if (previewBox) previewBox.classList.remove('hidden');
+      if (previewName) previewName.textContent = item.productName || '-';
+      if (previewSku) previewSku.textContent = item.sku || sku;
+      if (previewSloc) previewSloc.textContent = item.sloc || 'Belum Ada Rak';
+      if (previewStock) previewStock.textContent = item.qty || '0';
+    } else {
+      if (previewBox) previewBox.classList.add('hidden');
+    }
+  }
+
+  window.clearPinjamSku = function () {
+    const input = document.getElementById('pinjamSkuInput');
+    const nameInput = document.getElementById('pinjamNamaProdukInput');
+    const previewBox = document.getElementById('pinjamProductPreview');
+    const clearBtn = document.getElementById('pinjamClearSkuBtn');
+    const dropdown = document.getElementById('pinjamSkuDropdown');
+
+    if (input) input.value = '';
+    if (nameInput) nameInput.value = '';
+    if (previewBox) previewBox.classList.add('hidden');
+    if (clearBtn) clearBtn.classList.add('hidden');
+    if (dropdown) dropdown.classList.add('hidden');
+    if (input) input.focus();
+  };
+
+  window.openPinjamScanner = function () {
+    if (typeof openUniversalScanner === 'function') {
+      openUniversalScanner((decodedText) => {
+        const sku = String(decodedText || '').trim();
+        const input = document.getElementById('pinjamSkuInput');
+        if (input) {
+          input.value = sku;
+          applyPinjamSku(sku);
+        }
+      });
+    }
+  };
+
+  window.stepPinjamQty = function (delta) {
+    const qtyInput = document.getElementById('pinjamQtyInput');
+    if (!qtyInput) return;
+    const current = parseInt(qtyInput.value, 10) || 1;
+    qtyInput.value = Math.max(1, current + delta);
+  };
+
+  window.handlePinjamHubChange = function (val) {
+    const customContainer = document.getElementById('pinjamCustomHubContainer');
+    const customInput = document.getElementById('pinjamCustomHubInput');
+    if (val === 'custom') {
+      if (customContainer) customContainer.classList.remove('hidden');
+      if (customInput) customInput.focus();
+    } else {
+      if (customContainer) customContainer.classList.add('hidden');
+      if (customInput) customInput.value = '';
+    }
+  };
+
+  // ── 7. Setup Autocomplete untuk Form Pengembalian ──
+  function initKembaliSkuAutocomplete() {
+    const input = document.getElementById('kembaliSkuInput');
+    const dropdown = document.getElementById('kembaliSkuDropdown');
+    const clearBtn = document.getElementById('kembaliClearSkuBtn');
+    if (!input || !dropdown) return;
+
+    input.oninput = function () {
+      const val = input.value.trim();
+      if (clearBtn) clearBtn.classList.toggle('hidden', !val);
+
+      clearTimeout(pinjamanAutocompleteTimer);
+      if (val.length < 2) {
+        dropdown.classList.add('hidden');
+        dropdown.innerHTML = '';
+        return;
+      }
+
+      pinjamanAutocompleteTimer = setTimeout(() => {
+        const matches = searchSkuCandidates(val);
+        if (matches.length === 0) {
+          dropdown.classList.add('hidden');
+          dropdown.innerHTML = '';
+          return;
+        }
+
+        dropdown.innerHTML = matches.map(m => `
+          <div class="pinjaman-autocomplete-item" onclick="selectKembaliSkuCandidate('${encodeURIComponent(JSON.stringify(m))}')">
+            <div class="pinjaman-ac-name">${escapeHtml(m.productName)}</div>
+            <div class="pinjaman-ac-meta">
+              <span>SKU: ${escapeHtml(m.sku)}</span>
+              <span>•</span>
+              <span>📍 SLOC: ${escapeHtml(m.sloc)}</span>
+            </div>
+          </div>
+        `).join('');
+        dropdown.classList.remove('hidden');
+      }, 140);
+    };
+
+    input.onchange = function () {
+      applyKembaliSku(input.value.trim());
+    };
+
+    document.addEventListener('click', (e) => {
+      if (!input.contains(e.target) && !dropdown.contains(e.target)) {
+        dropdown.classList.add('hidden');
+      }
+    });
+  }
+
+  window.selectKembaliSkuCandidate = function (encodedItem) {
+    try {
+      const item = JSON.parse(decodeURIComponent(encodedItem));
+      const input = document.getElementById('kembaliSkuInput');
+      const dropdown = document.getElementById('kembaliSkuDropdown');
+      if (input) input.value = item.sku;
+      if (dropdown) dropdown.classList.add('hidden');
+      applyKembaliSku(item.sku, item);
+    } catch (e) {
+      console.warn('selectKembaliSkuCandidate error:', e);
+    }
+  };
+
+  function applyKembaliSku(sku, preloadedItem = null) {
+    if (!sku) return;
+    const item = preloadedItem || lookupSkuDetails(sku);
+    const clearBtn = document.getElementById('kembaliClearSkuBtn');
+    if (clearBtn) clearBtn.classList.remove('hidden');
+
+    const nameInput = document.getElementById('kembaliNamaProdukInput');
+    const slocInput = document.getElementById('kembaliSlocInput');
+    const previewBox = document.getElementById('kembaliProductPreview');
+    const previewName = document.getElementById('kembaliPreviewName');
+    const previewSku = document.getElementById('kembaliPreviewSku');
+    const previewSloc = document.getElementById('kembaliPreviewSloc');
+    const previewStock = document.getElementById('kembaliPreviewStock');
+
+    if (item) {
+      if (nameInput) nameInput.value = item.productName || '';
+      if (slocInput) slocInput.value = item.sloc || '';
+      if (previewBox) previewBox.classList.remove('hidden');
+      if (previewName) previewName.textContent = item.productName || '-';
+      if (previewSku) previewSku.textContent = item.sku || sku;
+      if (previewSloc) previewSloc.textContent = item.sloc || 'Belum Ada Rak';
+      if (previewStock) previewStock.textContent = item.qty || '0';
+    } else {
+      if (previewBox) previewBox.classList.add('hidden');
+    }
+  }
+
+  window.clearKembaliSku = function () {
+    const input = document.getElementById('kembaliSkuInput');
+    const nameInput = document.getElementById('kembaliNamaProdukInput');
+    const slocInput = document.getElementById('kembaliSlocInput');
+    const previewBox = document.getElementById('kembaliProductPreview');
+    const clearBtn = document.getElementById('kembaliClearSkuBtn');
+    const dropdown = document.getElementById('kembaliSkuDropdown');
+
+    if (input) input.value = '';
+    if (nameInput) nameInput.value = '';
+    if (slocInput) slocInput.value = '';
+    if (previewBox) previewBox.classList.add('hidden');
+    if (clearBtn) clearBtn.classList.add('hidden');
+    if (dropdown) dropdown.classList.add('hidden');
+    if (input) input.focus();
+  };
+
+  window.openKembaliScanner = function () {
+    if (typeof openUniversalScanner === 'function') {
+      openUniversalScanner((decodedText) => {
+        const sku = String(decodedText || '').trim();
+        const input = document.getElementById('kembaliSkuInput');
+        if (input) {
+          input.value = sku;
+          applyKembaliSku(sku);
+        }
+      });
+    }
+  };
+
+  window.stepKembaliQty = function (delta) {
+    const qtyInput = document.getElementById('kembaliQtyInput');
+    if (!qtyInput) return;
+    const current = parseInt(qtyInput.value, 10) || 1;
+    qtyInput.value = Math.max(1, current + delta);
+  };
+
+  window.handleKembaliHubChange = function (val) {
+    const customContainer = document.getElementById('kembaliCustomHubContainer');
+    const customInput = document.getElementById('kembaliCustomHubInput');
+    if (val === 'custom') {
+      if (customContainer) customContainer.classList.remove('hidden');
+      if (customInput) customInput.focus();
+    } else {
+      if (customContainer) customContainer.classList.add('hidden');
+      if (customInput) customInput.value = '';
+    }
+  };
+
+  // ── 8. Upload Foto Produk Pengembalian (Kamera & Galeri) ──
+  window.triggerKembaliCamera = function () {
+    const input = document.getElementById('kembaliPhotoCameraInput');
+    if (input) input.click();
+  };
+
+  window.triggerKembaliGallery = function () {
+    const input = document.getElementById('kembaliPhotoGalleryInput');
+    if (input) input.click();
+  };
+
+  window.handleKembaliPhotoSelected = function (event) {
+    const file = event.target.files && event.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = function (e) {
+      const img = new Image();
+      img.onload = function () {
+        const canvas = document.createElement('canvas');
+        const MAX_DIM = 800;
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > MAX_DIM) {
+            height *= MAX_DIM / width;
+            width = MAX_DIM;
+          }
+        } else {
+          if (height > MAX_DIM) {
+            width *= MAX_DIM / height;
+            height = MAX_DIM;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, width, height);
+
+        // Kompresi ringan JPEG quality 0.70 (~35-50KB)
+        kembaliPhotoBase64 = canvas.toDataURL('image/jpeg', 0.70);
+        const approxKb = Math.round((kembaliPhotoBase64.length * 3 / 4) / 1024);
+
+        const dropzone = document.getElementById('kembaliPhotoDropzone');
+        const previewWrap = document.getElementById('kembaliPhotoPreviewContainer');
+        const previewImg = document.getElementById('kembaliPhotoPreviewImg');
+        const metaText = document.getElementById('kembaliPhotoMetaText');
+
+        if (previewImg) previewImg.src = kembaliPhotoBase64;
+        if (metaText) metaText.textContent = `✅ Foto siap upload (${approxKb} KB)`;
+        if (dropzone) dropzone.classList.add('hidden');
+        if (previewWrap) previewWrap.classList.remove('hidden');
+
+        if (typeof playSuccessBeep === 'function') playSuccessBeep();
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  };
+
+  window.removeKembaliPhoto = function () {
+    kembaliPhotoBase64 = '';
+    const camInput = document.getElementById('kembaliPhotoCameraInput');
+    const galInput = document.getElementById('kembaliPhotoGalleryInput');
+    if (camInput) camInput.value = '';
+    if (galInput) galInput.value = '';
+
+    const dropzone = document.getElementById('kembaliPhotoDropzone');
+    const previewWrap = document.getElementById('kembaliPhotoPreviewContainer');
+    const previewImg = document.getElementById('kembaliPhotoPreviewImg');
+
+    if (previewImg) previewImg.src = '';
+    if (previewWrap) previewWrap.classList.add('hidden');
+    if (dropzone) dropzone.classList.remove('hidden');
+  };
+
+  // ── 9. Submit Form Peminjaman ──
+  window.submitFormPinjam = async function (e) {
+    if (e && e.preventDefault) e.preventDefault();
+
+    const skuInput = document.getElementById('pinjamSkuInput');
+    const nameInput = document.getElementById('pinjamNamaProdukInput');
+    const qtyInput = document.getElementById('pinjamQtyInput');
+    const hubSelect = document.getElementById('pinjamHubSelect');
+    const customHubInput = document.getElementById('pinjamCustomHubInput');
+    const picInput = document.getElementById('pinjamPicInput');
+    const remarksInput = document.getElementById('pinjamRemarksInput');
+    const submitBtn = document.getElementById('btnSubmitPinjam');
+
+    const sku = (skuInput ? skuInput.value : '').trim();
+    const productName = (nameInput ? nameInput.value : '').trim();
+    const qty = parseInt(qtyInput ? qtyInput.value : '1', 10) || 1;
+    let hub = (hubSelect ? hubSelect.value : '').trim();
+    if (hub === 'custom') {
+      hub = (customHubInput ? customHubInput.value : '').trim();
+    }
+    const pic = (picInput ? picInput.value : '').trim();
+    const remarks = (remarksInput ? remarksInput.value : '').trim();
+
+    // Validasi
+    if (!sku) {
+      alert('Silakan masukkan Nomor SKU Produk.');
+      if (skuInput) skuInput.focus();
+      return;
+    }
+    if (!productName) {
+      alert('Silakan masukkan Nama Produk.');
+      if (nameInput) nameInput.focus();
+      return;
+    }
+    if (qty < 1) {
+      alert('Jumlah QTY minimal 1.');
+      if (qtyInput) qtyInput.focus();
+      return;
+    }
+    if (!hub) {
+      alert('Silakan pilih atau ketik HUB tujuan peminjaman.');
+      if (hubSelect) hubSelect.focus();
+      return;
+    }
+    if (!pic) {
+      alert('Silakan masukkan nama PIC Peminjam.');
+      if (picInput) picInput.focus();
+      return;
+    }
+
+    const payload = {
+      action: 'savePinjamanBarang',
+      module: 'pinjaman',
+      formType: 'pinjam',
+      sku: sku,
+      productName: productName,
+      qty: qty,
+      hub: hub,
+      pic: pic,
+      remarks: remarks,
+      status: 'DIPINJAM'
+    };
+
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      submitBtn.innerHTML = '<span>⏳ Menyimpan Peminjaman...</span>';
+    }
+
+    try {
+      await fetch(DCC_WEBAPP_URL, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'text/plain' },
+        body: JSON.stringify(payload)
+      });
+
+      // Simpan PIC ke localStorage
+      localStorage.setItem('SUPERAPP_LAST_PIC_PINJAM', pic);
+
+      // Audio & Feedback
+      if (typeof playSaveSuccessChime === 'function') playSaveSuccessChime();
+      if (navigator.vibrate) try { navigator.vibrate([60, 40, 60]); } catch (e) {}
+      if (typeof showDccToast === 'function') {
+        showDccToast('success', 'Peminjaman Berhasil!', `SKU ${sku} (${productName}) QTY ${qty} ke ${hub} tercatat.`);
+      } else {
+        alert(`✅ Peminjaman Berhasil!\n\nSKU: ${sku}\nProduk: ${productName}\nQTY: ${qty}\nHUB: ${hub}\nPIC: ${pic}`);
+      }
+
+      // Reset form (pertahankan PIC)
+      if (skuInput) skuInput.value = '';
+      if (nameInput) nameInput.value = '';
+      if (qtyInput) qtyInput.value = '1';
+      if (hubSelect) hubSelect.value = '';
+      if (customHubInput) customHubInput.value = '';
+      document.getElementById('pinjamCustomHubContainer')?.classList.add('hidden');
+      if (remarksInput) remarksInput.value = '';
+      document.getElementById('pinjamProductPreview')?.classList.add('hidden');
+      document.getElementById('pinjamClearSkuBtn')?.classList.add('hidden');
+
+    } catch (err) {
+      console.error('Gagal simpan pinjaman:', err);
+      alert('Gagal mengirim data. Silakan periksa koneksi internet Anda.');
+    } finally {
+      if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = `
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="22" y1="2" x2="11" y2="13"></line>
+            <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+          </svg>
+          <span>Submit Peminjaman</span>
+        `;
+      }
+    }
+  };
+
+  // ── 10. Submit Form Pengembalian ──
+  window.submitFormKembali = async function (e) {
+    if (e && e.preventDefault) e.preventDefault();
+
+    const skuInput = document.getElementById('kembaliSkuInput');
+    const nameInput = document.getElementById('kembaliNamaProdukInput');
+    const slocInput = document.getElementById('kembaliSlocInput');
+    const qtyInput = document.getElementById('kembaliQtyInput');
+    const hubSelect = document.getElementById('kembaliHubSelect');
+    const customHubInput = document.getElementById('kembaliCustomHubInput');
+    const picInput = document.getElementById('kembaliPicInput');
+    const remarksInput = document.getElementById('kembaliRemarksInput');
+    const submitBtn = document.getElementById('btnSubmitKembali');
+
+    const sku = (skuInput ? skuInput.value : '').trim();
+    const productName = (nameInput ? nameInput.value : '').trim();
+    const sloc = (slocInput ? slocInput.value : '').trim();
+    const qty = parseInt(qtyInput ? qtyInput.value : '1', 10) || 1;
+    let hub = (hubSelect ? hubSelect.value : '').trim();
+    if (hub === 'custom') {
+      hub = (customHubInput ? customHubInput.value : '').trim();
+    }
+    const pic = (picInput ? picInput.value : '').trim();
+    const remarks = (remarksInput ? remarksInput.value : '').trim();
+
+    // Validasi
+    if (!sku) {
+      alert('Silakan masukkan Nomor SKU Produk yang dikembalikan.');
+      if (skuInput) skuInput.focus();
+      return;
+    }
+    if (!productName) {
+      alert('Silakan masukkan Nama Produk.');
+      if (nameInput) nameInput.focus();
+      return;
+    }
+    if (!sloc) {
+      alert('Silakan masukkan SLOC (Lokasi Rak) produk.');
+      if (slocInput) slocInput.focus();
+      return;
+    }
+    if (qty < 1) {
+      alert('Jumlah QTY minimal 1.');
+      if (qtyInput) qtyInput.focus();
+      return;
+    }
+    if (!kembaliPhotoBase64) {
+      alert('Wajib upload foto produk yang dikembalikan (via Kamera atau Galeri).');
+      return;
+    }
+    if (!pic) {
+      alert('Silakan masukkan nama PIC Pengembalian.');
+      if (picInput) picInput.focus();
+      return;
+    }
+    if (!hub) {
+      alert('Silakan pilih atau ketik HUB asal pengembalian barang.');
+      if (hubSelect) hubSelect.focus();
+      return;
+    }
+
+    const payload = {
+      action: 'savePengembalianBarang',
+      module: 'pinjaman',
+      formType: 'pengembalian',
+      sku: sku,
+      productName: productName,
+      sloc: sloc,
+      qty: qty,
+      hub: hub,
+      pic: pic,
+      remarks: remarks,
+      imageBase64: kembaliPhotoBase64,
+      status: 'DIKEMBALIKAN'
+    };
+
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      submitBtn.innerHTML = '<span>⏳ Menyimpan Pengembalian & Foto...</span>';
+    }
+
+    try {
+      await fetch(DCC_WEBAPP_URL, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'text/plain' },
+        body: JSON.stringify(payload)
+      });
+
+      // Simpan PIC ke localStorage
+      localStorage.setItem('SUPERAPP_LAST_PIC_KEMBALI', pic);
+
+      // Feedback
+      if (typeof playSaveSuccessChime === 'function') playSaveSuccessChime();
+      if (navigator.vibrate) try { navigator.vibrate([60, 40, 60]); } catch (e) {}
+      if (typeof showDccToast === 'function') {
+        showDccToast('success', 'Pengembalian Berhasil!', `SKU ${sku} (${productName}) QTY ${qty} dikembalikan ke ${hub}.`);
+      } else {
+        alert(`✅ Pengembalian Berhasil!\n\nSKU: ${sku}\nProduk: ${productName}\nSLOC: ${sloc}\nQTY: ${qty}\nHUB: ${hub}\nPIC: ${pic}`);
+      }
+
+      // Reset Form & Foto
+      if (skuInput) skuInput.value = '';
+      if (nameInput) nameInput.value = '';
+      if (slocInput) slocInput.value = '';
+      if (qtyInput) qtyInput.value = '1';
+      if (hubSelect) hubSelect.value = '';
+      if (customHubInput) customHubInput.value = '';
+      document.getElementById('kembaliCustomHubContainer')?.classList.add('hidden');
+      if (remarksInput) remarksInput.value = '';
+      document.getElementById('kembaliProductPreview')?.classList.add('hidden');
+      document.getElementById('kembaliClearSkuBtn')?.classList.add('hidden');
+      removeKembaliPhoto();
+
+    } catch (err) {
+      console.error('Gagal simpan pengembalian:', err);
+      alert('Gagal mengirim data pengembalian. Silakan periksa koneksi internet Anda.');
+    } finally {
+      if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = `
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="20 6 9 17 4 12"></polyline>
+          </svg>
+          <span>Submit Pengembalian</span>
+        `;
+      }
+    }
+  };
+
+  // ── 11. Fetch & Render Riwayat Transaksi ──
+  window.refreshPinjamanData = function (showToast = false) {
+    fetchStockUpdateSheet();
+    fetchPinjamanHistory();
+    if (showToast && typeof showDccToast === 'function') {
+      showDccToast('info', 'Menyinkronkan...', 'Memperbarui data Pinjaman & Pengembalian MTG.');
+    }
+  };
+
+  async function fetchPinjamanHistory() {
+    const listContainer = document.getElementById('pinjamanHistoryList');
+    if (!listContainer) return;
+
+    listContainer.innerHTML = `
+      <div class="dcc-empty-state" style="padding: 30px 10px; text-align: center;">
+        <div class="spinning" style="display: inline-block; font-size: 24px; margin-bottom: 8px;">⏳</div>
+        <div style="font-size: 0.85rem; color: #94a3b8;">Memuat riwayat transaksi dari Google Sheets...</div>
+      </div>
+    `;
+
+    try {
+      const pUrl = `${DCC_WEBAPP_URL}?sheet=${encodeURIComponent('Pinjaman Barang MTG')}&_ts=${Date.now()}`;
+      const kUrl = `${DCC_WEBAPP_URL}?sheet=${encodeURIComponent('Pengembalian Barang MTG')}&_ts=${Date.now()}`;
+
+      const [resP, resK] = await Promise.all([
+        fetch(pUrl).catch(() => null),
+        fetch(kUrl).catch(() => null)
+      ]);
+
+      const dataP = resP && resP.ok ? await resP.json() : [];
+      const dataK = resK && resK.ok ? await resK.json() : [];
+
+      const combined = [];
+
+      if (Array.isArray(dataP)) {
+        dataP.forEach(row => {
+          if (row['NOMOR SKU'] || row['TIMESTAMP']) {
+            combined.push({
+              type: 'pinjam',
+              timestamp: row['TIMESTAMP'] || '',
+              sku: row['NOMOR SKU'] || '',
+              productName: row['NAMA PRODUK'] || '',
+              qty: row['QTY PINJAM'] || '1',
+              hub: row['PINJAM KE HUB'] || '-',
+              pic: row['PIC PEMINJAM'] || '-',
+              sloc: '',
+              photoUrl: '',
+              status: row['STATUS'] || 'DIPINJAM',
+              remarks: row['CATATAN'] || ''
+            });
+          }
+        });
+      }
+
+      if (Array.isArray(dataK)) {
+        dataK.forEach(row => {
+          if (row['NOMOR SKU'] || row['TIMESTAMP']) {
+            combined.push({
+              type: 'kembali',
+              timestamp: row['TIMESTAMP'] || '',
+              sku: row['NOMOR SKU'] || '',
+              productName: row['NAMA PRODUK'] || '',
+              qty: row['QTY KEMBALI'] || '1',
+              hub: row['KEMBALIKAN KE HUB'] || '-',
+              pic: row['PIC PENGEMBALIAN'] || '-',
+              sloc: row['SLOC (LOKASI RAK)'] || '',
+              photoUrl: row['FOTO PRODUK (DRIVE)'] || '',
+              status: row['STATUS'] || 'DIKEMBALIKAN',
+              remarks: row['CATATAN'] || ''
+            });
+          }
+        });
+      }
+
+      // Sort descending by timestamp / newest first
+      combined.reverse();
+      pinjamanHistoryData = combined;
+      renderPinjamanHistory();
+
+    } catch (e) {
+      console.warn('Gagal memuat riwayat pinjaman:', e);
+      listContainer.innerHTML = `
+        <div class="dcc-empty-state" style="padding: 24px 10px; text-align: center;">
+          <div style="font-size: 28px; margin-bottom: 6px;">📡</div>
+          <div style="font-size: 0.88rem; font-weight: 600; color: #f8fafc;">Belum Ada Riwayat Tersimpan</div>
+          <div style="font-size: 0.74rem; color: #94a3b8; margin-top: 4px;">Data riwayat akan muncul otomatis setelah Anda melakukan submit formulir.</div>
+        </div>
+      `;
+    }
+  }
+
+  function renderPinjamanHistory() {
+    const listContainer = document.getElementById('pinjamanHistoryList');
+    const searchInput = document.getElementById('pinjamanHistorySearch');
+    if (!listContainer) return;
+
+    const query = (searchInput ? searchInput.value : '').trim().toLowerCase();
+
+    let filtered = pinjamanHistoryData;
+
+    // Filter tipe
+    if (pinjamanHistoryFilter === 'pinjam') {
+      filtered = filtered.filter(it => it.type === 'pinjam');
+    } else if (pinjamanHistoryFilter === 'kembali') {
+      filtered = filtered.filter(it => it.type === 'kembali');
+    }
+
+    // Filter search text
+    if (query) {
+      filtered = filtered.filter(it => {
+        return (it.sku && it.sku.toLowerCase().includes(query)) ||
+               (it.productName && it.productName.toLowerCase().includes(query)) ||
+               (it.hub && it.hub.toLowerCase().includes(query)) ||
+               (it.pic && it.pic.toLowerCase().includes(query));
+      });
+    }
+
+    if (filtered.length === 0) {
+      listContainer.innerHTML = `
+        <div class="dcc-empty-state" style="padding: 24px 10px; text-align: center;">
+          <div style="font-size: 26px; margin-bottom: 6px;">🔍</div>
+          <div style="font-size: 0.85rem; color: #94a3b8;">Tidak ada data yang sesuai kriteria filter.</div>
+        </div>
+      `;
+      return;
+    }
+
+    listContainer.innerHTML = filtered.map(it => {
+      const isPinjam = it.type === 'pinjam';
+      const badgeClass = isPinjam ? 'pinjam' : 'kembali';
+      const badgeText = isPinjam ? '📦 DIPINJAM' : '🔄 DIKEMBALIKAN';
+      const cardClass = isPinjam ? 'pinjam' : 'kembali';
+
+      return `
+        <div class="pinjaman-history-card ${cardClass}">
+          <div class="pinjaman-hist-header">
+            <span class="pinjaman-hist-badge ${badgeClass}">${badgeText}</span>
+            <span class="pinjaman-hist-time">${escapeHtml(it.timestamp)}</span>
+          </div>
+          <div class="pinjaman-hist-product">${escapeHtml(it.productName || 'Produk Tanpa Nama')}</div>
+          <div class="pinjaman-hist-meta">
+            <span><strong>SKU:</strong> ${escapeHtml(it.sku)}</span>
+            <span><strong>QTY:</strong> ${escapeHtml(String(it.qty))}</span>
+            <span><strong>HUB:</strong> ${escapeHtml(it.hub)}</span>
+            <span><strong>PIC:</strong> ${escapeHtml(it.pic)}</span>
+            ${it.sloc ? `<span><strong>📍 SLOC:</strong> ${escapeHtml(it.sloc)}</span>` : ''}
+            ${it.photoUrl ? `<span><a href="${escapeHtml(it.photoUrl)}" target="_blank" class="pinjaman-hist-photo-link">📷 Lihat Bukti Foto</a></span>` : ''}
+            ${it.remarks ? `<span><em>"${escapeHtml(it.remarks)}"</em></span>` : ''}
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  window.filterPinjamanHistory = function () {
+    renderPinjamanHistory();
+  };
+
+  window.setPinjamanHistoryFilter = function (filter, btn) {
+    pinjamanHistoryFilter = filter;
+    document.querySelectorAll('.pinjaman-pill-btn').forEach(b => b.classList.remove('active'));
+    if (btn) btn.classList.add('active');
+    renderPinjamanHistory();
+  };
+
+  // Helper escapeHtml jika belum ada
+  function escapeHtml(str) {
+    if (!str) return '';
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+  }
+
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => {
       initKoliSearchInput();
@@ -12704,4 +13702,5 @@
   }
 
 })();
+
 

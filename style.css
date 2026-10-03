@@ -564,6 +564,11 @@ body::after {
   border: 1px solid rgba(168, 85, 247, 0.25);
 }
 
+.menu-icon-box.pinjaman {
+  background: rgba(14, 165, 233, 0.14);
+  border: 1px solid rgba(56, 189, 248, 0.3);
+}
+
 .menu-card-title {
   font-size: clamp(0.74rem, 2.5vw, 0.84rem);
   font-weight: 600;
@@ -10499,5 +10504,765 @@ select.dcc-field-input option {
   color: #f87171;
   border: 1px solid rgba(239, 68, 68, 0.3);
 }
+
+/* ══════════════════════════════════════════════════════════════════
+   🚀 PINJAMAN & PENGEMBALIAN BARANG MTG (AEROSPACE HUD THEME)
+   ══════════════════════════════════════════════════════════════════ */
+
+.pinjaman-workspace {
+  animation: fadeIn 0.25s ease-out;
+  padding-bottom: 70px;
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+/* ── Top Bar ── */
+.pinjaman-top-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  background: rgba(15, 23, 42, 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  margin-bottom: 14px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+}
+
+.pinjaman-top-back-btn,
+.pinjaman-refresh-btn {
+  width: 42px;
+  height: 42px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  color: #f8fafc;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.pinjaman-top-back-btn:hover,
+.pinjaman-refresh-btn:hover {
+  background: rgba(56, 189, 248, 0.15);
+  border-color: rgba(56, 189, 248, 0.4);
+  color: #38bdf8;
+  transform: translateY(-1px);
+}
+
+.pinjaman-top-back-btn:active,
+.pinjaman-refresh-btn:active {
+  transform: scale(0.95);
+}
+
+.pinjaman-title-wrap {
+  text-align: center;
+  flex: 1;
+  padding: 0 10px;
+}
+
+.pinjaman-title {
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: #f8fafc;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.pinjaman-subtitle {
+  font-size: 0.72rem;
+  color: #94a3b8;
+  margin: 2px 0 0;
+  font-family: 'JetBrains Mono', monospace;
+  letter-spacing: 0.02em;
+}
+
+/* ── Segmented Navigation Tabs ── */
+.pinjaman-nav {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 6px;
+  background: rgba(10, 15, 29, 0.9);
+  padding: 4px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  margin-bottom: 16px;
+}
+
+.pinjaman-tab-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 10px 8px;
+  background: transparent;
+  border: none;
+  border-radius: 10px;
+  color: #94a3b8;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  text-align: center;
+}
+
+.pinjaman-tab-btn:hover {
+  color: #f8fafc;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.pinjaman-tab-btn.active {
+  background: rgba(56, 189, 248, 0.16);
+  color: #38bdf8;
+  box-shadow: 0 2px 10px rgba(56, 189, 248, 0.2);
+  border: 1px solid rgba(56, 189, 248, 0.3);
+}
+
+.pinjaman-tab-btn.active.kembali-tab {
+  background: rgba(16, 185, 129, 0.16);
+  color: #34d399;
+  box-shadow: 0 2px 10px rgba(16, 185, 129, 0.2);
+  border-color: rgba(16, 185, 129, 0.3);
+}
+
+.pinjaman-tab-btn.active.history-tab {
+  background: rgba(168, 85, 247, 0.16);
+  color: #c084fc;
+  box-shadow: 0 2px 10px rgba(168, 85, 247, 0.2);
+  border-color: rgba(168, 85, 247, 0.3);
+}
+
+/* ── Form Card ── */
+.pinjaman-form-card {
+  background: rgba(15, 23, 42, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 18px;
+  padding: 18px 16px;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
+  margin-bottom: 18px;
+}
+
+.pinjaman-form-card.accent-pinjam {
+  border-top: 3px solid #38bdf8;
+}
+
+.pinjaman-form-card.accent-kembali {
+  border-top: 3px solid #10b981;
+}
+
+.pinjaman-card-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.pinjaman-badge-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1rem;
+}
+
+.pinjaman-badge-icon.pinjam {
+  background: rgba(56, 189, 248, 0.15);
+  border: 1px solid rgba(56, 189, 248, 0.3);
+}
+
+.pinjaman-badge-icon.kembali {
+  background: rgba(16, 185, 129, 0.15);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.pinjaman-card-title {
+  font-size: 0.98rem;
+  font-weight: 700;
+  color: #f8fafc;
+  margin: 0;
+}
+
+.pinjaman-card-desc {
+  font-size: 0.76rem;
+  color: #94a3b8;
+  margin: 2px 0 0;
+}
+
+/* ── Field Groups ── */
+.pinjaman-field-group {
+  margin-bottom: 14px;
+  position: relative;
+}
+
+.pinjaman-label {
+  display: block;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #cbd5e1;
+  margin-bottom: 6px;
+}
+
+.pinjaman-label span.req {
+  color: #f43f5e;
+  margin-left: 2px;
+}
+
+.pinjaman-input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.pinjaman-input {
+  width: 100%;
+  height: 46px;
+  background: rgba(10, 15, 29, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  padding: 0 14px;
+  font-size: 0.92rem;
+  color: #f8fafc;
+  font-family: inherit;
+  transition: all 0.2s ease;
+  box-sizing: border-box;
+}
+
+.pinjaman-input:focus {
+  outline: none;
+  border-color: #38bdf8;
+  box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.2);
+  background: rgba(15, 23, 42, 0.95);
+}
+
+.pinjaman-input.accent-kembali:focus {
+  border-color: #10b981;
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.2);
+}
+
+.pinjaman-input.with-scan-btn {
+  padding-right: 86px;
+}
+
+.pinjaman-input-action-btns {
+  position: absolute;
+  right: 6px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.pinjaman-input-clear-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  border: none;
+  background: rgba(255, 255, 255, 0.08);
+  color: #94a3b8;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+}
+
+.pinjaman-input-clear-btn:hover {
+  color: #f8fafc;
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.pinjaman-scan-btn {
+  height: 34px;
+  padding: 0 10px;
+  border-radius: 9px;
+  border: 1px solid rgba(56, 189, 248, 0.35);
+  background: rgba(56, 189, 248, 0.15);
+  color: #38bdf8;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  transition: all 0.2s ease;
+}
+
+.pinjaman-scan-btn:hover {
+  background: rgba(56, 189, 248, 0.25);
+  border-color: #38bdf8;
+}
+
+.pinjaman-scan-btn:active {
+  transform: scale(0.96);
+}
+
+/* ── Dropdown Select ── */
+.pinjaman-select {
+  width: 100%;
+  height: 46px;
+  background: rgba(10, 15, 29, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  padding: 0 14px;
+  font-size: 0.92rem;
+  color: #f8fafc;
+  font-family: inherit;
+  transition: all 0.2s ease;
+  box-sizing: border-box;
+  appearance: none;
+  background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+  background-repeat: no-repeat;
+  background-position: right 14px center;
+  background-size: 16px;
+  cursor: pointer;
+}
+
+.pinjaman-select:focus {
+  outline: none;
+  border-color: #38bdf8;
+  box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.2);
+}
+
+.pinjaman-select option {
+  background: #0a0f1d;
+  color: #f8fafc;
+}
+
+/* ── Custom HUB Input Animation ── */
+.custom-hub-container {
+  margin-top: 8px;
+  animation: fadeIn 0.2s ease;
+}
+
+/* ── QTY Stepper ── */
+.pinjaman-qty-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.pinjaman-stepper-btn {
+  width: 46px;
+  height: 46px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  color: #f8fafc;
+  font-size: 1.25rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  user-select: none;
+}
+
+.pinjaman-stepper-btn:hover {
+  background: rgba(56, 189, 248, 0.15);
+  border-color: #38bdf8;
+  color: #38bdf8;
+}
+
+.pinjaman-stepper-btn:active {
+  transform: scale(0.92);
+}
+
+.pinjaman-qty-input {
+  text-align: center;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 1.15rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  flex: 1;
+}
+
+/* ── Telemetry Product Card (Auto Preview) ── */
+.pinjaman-product-telemetry {
+  background: rgba(10, 15, 29, 0.65);
+  border: 1px solid rgba(56, 189, 248, 0.25);
+  border-radius: 14px;
+  padding: 12px 14px;
+  margin-top: 8px;
+  animation: fadeIn 0.2s ease;
+}
+
+.pinjaman-product-telemetry.kembali-mode {
+  border-color: rgba(16, 185, 129, 0.3);
+}
+
+.pinjaman-telemetry-title {
+  font-size: 0.94rem;
+  font-weight: 700;
+  color: #f8fafc;
+  line-height: 1.35;
+  margin-bottom: 8px;
+}
+
+.pinjaman-telemetry-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.pinjaman-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 8px;
+  border-radius: 8px;
+  font-size: 0.74rem;
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 600;
+}
+
+.pinjaman-chip.sloc {
+  background: rgba(16, 185, 129, 0.15);
+  color: #34d399;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.pinjaman-chip.stock {
+  background: rgba(56, 189, 248, 0.12);
+  color: #38bdf8;
+  border: 1px solid rgba(56, 189, 248, 0.25);
+}
+
+.pinjaman-chip.sku {
+  background: rgba(255, 255, 255, 0.06);
+  color: #cbd5e1;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* ── SKU Search Autocomplete Dropdown ── */
+.pinjaman-autocomplete-dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  max-height: 240px;
+  overflow-y: auto;
+  background: #0a0f1d;
+  border: 1px solid rgba(56, 189, 248, 0.3);
+  border-radius: 12px;
+  z-index: 1000;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
+  padding: 4px;
+}
+
+.pinjaman-autocomplete-item {
+  padding: 8px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.pinjaman-autocomplete-item:last-child {
+  border-bottom: none;
+}
+
+.pinjaman-autocomplete-item:hover,
+.pinjaman-autocomplete-item.active {
+  background: rgba(56, 189, 248, 0.15);
+}
+
+.pinjaman-ac-name {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #f8fafc;
+}
+
+.pinjaman-ac-meta {
+  font-size: 0.72rem;
+  color: #94a3b8;
+  font-family: 'JetBrains Mono', monospace;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* ── Photo Upload Dropzone ── */
+.pinjaman-photo-dropzone {
+  border: 2px dashed rgba(255, 255, 255, 0.15);
+  border-radius: 14px;
+  padding: 18px 14px;
+  text-align: center;
+  background: rgba(10, 15, 29, 0.4);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.pinjaman-photo-dropzone:hover {
+  border-color: #10b981;
+  background: rgba(16, 185, 129, 0.05);
+}
+
+.pinjaman-photo-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+  justify-content: center;
+}
+
+.btn-photo-pick {
+  height: 38px;
+  padding: 0 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.06);
+  color: #f8fafc;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.2s ease;
+}
+
+.btn-photo-pick.camera {
+  background: rgba(16, 185, 129, 0.15);
+  border-color: rgba(16, 185, 129, 0.35);
+  color: #34d399;
+}
+
+.btn-photo-pick:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.btn-photo-pick.camera:hover {
+  background: rgba(16, 185, 129, 0.25);
+  border-color: #10b981;
+}
+
+.pinjaman-photo-preview-wrap {
+  position: relative;
+  margin-top: 10px;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  background: #000;
+  max-width: 240px;
+}
+
+.pinjaman-photo-preview-img {
+  width: 100%;
+  height: 160px;
+  object-fit: cover;
+  display: block;
+}
+
+.pinjaman-photo-remove-btn {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(239, 68, 68, 0.85);
+  color: #fff;
+  cursor: pointer;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+  transition: transform 0.15s ease;
+}
+
+.pinjaman-photo-remove-btn:hover {
+  transform: scale(1.1);
+}
+
+/* ── Submit Buttons ── */
+.btn-pinjaman-submit {
+  width: 100%;
+  height: 50px;
+  border-radius: 14px;
+  border: none;
+  font-size: 0.95rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+  color: #ffffff;
+  margin-top: 18px;
+}
+
+.btn-pinjaman-submit.pinjam {
+  background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
+  box-shadow: 0 6px 20px rgba(2, 132, 199, 0.35);
+}
+
+.btn-pinjaman-submit.pinjam:hover {
+  background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%);
+  box-shadow: 0 8px 25px rgba(2, 132, 199, 0.5);
+  transform: translateY(-2px);
+}
+
+.btn-pinjaman-submit.kembali {
+  background: linear-gradient(135deg, #059669 0%, #047857 100%);
+  box-shadow: 0 6px 20px rgba(5, 150, 105, 0.35);
+}
+
+.btn-pinjaman-submit.kembali:hover {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  box-shadow: 0 8px 25px rgba(5, 150, 105, 0.5);
+  transform: translateY(-2px);
+}
+
+.btn-pinjaman-submit:active {
+  transform: scale(0.97);
+}
+
+.btn-pinjaman-submit:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none !important;
+}
+
+/* ── History Tab ── */
+.pinjaman-history-controls {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.pinjaman-history-search {
+  flex: 1;
+}
+
+.pinjaman-history-filter-pills {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  margin-bottom: 14px;
+  padding-bottom: 2px;
+}
+
+.pinjaman-pill-btn {
+  padding: 6px 12px;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #94a3b8;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+}
+
+.pinjaman-pill-btn.active {
+  background: rgba(56, 189, 248, 0.15);
+  border-color: #38bdf8;
+  color: #38bdf8;
+}
+
+.pinjaman-history-card {
+  background: rgba(15, 23, 42, 0.75);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  padding: 12px 14px;
+  margin-bottom: 10px;
+  transition: all 0.2s ease;
+}
+
+.pinjaman-history-card:hover {
+  border-color: rgba(255, 255, 255, 0.18);
+  transform: translateY(-1px);
+}
+
+.pinjaman-history-card.pinjam {
+  border-left: 4px solid #38bdf8;
+}
+
+.pinjaman-history-card.kembali {
+  border-left: 4px solid #10b981;
+}
+
+.pinjaman-hist-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.pinjaman-hist-badge {
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 6px;
+  text-transform: uppercase;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.pinjaman-hist-badge.pinjam {
+  background: rgba(56, 189, 248, 0.15);
+  color: #38bdf8;
+  border: 1px solid rgba(56, 189, 248, 0.3);
+}
+
+.pinjaman-hist-badge.kembali {
+  background: rgba(16, 185, 129, 0.15);
+  color: #34d399;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.pinjaman-hist-time {
+  font-size: 0.72rem;
+  color: #64748b;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.pinjaman-hist-product {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: #f8fafc;
+  margin-bottom: 6px;
+}
+
+.pinjaman-hist-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  font-size: 0.75rem;
+  color: #94a3b8;
+}
+
+.pinjaman-hist-meta span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.pinjaman-hist-photo-link {
+  color: #38bdf8;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
 
 

@@ -85,7 +85,7 @@
       <div class="home-version-wrap">
         <button type="button" class="home-version-chip" onclick="checkForAppUpdates(true)" title="Klik untuk memeriksa pembaruan aplikasi">
           <span class="home-version-dot"></span>
-          <span id="homeAppVersionText">v1.2.9</span> • Cek Update
+          <span id="homeAppVersionText">v1.3.0</span> • Cek Update
         </button>
       </div>
     </header>
@@ -221,6 +221,18 @@
             </svg>
           </div>
           <div class="menu-card-title">ED Correction</div>
+        </div>
+
+        <!-- 10. Pinjaman -->
+        <div class="menu-card" onclick="openAppMenu('pinjaman')">
+          <div class="menu-icon-box pinjaman">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M7 16V4m0 0L3 8m4-4l4 4" stroke="#38bdf8" />
+              <path d="M17 8v12m0 0l4-4m-4 4l-4-4" stroke="#10b981" />
+              <rect x="2" y="11" width="10" height="9" rx="2" stroke="#38bdf8" fill="rgba(56, 189, 248, 0.15)" />
+            </svg>
+          </div>
+          <div class="menu-card-title">Pinjaman</div>
         </div>
       </div>
     </section>
@@ -2088,6 +2100,345 @@
 
     </div> <!-- End Koli Inbound Workspace -->
 
+    <!-- ── Pinjaman & Pengembalian Workspace (Hidden by Default) ── -->
+    <div id="pinjamanWorkspace" class="hidden pinjaman-workspace">
+      <!-- Top Action Bar -->
+      <div class="pinjaman-top-bar">
+        <button type="button" class="pinjaman-top-back-btn" onclick="goBackToMenu()" title="Kembali ke Menu Utama">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="15 18 9 12 15 6"></polyline>
+          </svg>
+        </button>
+
+        <div class="pinjaman-title-wrap">
+          <h2 class="pinjaman-title">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M7 16V4m0 0L3 8m4-4l4 4" />
+              <path d="M17 8v12m0 0l4-4m-4 4l-4-4" />
+            </svg>
+            <span>Pinjaman MTG</span>
+          </h2>
+          <p class="pinjaman-subtitle">Peminjaman &amp; Pengembalian Hub MTG</p>
+        </div>
+
+        <button type="button" class="pinjaman-refresh-btn" onclick="refreshPinjamanData(true)" title="Muat Ulang / Sinkronisasi">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="23 4 23 10 17 10"></polyline>
+            <polyline points="1 20 1 14 7 14"></polyline>
+            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+          </svg>
+        </button>
+      </div>
+
+      <!-- Segmented Nav Tabs -->
+      <nav class="pinjaman-nav">
+        <button type="button" class="pinjaman-tab-btn active" id="tabPinjamBtn" onclick="switchPinjamanTab('pinjam')">
+          <span>📦 Pinjam Barang</span>
+        </button>
+        <button type="button" class="pinjaman-tab-btn kembali-tab" id="tabKembaliBtn" onclick="switchPinjamanTab('kembali')">
+          <span>🔄 Pengembalian</span>
+        </button>
+        <button type="button" class="pinjaman-tab-btn history-tab" id="tabHistoryBtn" onclick="switchPinjamanTab('history')">
+          <span>📋 Riwayat</span>
+        </button>
+      </nav>
+
+      <!-- ════════════════ TAB 1: FORM PEMINJAMAN BARANG ════════════════ -->
+      <div id="tabContentPinjam" class="pinjaman-tab-panel">
+        <div class="pinjaman-form-card accent-pinjam">
+          <div class="pinjaman-card-header">
+            <div class="pinjaman-badge-icon pinjam">📦</div>
+            <div>
+              <h3 class="pinjaman-card-title">Form Peminjaman Barang</h3>
+              <p class="pinjaman-card-desc">Catat barang MTG yang dipinjamkan ke HUB lain</p>
+            </div>
+          </div>
+
+          <form id="formPeminjamanBarang" onsubmit="submitFormPinjam(event)" autocomplete="off">
+            <!-- 1. Input Nomor SKU -->
+            <div class="pinjaman-field-group">
+              <label class="pinjaman-label" for="pinjamSkuInput">
+                Nomor SKU Produk <span class="req">*</span>
+              </label>
+              <div class="pinjaman-input-wrapper">
+                <input type="text" id="pinjamSkuInput" class="pinjaman-input with-scan-btn font-mono"
+                  placeholder="Ketik SKU atau scan barcode..." autocomplete="off" spellcheck="false" inputmode="text">
+                <div class="pinjaman-input-action-btns">
+                  <button type="button" id="pinjamClearSkuBtn" class="pinjaman-input-clear-btn hidden" onclick="clearPinjamSku()" title="Hapus SKU">✕</button>
+                  <button type="button" class="pinjaman-scan-btn" onclick="openPinjamScanner()" title="Scan Kamera">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
+                      <circle cx="12" cy="13" r="4"></circle>
+                    </svg>
+                    <span>Scan</span>
+                  </button>
+                </div>
+              </div>
+
+              <!-- Dropdown Autocomplete SKU / Produk -->
+              <div id="pinjamSkuDropdown" class="pinjaman-autocomplete-dropdown hidden"></div>
+
+              <!-- Product Telemetry Preview (Otomatis muncul jika SKU terdeteksi) -->
+              <div id="pinjamProductPreview" class="pinjaman-product-telemetry hidden">
+                <div class="pinjaman-telemetry-title" id="pinjamPreviewName">-</div>
+                <div class="pinjaman-telemetry-chips">
+                  <span class="pinjaman-chip sku">SKU: <strong id="pinjamPreviewSku">-</strong></span>
+                  <span class="pinjaman-chip sloc">📍 SLOC: <strong id="pinjamPreviewSloc">-</strong></span>
+                  <span class="pinjaman-chip stock">📊 Stock: <strong id="pinjamPreviewStock">-</strong></span>
+                </div>
+              </div>
+            </div>
+
+            <!-- 2. Nama Produk (Otomatis terisi) -->
+            <div class="pinjaman-field-group">
+              <label class="pinjaman-label" for="pinjamNamaProdukInput">
+                Nama Produk <span class="req">*</span>
+              </label>
+              <input type="text" id="pinjamNamaProdukInput" class="pinjaman-input" placeholder="Otomatis terisi dari Stock Update..." required>
+            </div>
+
+            <!-- 3. QTY Pinjam -->
+            <div class="pinjaman-field-group">
+              <label class="pinjaman-label" for="pinjamQtyInput">
+                QTY Pinjam <span class="req">*</span>
+              </label>
+              <div class="pinjaman-qty-row">
+                <button type="button" class="pinjaman-stepper-btn" onclick="stepPinjamQty(-1)" title="Kurang 1">−</button>
+                <input type="number" id="pinjamQtyInput" class="pinjaman-input pinjaman-qty-input" value="1" min="1" step="1" required inputmode="numeric">
+                <button type="button" class="pinjaman-stepper-btn" onclick="stepPinjamQty(1)" title="Tambah 1">+</button>
+              </div>
+            </div>
+
+            <!-- 4. Pinjam ke HUB -->
+            <div class="pinjaman-field-group">
+              <label class="pinjaman-label" for="pinjamHubSelect">
+                Pinjam ke HUB <span class="req">*</span>
+              </label>
+              <select id="pinjamHubSelect" class="pinjaman-select" onchange="handlePinjamHubChange(this.value)" required>
+                <option value="">-- Pilih HUB Tujuan --</option>
+                <option value="Hub MGR ( Manggarai )">1. Hub MGR ( Manggarai )</option>
+                <option value="Hub SAL ( Salemba)">2. Hub SAL ( Salemba)</option>
+                <option value="Hub SLP ( Slipi )">3. Hub SLP ( Slipi )</option>
+                <option value="Hub GPL ( Gudang Peluru )">4. Hub GPL ( Gudang Peluru )</option>
+                <option value="custom">5. Isi sendiri</option>
+              </select>
+
+              <div id="pinjamCustomHubContainer" class="custom-hub-container hidden">
+                <input type="text" id="pinjamCustomHubInput" class="pinjaman-input" placeholder="Ketik nama HUB atau lokasi tujuan...">
+              </div>
+            </div>
+
+            <!-- 5. PIC Peminjam -->
+            <div class="pinjaman-field-group">
+              <label class="pinjaman-label" for="pinjamPicInput">
+                Form input PIC Peminjam <span class="req">*</span>
+              </label>
+              <input type="text" id="pinjamPicInput" class="pinjaman-input" placeholder="Nama lengkap petugas peminjam..." required autocomplete="name">
+            </div>
+
+            <!-- 6. Catatan (Opsional) -->
+            <div class="pinjaman-field-group">
+              <label class="pinjaman-label" for="pinjamRemarksInput">
+                Catatan / Keterangan (Opsional)
+              </label>
+              <input type="text" id="pinjamRemarksInput" class="pinjaman-input" placeholder="Catatan tambahan / nomor referensi...">
+            </div>
+
+            <!-- Tombol Submit -->
+            <button type="submit" id="btnSubmitPinjam" class="btn-pinjaman-submit pinjam">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="22" y1="2" x2="11" y2="13"></line>
+                <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+              </svg>
+              <span>Submit Peminjaman</span>
+            </button>
+          </form>
+        </div>
+      </div>
+
+      <!-- ════════════════ TAB 2: FORM PENGEMBALIAN BARANG ════════════════ -->
+      <div id="tabContentKembali" class="pinjaman-tab-panel hidden">
+        <div class="pinjaman-form-card accent-kembali">
+          <div class="pinjaman-card-header">
+            <div class="pinjaman-badge-icon kembali">🔄</div>
+            <div>
+              <h3 class="pinjaman-card-title">Form Pengembalian Barang</h3>
+              <p class="pinjaman-card-desc">Pengembalian barang ke HUB dengan verifikasi foto &amp; SLOC</p>
+            </div>
+          </div>
+
+          <form id="formPengembalianBarang" onsubmit="submitFormKembali(event)" autocomplete="off">
+            <!-- 1. Input SKU -->
+            <div class="pinjaman-field-group">
+              <label class="pinjaman-label" for="kembaliSkuInput">
+                Nomor SKU Produk <span class="req">*</span>
+              </label>
+              <div class="pinjaman-input-wrapper">
+                <input type="text" id="kembaliSkuInput" class="pinjaman-input accent-kembali with-scan-btn font-mono"
+                  placeholder="Ketik SKU atau scan barcode..." autocomplete="off" spellcheck="false" inputmode="text">
+                <div class="pinjaman-input-action-btns">
+                  <button type="button" id="kembaliClearSkuBtn" class="pinjaman-input-clear-btn hidden" onclick="clearKembaliSku()" title="Hapus SKU">✕</button>
+                  <button type="button" class="pinjaman-scan-btn" style="border-color: rgba(16,185,129,0.35); background: rgba(16,185,129,0.15); color: #34d399;" onclick="openKembaliScanner()" title="Scan Kamera">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
+                      <circle cx="12" cy="13" r="4"></circle>
+                    </svg>
+                    <span>Scan</span>
+                  </button>
+                </div>
+              </div>
+
+              <!-- Dropdown Autocomplete SKU / Produk -->
+              <div id="kembaliSkuDropdown" class="pinjaman-autocomplete-dropdown hidden"></div>
+
+              <!-- Detail Otomatis Nama Produk & SLOC Telemetry -->
+              <div id="kembaliProductPreview" class="pinjaman-product-telemetry kembali-mode hidden">
+                <div class="pinjaman-telemetry-title" id="kembaliPreviewName">-</div>
+                <div class="pinjaman-telemetry-chips">
+                  <span class="pinjaman-chip sku">SKU: <strong id="kembaliPreviewSku">-</strong></span>
+                  <span class="pinjaman-chip sloc">📍 SLOC: <strong id="kembaliPreviewSloc">-</strong></span>
+                  <span class="pinjaman-chip stock">📊 Stock: <strong id="kembaliPreviewStock">-</strong></span>
+                </div>
+              </div>
+            </div>
+
+            <!-- 2. Nama Produk (Otomatis muncul) -->
+            <div class="pinjaman-field-group">
+              <label class="pinjaman-label" for="kembaliNamaProdukInput">
+                Nama Produk <span class="req">*</span>
+              </label>
+              <input type="text" id="kembaliNamaProdukInput" class="pinjaman-input accent-kembali" placeholder="Otomatis muncul dari SKU..." required>
+            </div>
+
+            <!-- 3. SLOC (Lokasi Rak) (Otomatis muncul) -->
+            <div class="pinjaman-field-group">
+              <label class="pinjaman-label" for="kembaliSlocInput">
+                SLOC (Lokasi Rak) <span class="req">*</span>
+              </label>
+              <input type="text" id="kembaliSlocInput" class="pinjaman-input accent-kembali font-mono" placeholder="Otomatis muncul dari data rak..." required>
+            </div>
+
+            <!-- 4. QTY -->
+            <div class="pinjaman-field-group">
+              <label class="pinjaman-label" for="kembaliQtyInput">
+                QTY <span class="req">*</span>
+              </label>
+              <div class="pinjaman-qty-row">
+                <button type="button" class="pinjaman-stepper-btn" onclick="stepKembaliQty(-1)" title="Kurang 1">−</button>
+                <input type="number" id="kembaliQtyInput" class="pinjaman-input pinjaman-qty-input accent-kembali" value="1" min="1" step="1" required inputmode="numeric">
+                <button type="button" class="pinjaman-stepper-btn" onclick="stepKembaliQty(1)" title="Tambah 1">+</button>
+              </div>
+            </div>
+
+            <!-- 5. Foto Produk yang Dikembalikan (Upload via galeri atau kamera) -->
+            <div class="pinjaman-field-group">
+              <label class="pinjaman-label">
+                Foto Produk yang Dikembalikan <span class="req">*</span> (Kamera / Galeri)
+              </label>
+
+              <!-- Hidden native file inputs for camera vs gallery -->
+              <input type="file" id="kembaliPhotoCameraInput" accept="image/*" capture="environment" class="hidden" onchange="handleKembaliPhotoSelected(event)">
+              <input type="file" id="kembaliPhotoGalleryInput" accept="image/*" class="hidden" onchange="handleKembaliPhotoSelected(event)">
+
+              <!-- Drag/Click Dropzone -->
+              <div class="pinjaman-photo-dropzone" id="kembaliPhotoDropzone">
+                <div style="font-size: 1.8rem; margin-bottom: 4px;">📸</div>
+                <div style="font-size: 0.84rem; font-weight: 600; color: #f8fafc;">Ambil Foto atau Pilih dari Galeri</div>
+                <div style="font-size: 0.72rem; color: #94a3b8; margin-top: 2px;">Format JPG/PNG, kompresi otomatis ringan</div>
+
+                <div class="pinjaman-photo-actions">
+                  <button type="button" class="btn-photo-pick camera" onclick="triggerKembaliCamera()">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>
+                    <span>Buka Kamera</span>
+                  </button>
+                  <button type="button" class="btn-photo-pick" onclick="triggerKembaliGallery()">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                    <span>Galeri Foto</span>
+                  </button>
+                </div>
+              </div>
+
+              <!-- Photo Preview Container -->
+              <div id="kembaliPhotoPreviewContainer" class="hidden">
+                <div class="pinjaman-photo-preview-wrap">
+                  <img id="kembaliPhotoPreviewImg" class="pinjaman-photo-preview-img" alt="Preview Foto Produk">
+                  <button type="button" class="pinjaman-photo-remove-btn" onclick="removeKembaliPhoto()" title="Hapus Foto">✕</button>
+                </div>
+                <div id="kembaliPhotoMetaText" style="font-size: 0.72rem; color: #34d399; margin-top: 4px; font-family: 'JetBrains Mono', monospace;"></div>
+              </div>
+            </div>
+
+            <!-- 6. PIC Pengembalian -->
+            <div class="pinjaman-field-group">
+              <label class="pinjaman-label" for="kembaliPicInput">
+                PIC Pengembalian <span class="req">*</span>
+              </label>
+              <input type="text" id="kembaliPicInput" class="pinjaman-input accent-kembali" placeholder="Nama lengkap petugas pengembalian..." required autocomplete="name">
+            </div>
+
+            <!-- 7. Kembalikan Barang ke HUB -->
+            <div class="pinjaman-field-group">
+              <label class="pinjaman-label" for="kembaliHubSelect">
+                Kembalikan Barang ke HUB <span class="req">*</span>
+              </label>
+              <select id="kembaliHubSelect" class="pinjaman-select" onchange="handleKembaliHubChange(this.value)" required>
+                <option value="">-- Pilih HUB Tujuan Pengembalian --</option>
+                <option value="Hub MGR ( Manggarai )">1. Hub MGR ( Manggarai )</option>
+                <option value="Hub SAL ( Salemba)">2. Hub SAL ( Salemba)</option>
+                <option value="Hub SLP ( Slipi )">3. Hub SLP ( Slipi )</option>
+                <option value="Hub GPL ( Gudang Peluru )">4. Hub GPL ( Gudang Peluru )</option>
+                <option value="custom">5. Isi sendiri</option>
+              </select>
+
+              <div id="kembaliCustomHubContainer" class="custom-hub-container hidden">
+                <input type="text" id="kembaliCustomHubInput" class="pinjaman-input accent-kembali" placeholder="Ketik nama HUB atau lokasi pengembalian...">
+              </div>
+            </div>
+
+            <!-- 8. Catatan / Keterangan (Opsional) -->
+            <div class="pinjaman-field-group">
+              <label class="pinjaman-label" for="kembaliRemarksInput">
+                Catatan / Kondisi Fisik Barang (Opsional)
+              </label>
+              <input type="text" id="kembaliRemarksInput" class="pinjaman-input accent-kembali" placeholder="Kondisi barang saat dikembalikan (bagus, segel utuh, dll)...">
+            </div>
+
+            <!-- Tombol Submit -->
+            <button type="submit" id="btnSubmitKembali" class="btn-pinjaman-submit kembali">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="20 6 9 17 4 12"></polyline>
+              </svg>
+              <span>Submit Pengembalian</span>
+            </button>
+          </form>
+        </div>
+      </div>
+
+      <!-- ════════════════ TAB 3: RIWAYAT TRANSAKSI ════════════════ -->
+      <div id="tabContentHistory" class="pinjaman-tab-panel hidden">
+        <!-- Search & Filter Controls -->
+        <div class="pinjaman-history-controls">
+          <input type="text" id="pinjamanHistorySearch" class="pinjaman-input pinjaman-history-search"
+            placeholder="Cari riwayat SKU, nama produk, HUB, atau PIC..." oninput="filterPinjamanHistory()" autocomplete="off">
+        </div>
+
+        <div class="pinjaman-history-filter-pills">
+          <button type="button" class="pinjaman-pill-btn active" data-filter="all" onclick="setPinjamanHistoryFilter('all', this)">Semua Transaksi</button>
+          <button type="button" class="pinjaman-pill-btn" data-filter="pinjam" onclick="setPinjamanHistoryFilter('pinjam', this)">📦 Dipinjam</button>
+          <button type="button" class="pinjaman-pill-btn" data-filter="kembali" onclick="setPinjamanHistoryFilter('kembali', this)">🔄 Dikembalikan</button>
+        </div>
+
+        <!-- History Container -->
+        <div id="pinjamanHistoryList">
+          <div class="dcc-empty-state" style="padding: 30px 10px; text-align: center;">
+            <div class="spinning" style="display: inline-block; font-size: 24px; margin-bottom: 8px;">⏳</div>
+            <div style="font-size: 0.85rem; color: #94a3b8;">Memuat riwayat transaksi dari Google Sheets...</div>
+          </div>
+        </div>
+      </div>
+
+    </div> <!-- End Pinjaman Workspace -->
+
     <!-- ── Footer ── -->
     <footer class="app-footer">
       <p>&copy; Project Star 2026</p>
@@ -2307,23 +2658,24 @@
         <h3 class="app-update-title" style="color: #4ade80;">Versi Anda Terbaru!</h3>
         <p class="app-update-subtitle" id="alreadyLatestSubtitle">Aplikasi Super App MTG sudah diperbarui</p>
         <div class="app-update-version-row">
-          <span class="app-update-badge current" id="alreadyLatestBadge">Versi Aktif: v1.2.7 (Build 23)</span>
+          <span class="app-update-badge current" id="alreadyLatestBadge">Versi Aktif: v1.3.0 (Build 26)</span>
         </div>
       </div>
       <div class="app-update-body">
         <div id="alreadyLatestLiveTitle" style="font-size: 0.88rem; color: #a7f3d0; font-weight: 600; margin-bottom: 6px; text-align: center;">
-          🚀 Pembaruan Sistem v1.2.7 Sudah Aktif (Live OTA)
+          🚀 Pembaruan Sistem v1.3.0 Sudah Aktif (Live OTA)
         </div>
         <ul class="app-update-changelog" id="alreadyLatestChangelog" style="font-size: 0.82rem; color: #cbd5e1; margin: 0 0 10px 0; padding-left: 18px; text-align: left;">
-          <li>Perbaikan pembacaan SKU ED Correction dari chart Superset &amp; barcode scanner</li>
-          <li>Perbaikan akurasi status tugas PENDING dan report live audit</li>
-          <li>Peningkatan multi-SKU paste modal dan auto-split format QR &amp; EAN-13</li>
+          <li>Menu baru: Pinjaman &amp; Pengembalian Barang MTG terintegrasi ke Dashboard STK MTG 2K26</li>
+          <li>Formulir Peminjaman Barang ke HUB (MGR, SAL, SLP, GPL, Custom) dengan auto-fill SKU &amp; Nama Produk</li>
+          <li>Formulir Pengembalian Barang dengan auto-lookup SLOC dan upload bukti foto Google Drive</li>
+          <li>Riwayat transaksi live, sinkronisasi Superset &amp; perapian backend DCC Master</li>
         </ul>
       </div>
       <div class="app-update-actions" style="flex-direction: column; gap: 8px;">
         <button type="button" class="btn-primary" style="width: 100%;" onclick="closeAppAlreadyLatestModal()">Oke, Mengerti</button>
         <button type="button" class="btn-secondary" id="alreadyLatestDownloadBtn" style="width: 100%; font-size: 0.85rem; border-color: rgba(6,214,160,0.3); color: #06d6a0;" onclick="forceDownloadLatestApk()">
-          📥 Unduh &amp; Pasang APK v1.2.7 Terbaru
+          📥 Unduh &amp; Pasang APK v1.3.0 Terbaru
         </button>
       </div>
     </div>
