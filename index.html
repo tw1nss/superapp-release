@@ -2130,13 +2130,19 @@
         </button>
       </div>
 
-      <!-- Segmented Nav Tabs -->
+      <!-- Segmented Nav Tabs (5 Flows) -->
       <nav class="pinjaman-nav">
         <button type="button" class="pinjaman-tab-btn active" id="tabPinjamBtn" onclick="switchPinjamanTab('pinjam')">
-          <span>📦 Pinjam Barang</span>
+          <span>📤 Pinjam ke Hub</span>
         </button>
         <button type="button" class="pinjaman-tab-btn kembali-tab" id="tabKembaliBtn" onclick="switchPinjamanTab('kembali')">
-          <span>🔄 Pengembalian</span>
+          <span>🔄 Kembalikan ke Hub</span>
+        </button>
+        <button type="button" class="pinjaman-tab-btn pinjemin-tab" id="tabPinjeminBtn" onclick="switchPinjamanTab('pinjemin')">
+          <span>🤝 Pinjemin ke Hub</span>
+        </button>
+        <button type="button" class="pinjaman-tab-btn terima-tab" id="tabTerimaBtn" onclick="switchPinjamanTab('terima')">
+          <span>📦 Terima Kembali</span>
         </button>
         <button type="button" class="pinjaman-tab-btn history-tab" id="tabHistoryBtn" onclick="switchPinjamanTab('history')">
           <span>📋 Riwayat</span>
@@ -2414,7 +2420,346 @@
         </div>
       </div>
 
-      <!-- ════════════════ TAB 3: RIWAYAT TRANSAKSI ════════════════ -->
+      <!-- ════════════════ TAB 3: FORM MTG PINJEMIN KE HUB LAIN ════════════════ -->
+      <div id="tabContentPinjemin" class="pinjaman-tab-panel hidden">
+        <div class="pinjaman-form-card accent-pinjemin">
+          <div class="pinjaman-card-header">
+            <div class="pinjaman-badge-icon pinjemin">🤝</div>
+            <div>
+              <h3 class="pinjaman-card-title">MTG Pinjemin ke Hub Lain</h3>
+              <p class="pinjaman-card-desc">Catat stok MTG yang dipinjamkan keluar ke HUB lain</p>
+            </div>
+          </div>
+
+          <form id="formPinjeminBarang" onsubmit="submitFormPinjemin(event)" autocomplete="off">
+            <!-- 1. Input SKU -->
+            <div class="pinjaman-field-group">
+              <label class="pinjaman-label" for="pinjeminSkuInput">
+                Nomor SKU Produk <span class="req">*</span>
+              </label>
+              <div class="pinjaman-input-wrapper">
+                <input type="text" id="pinjeminSkuInput" class="pinjaman-input with-scan-btn font-mono"
+                  placeholder="Ketik SKU atau scan barcode..." autocomplete="off" spellcheck="false" inputmode="text">
+                <div class="pinjaman-input-action-btns">
+                  <button type="button" id="pinjeminClearSkuBtn" class="pinjaman-input-clear-btn hidden" onclick="clearPinjeminSku()" title="Hapus SKU">✕</button>
+                  <button type="button" class="pinjaman-scan-btn" style="border-color: rgba(139,92,246,0.35); background: rgba(139,92,246,0.15); color: #c084fc;" onclick="openPinjeminScanner()" title="Scan Kamera">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
+                      <circle cx="12" cy="13" r="4"></circle>
+                    </svg>
+                    <span>Scan</span>
+                  </button>
+                </div>
+              </div>
+
+              <!-- Dropdown Autocomplete SKU / Produk -->
+              <div id="pinjeminSkuDropdown" class="pinjaman-autocomplete-dropdown hidden"></div>
+
+              <!-- Product Telemetry Preview -->
+              <div id="pinjeminProductPreview" class="pinjaman-product-telemetry hidden">
+                <div class="pinjaman-telemetry-title" id="pinjeminPreviewName">-</div>
+                <div class="pinjaman-telemetry-chips">
+                  <span class="pinjaman-chip sku">SKU: <strong id="pinjeminPreviewSku">-</strong></span>
+                  <span class="pinjaman-chip sloc">📍 SLOC: <strong id="pinjeminPreviewSloc">-</strong></span>
+                  <span class="pinjaman-chip stock">📊 Stock: <strong id="pinjeminPreviewStock">-</strong></span>
+                </div>
+              </div>
+            </div>
+
+            <!-- 2. Nama Produk (Otomatis terisi) -->
+            <div class="pinjaman-field-group">
+              <label class="pinjaman-label" for="pinjeminNamaProdukInput">
+                Nama Produk <span class="req">*</span>
+              </label>
+              <input type="text" id="pinjeminNamaProdukInput" class="pinjaman-input" placeholder="Otomatis terisi dari Stock Update..." required>
+            </div>
+
+            <!-- 3. SLOC / Lokasi Rak Asal Pengambilan -->
+            <div class="pinjaman-field-group">
+              <label class="pinjaman-label" for="pinjeminSlocInput">
+                SLOC (Lokasi Rak Asal) <span class="req">*</span>
+              </label>
+              <input type="text" id="pinjeminSlocInput" class="pinjaman-input font-mono" placeholder="Otomatis muncul atau ketik lokasi rak..." required>
+            </div>
+
+            <!-- 4. QTY Pinjamkan -->
+            <div class="pinjaman-field-group">
+              <label class="pinjaman-label" for="pinjeminQtyInput">
+                QTY Pinjamkan <span class="req">*</span>
+              </label>
+              <div class="pinjaman-qty-row">
+                <button type="button" class="pinjaman-stepper-btn" onclick="stepPinjeminQty(-1)" title="Kurang 1">−</button>
+                <input type="number" id="pinjeminQtyInput" class="pinjaman-input pinjaman-qty-input" value="1" min="1" step="1" required inputmode="numeric">
+                <button type="button" class="pinjaman-stepper-btn" onclick="stepPinjeminQty(1)" title="Tambah 1">+</button>
+              </div>
+            </div>
+
+            <!-- 5. Pinjamkan ke HUB Mana -->
+            <div class="pinjaman-field-group">
+              <label class="pinjaman-label" for="pinjeminHubSelect">
+                Pinjamkan ke HUB <span class="req">*</span>
+              </label>
+              <select id="pinjeminHubSelect" class="pinjaman-select" onchange="handlePinjeminHubChange(this.value)" required>
+                <option value="">-- Pilih HUB Peminjam --</option>
+                <option value="Hub MGR ( Manggarai )">1. Hub MGR ( Manggarai )</option>
+                <option value="Hub SAL ( Salemba)">2. Hub SAL ( Salemba)</option>
+                <option value="Hub SLP ( Slipi )">3. Hub SLP ( Slipi )</option>
+                <option value="Hub GPL ( Gudang Peluru )">4. Hub GPL ( Gudang Peluru )</option>
+                <option value="custom">5. Isi sendiri</option>
+              </select>
+
+              <div id="pinjeminCustomHubContainer" class="custom-hub-container hidden">
+                <input type="text" id="pinjeminCustomHubInput" class="pinjaman-input" placeholder="Ketik nama HUB atau lokasi peminjam...">
+              </div>
+            </div>
+
+            <!-- 6. PIC Petugas MTG yang Mengeluarkan Barang -->
+            <div class="pinjaman-field-group">
+              <label class="pinjaman-label" for="pinjeminPicInput">
+                PIC Petugas MTG (Pemberi Pinjaman) <span class="req">*</span>
+              </label>
+              <input type="text" id="pinjeminPicInput" class="pinjaman-input" placeholder="Nama lengkap petugas MTG..." required autocomplete="name">
+            </div>
+
+            <!-- 7. PIC / Driver HUB Peminjam -->
+            <div class="pinjaman-field-group">
+              <label class="pinjaman-label" for="pinjeminDriverInput">
+                PIC / Driver HUB Peminjam (Penerima Barang)
+              </label>
+              <input type="text" id="pinjeminDriverInput" class="pinjaman-input" placeholder="Nama driver / PIC HUB peminjam...">
+            </div>
+
+            <!-- 8. Foto Bukti Serah Terima (Opsional) -->
+            <div class="pinjaman-field-group">
+              <label class="pinjaman-label">
+                Foto Bukti Serah Terima (Opsional)
+              </label>
+              <input type="file" id="pinjeminPhotoCameraInput" accept="image/*" capture="environment" class="hidden" onchange="handlePinjeminPhotoSelected(event)">
+              <input type="file" id="pinjeminPhotoGalleryInput" accept="image/*" class="hidden" onchange="handlePinjeminPhotoSelected(event)">
+
+              <div class="pinjaman-photo-dropzone" id="pinjeminPhotoDropzone">
+                <div style="font-size: 1.8rem; margin-bottom: 4px;">🤝</div>
+                <div style="font-size: 0.84rem; font-weight: 600; color: #f8fafc;">Foto Bukti Serah Terima Barang</div>
+                <div style="font-size: 0.72rem; color: #94a3b8; margin-top: 2px;">Format JPG/PNG, kompresi otomatis ringan</div>
+
+                <div class="pinjaman-photo-actions">
+                  <button type="button" class="btn-photo-pick camera" style="background: rgba(139,92,246,0.15); border-color: rgba(139,92,246,0.35); color: #c084fc;" onclick="triggerPinjeminCamera()">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>
+                    <span>Buka Kamera</span>
+                  </button>
+                  <button type="button" class="btn-photo-pick" onclick="triggerPinjeminGallery()">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                    <span>Galeri Foto</span>
+                  </button>
+                </div>
+              </div>
+
+              <div id="pinjeminPhotoPreviewContainer" class="hidden">
+                <div class="pinjaman-photo-preview-wrap" style="border-color: rgba(139,92,246,0.4);">
+                  <img id="pinjeminPhotoPreviewImg" class="pinjaman-photo-preview-img" alt="Preview Foto Bukti">
+                  <button type="button" class="pinjaman-photo-remove-btn" onclick="removePinjeminPhoto()" title="Hapus Foto">✕</button>
+                </div>
+                <div id="pinjeminPhotoMetaText" style="font-size: 0.72rem; color: #c084fc; margin-top: 4px; font-family: 'JetBrains Mono', monospace;"></div>
+              </div>
+            </div>
+
+            <!-- 9. Catatan -->
+            <div class="pinjaman-field-group">
+              <label class="pinjaman-label" for="pinjeminRemarksInput">
+                Catatan / Keterangan
+              </label>
+              <input type="text" id="pinjeminRemarksInput" class="pinjaman-input" placeholder="Alasan peminjaman / nomor resi...">
+            </div>
+
+            <!-- Tombol Submit -->
+            <button type="submit" id="btnSubmitPinjemin" class="btn-pinjaman-submit pinjemin">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                <circle cx="8.5" cy="7" r="4"></circle>
+                <line x1="20" y1="8" x2="20" y2="14"></line>
+                <line x1="23" y1="11" x2="17" y2="11"></line>
+              </svg>
+              <span>Submit MTG Pinjemin</span>
+            </button>
+          </form>
+        </div>
+      </div>
+
+      <!-- ════════════════ TAB 4: FORM MTG TERIMA PENGEMBALIAN DARI HUB LAIN ════════════════ -->
+      <div id="tabContentTerima" class="pinjaman-tab-panel hidden">
+        <div class="pinjaman-form-card accent-terima">
+          <div class="pinjaman-card-header">
+            <div class="pinjaman-badge-icon terima">📦</div>
+            <div>
+              <h3 class="pinjaman-card-title">MTG Terima Pengembalian</h3>
+              <p class="pinjaman-card-desc">Terima kembali barang MTG yang dipinjamkan ke HUB luar</p>
+            </div>
+          </div>
+
+          <form id="formTerimaPengembalian" onsubmit="submitFormTerima(event)" autocomplete="off">
+            <!-- 1. Input SKU -->
+            <div class="pinjaman-field-group">
+              <label class="pinjaman-label" for="terimaSkuInput">
+                Nomor SKU Produk <span class="req">*</span>
+              </label>
+              <div class="pinjaman-input-wrapper">
+                <input type="text" id="terimaSkuInput" class="pinjaman-input with-scan-btn font-mono"
+                  placeholder="Ketik SKU atau scan barcode..." autocomplete="off" spellcheck="false" inputmode="text">
+                <div class="pinjaman-input-action-btns">
+                  <button type="button" id="terimaClearSkuBtn" class="pinjaman-input-clear-btn hidden" onclick="clearTerimaSku()" title="Hapus SKU">✕</button>
+                  <button type="button" class="pinjaman-scan-btn" style="border-color: rgba(245,158,11,0.35); background: rgba(245,158,11,0.15); color: #fbbf24;" onclick="openTerimaScanner()" title="Scan Kamera">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
+                      <circle cx="12" cy="13" r="4"></circle>
+                    </svg>
+                    <span>Scan</span>
+                  </button>
+                </div>
+              </div>
+
+              <!-- Dropdown Autocomplete SKU / Produk -->
+              <div id="terimaSkuDropdown" class="pinjaman-autocomplete-dropdown hidden"></div>
+
+              <!-- Product Telemetry Preview -->
+              <div id="terimaProductPreview" class="pinjaman-product-telemetry hidden">
+                <div class="pinjaman-telemetry-title" id="terimaPreviewName">-</div>
+                <div class="pinjaman-telemetry-chips">
+                  <span class="pinjaman-chip sku">SKU: <strong id="terimaPreviewSku">-</strong></span>
+                  <span class="pinjaman-chip sloc">📍 SLOC: <strong id="terimaPreviewSloc">-</strong></span>
+                  <span class="pinjaman-chip stock">📊 Stock: <strong id="terimaPreviewStock">-</strong></span>
+                </div>
+              </div>
+            </div>
+
+            <!-- 2. Nama Produk (Otomatis terisi) -->
+            <div class="pinjaman-field-group">
+              <label class="pinjaman-label" for="terimaNamaProdukInput">
+                Nama Produk <span class="req">*</span>
+              </label>
+              <input type="text" id="terimaNamaProdukInput" class="pinjaman-input" placeholder="Otomatis muncul dari SKU..." required>
+            </div>
+
+            <!-- 3. SLOC Penempatan Rak (Simpan kembali di rak mana) -->
+            <div class="pinjaman-field-group">
+              <label class="pinjaman-label" for="terimaSlocInput">
+                SLOC (Lokasi Rak Simpan) <span class="req">*</span>
+              </label>
+              <input type="text" id="terimaSlocInput" class="pinjaman-input font-mono" placeholder="Otomatis muncul atau tentukan rak simpan..." required>
+            </div>
+
+            <!-- 4. QTY Diterima Kembali -->
+            <div class="pinjaman-field-group">
+              <label class="pinjaman-label" for="terimaQtyInput">
+                QTY Diterima Kembali <span class="req">*</span>
+              </label>
+              <div class="pinjaman-qty-row">
+                <button type="button" class="pinjaman-stepper-btn" onclick="stepTerimaQty(-1)" title="Kurang 1">−</button>
+                <input type="number" id="terimaQtyInput" class="pinjaman-input pinjaman-qty-input" value="1" min="1" step="1" required inputmode="numeric">
+                <button type="button" class="pinjaman-stepper-btn" onclick="stepTerimaQty(1)" title="Tambah 1">+</button>
+              </div>
+            </div>
+
+            <!-- 5. Diterima Dari HUB -->
+            <div class="pinjaman-field-group">
+              <label class="pinjaman-label" for="terimaHubSelect">
+                Diterima dari HUB <span class="req">*</span>
+              </label>
+              <select id="terimaHubSelect" class="pinjaman-select" onchange="handleTerimaHubChange(this.value)" required>
+                <option value="">-- Pilih HUB Asal Pengembalian --</option>
+                <option value="Hub MGR ( Manggarai )">1. Hub MGR ( Manggarai )</option>
+                <option value="Hub SAL ( Salemba)">2. Hub SAL ( Salemba)</option>
+                <option value="Hub SLP ( Slipi )">3. Hub SLP ( Slipi )</option>
+                <option value="Hub GPL ( Gudang Peluru )">4. Hub GPL ( Gudang Peluru )</option>
+                <option value="custom">5. Isi sendiri</option>
+              </select>
+
+              <div id="terimaCustomHubContainer" class="custom-hub-container hidden">
+                <input type="text" id="terimaCustomHubInput" class="pinjaman-input" placeholder="Ketik nama HUB pengembali...">
+              </div>
+            </div>
+
+            <!-- 6. Kondisi Barang Saat Diterima -->
+            <div class="pinjaman-field-group">
+              <label class="pinjaman-label" for="terimaKondisiSelect">
+                Kondisi Fisik Barang <span class="req">*</span>
+              </label>
+              <select id="terimaKondisiSelect" class="pinjaman-select" required>
+                <option value="Good">✅ Good (Kondisi Bagus & Utuh)</option>
+                <option value="Bad">⚠️ Bad / Rusak (Kemasan / Produk Cacat)</option>
+                <option value="Reject">❌ Reject / ED (Kadaluarsa / Tidak Layak)</option>
+              </select>
+            </div>
+
+            <!-- 7. Foto Produk / Bukti Terima (Kamera / Galeri) -->
+            <div class="pinjaman-field-group">
+              <label class="pinjaman-label">
+                Foto Bukti Barang Diterima (Kamera / Galeri)
+              </label>
+              <input type="file" id="terimaPhotoCameraInput" accept="image/*" capture="environment" class="hidden" onchange="handleTerimaPhotoSelected(event)">
+              <input type="file" id="terimaPhotoGalleryInput" accept="image/*" class="hidden" onchange="handleTerimaPhotoSelected(event)">
+
+              <div class="pinjaman-photo-dropzone" id="terimaPhotoDropzone">
+                <div style="font-size: 1.8rem; margin-bottom: 4px;">📸</div>
+                <div style="font-size: 0.84rem; font-weight: 600; color: #f8fafc;">Foto Fisik Barang yang Diterima</div>
+                <div style="font-size: 0.72rem; color: #94a3b8; margin-top: 2px;">Format JPG/PNG, kompresi otomatis ringan</div>
+
+                <div class="pinjaman-photo-actions">
+                  <button type="button" class="btn-photo-pick camera" style="background: rgba(245,158,11,0.15); border-color: rgba(245,158,11,0.35); color: #fbbf24;" onclick="triggerTerimaCamera()">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>
+                    <span>Buka Kamera</span>
+                  </button>
+                  <button type="button" class="btn-photo-pick" onclick="triggerTerimaGallery()">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                    <span>Galeri Foto</span>
+                  </button>
+                </div>
+              </div>
+
+              <div id="terimaPhotoPreviewContainer" class="hidden">
+                <div class="pinjaman-photo-preview-wrap" style="border-color: rgba(245,158,11,0.4);">
+                  <img id="terimaPhotoPreviewImg" class="pinjaman-photo-preview-img" alt="Preview Foto Terima">
+                  <button type="button" class="pinjaman-photo-remove-btn" onclick="removeTerimaPhoto()" title="Hapus Foto">✕</button>
+                </div>
+                <div id="terimaPhotoMetaText" style="font-size: 0.72rem; color: #fbbf24; margin-top: 4px; font-family: 'JetBrains Mono', monospace;"></div>
+              </div>
+            </div>
+
+            <!-- 8. PIC Petugas MTG Penerima -->
+            <div class="pinjaman-field-group">
+              <label class="pinjaman-label" for="terimaPicInput">
+                PIC Petugas MTG (Penerima) <span class="req">*</span>
+              </label>
+              <input type="text" id="terimaPicInput" class="pinjaman-input" placeholder="Nama lengkap petugas MTG penerima..." required autocomplete="name">
+            </div>
+
+            <!-- 9. PIC / Driver Pengantar -->
+            <div class="pinjaman-field-group">
+              <label class="pinjaman-label" for="terimaDriverInput">
+                PIC / Driver HUB Pengantar
+              </label>
+              <input type="text" id="terimaDriverInput" class="pinjaman-input" placeholder="Nama driver / kurir yang mengantar...">
+            </div>
+
+            <!-- 10. Catatan -->
+            <div class="pinjaman-field-group">
+              <label class="pinjaman-label" for="terimaRemarksInput">
+                Catatan Tambahan
+              </label>
+              <input type="text" id="terimaRemarksInput" class="pinjaman-input" placeholder="Catatan kondisi produk / informasi lain...">
+            </div>
+
+            <!-- Tombol Submit -->
+            <button type="submit" id="btnSubmitTerima" class="btn-pinjaman-submit terima">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="20 6 9 17 4 12"></polyline>
+              </svg>
+              <span>Submit Terima Pengembalian</span>
+            </button>
+          </form>
+        </div>
+      </div>
+
+      <!-- ════════════════ TAB 5: RIWAYAT TRANSAKSI ════════════════ -->
       <div id="tabContentHistory" class="pinjaman-tab-panel hidden">
         <!-- Search & Filter Controls -->
         <div class="pinjaman-history-controls">
@@ -2424,8 +2769,10 @@
 
         <div class="pinjaman-history-filter-pills">
           <button type="button" class="pinjaman-pill-btn active" data-filter="all" onclick="setPinjamanHistoryFilter('all', this)">Semua Transaksi</button>
-          <button type="button" class="pinjaman-pill-btn" data-filter="pinjam" onclick="setPinjamanHistoryFilter('pinjam', this)">📦 Dipinjam</button>
-          <button type="button" class="pinjaman-pill-btn" data-filter="kembali" onclick="setPinjamanHistoryFilter('kembali', this)">🔄 Dikembalikan</button>
+          <button type="button" class="pinjaman-pill-btn" data-filter="pinjam" onclick="setPinjamanHistoryFilter('pinjam', this)">📤 MTG Pinjam</button>
+          <button type="button" class="pinjaman-pill-btn" data-filter="kembali" onclick="setPinjamanHistoryFilter('kembali', this)">🔄 MTG Kembalikan</button>
+          <button type="button" class="pinjaman-pill-btn" data-filter="pinjemin" onclick="setPinjamanHistoryFilter('pinjemin', this)">🤝 MTG Pinjemin</button>
+          <button type="button" class="pinjaman-pill-btn" data-filter="terima" onclick="setPinjamanHistoryFilter('terima', this)">📦 Terima Kembali</button>
         </div>
 
         <!-- History Container -->

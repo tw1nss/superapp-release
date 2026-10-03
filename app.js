@@ -12716,6 +12716,8 @@
 
   let currentPinjamanTab = 'pinjam';
   let kembaliPhotoBase64 = '';
+  let pinjeminPhotoBase64 = '';
+  let terimaPhotoBase64 = '';
   let pinjamanHistoryData = [];
   let pinjamanHistoryFilter = 'all';
   let stockUpdateCacheMap = new Map();
@@ -12867,6 +12869,8 @@
     // Restore PIC peminjam & pengembalian terakhir
     const lastPicPinjam = localStorage.getItem('SUPERAPP_LAST_PIC_PINJAM') || '';
     const lastPicKembali = localStorage.getItem('SUPERAPP_LAST_PIC_KEMBALI') || '';
+    const lastPicPinjemin = localStorage.getItem('SUPERAPP_LAST_PIC_PINJEMIN') || '';
+    const lastPicTerima = localStorage.getItem('SUPERAPP_LAST_PIC_TERIMA') || '';
 
     const picPinjamInput = document.getElementById('pinjamPicInput');
     if (picPinjamInput && !picPinjamInput.value && lastPicPinjam) {
@@ -12878,28 +12882,44 @@
       picKembaliInput.value = lastPicKembali;
     }
 
-    // Pasang input listeners untuk autocomplete
+    const picPinjeminInput = document.getElementById('pinjeminPicInput');
+    if (picPinjeminInput && !picPinjeminInput.value && (lastPicPinjemin || lastPicPinjam)) {
+      picPinjeminInput.value = lastPicPinjemin || lastPicPinjam;
+    }
+
+    const picTerimaInput = document.getElementById('terimaPicInput');
+    if (picTerimaInput && !picTerimaInput.value && (lastPicTerima || lastPicKembali)) {
+      picTerimaInput.value = lastPicTerima || lastPicKembali;
+    }
+
+    // Pasang input listeners untuk autocomplete 4 form
     initPinjamSkuAutocomplete();
     initKembaliSkuAutocomplete();
+    initPinjeminSkuAutocomplete();
+    initTerimaSkuAutocomplete();
 
     // Default ke tab pinjam
     switchPinjamanTab(currentPinjamanTab || 'pinjam');
   };
 
-  // ── 5. Tab Switcher ──
+  // ── 5. Tab Switcher (5 Flows) ──
   window.switchPinjamanTab = function (tabName) {
     currentPinjamanTab = tabName;
 
     const btnPinjam = document.getElementById('tabPinjamBtn');
     const btnKembali = document.getElementById('tabKembaliBtn');
+    const btnPinjemin = document.getElementById('tabPinjeminBtn');
+    const btnTerima = document.getElementById('tabTerimaBtn');
     const btnHistory = document.getElementById('tabHistoryBtn');
 
     const panelPinjam = document.getElementById('tabContentPinjam');
     const panelKembali = document.getElementById('tabContentKembali');
+    const panelPinjemin = document.getElementById('tabContentPinjemin');
+    const panelTerima = document.getElementById('tabContentTerima');
     const panelHistory = document.getElementById('tabContentHistory');
 
-    [btnPinjam, btnKembali, btnHistory].forEach(b => b && b.classList.remove('active'));
-    [panelPinjam, panelKembali, panelHistory].forEach(p => p && p.classList.add('hidden'));
+    [btnPinjam, btnKembali, btnPinjemin, btnTerima, btnHistory].forEach(b => b && b.classList.remove('active'));
+    [panelPinjam, panelKembali, panelPinjemin, panelTerima, panelHistory].forEach(p => p && p.classList.add('hidden'));
 
     if (tabName === 'pinjam') {
       if (btnPinjam) btnPinjam.classList.add('active');
@@ -12907,6 +12927,12 @@
     } else if (tabName === 'kembali') {
       if (btnKembali) btnKembali.classList.add('active');
       if (panelKembali) panelKembali.classList.remove('hidden');
+    } else if (tabName === 'pinjemin') {
+      if (btnPinjemin) btnPinjemin.classList.add('active');
+      if (panelPinjemin) panelPinjemin.classList.remove('hidden');
+    } else if (tabName === 'terima') {
+      if (btnTerima) btnTerima.classList.add('active');
+      if (panelTerima) panelTerima.classList.remove('hidden');
     } else if (tabName === 'history') {
       if (btnHistory) btnHistory.classList.add('active');
       if (panelHistory) panelHistory.classList.remove('hidden');
@@ -13269,6 +13295,438 @@
     if (dropzone) dropzone.classList.remove('hidden');
   };
 
+  // ── 8B. Setup Autocomplete & Helper Form MTG Pinjemin ke Hub Lain ──
+  function initPinjeminSkuAutocomplete() {
+    const input = document.getElementById('pinjeminSkuInput');
+    const dropdown = document.getElementById('pinjeminSkuDropdown');
+    const clearBtn = document.getElementById('pinjeminClearSkuBtn');
+    if (!input || !dropdown) return;
+
+    input.oninput = function () {
+      const val = input.value.trim();
+      if (clearBtn) clearBtn.classList.toggle('hidden', !val);
+
+      clearTimeout(pinjamanAutocompleteTimer);
+      if (val.length < 2) {
+        dropdown.classList.add('hidden');
+        dropdown.innerHTML = '';
+        return;
+      }
+
+      pinjamanAutocompleteTimer = setTimeout(() => {
+        const matches = searchSkuCandidates(val);
+        if (matches.length === 0) {
+          dropdown.classList.add('hidden');
+          dropdown.innerHTML = '';
+          return;
+        }
+
+        dropdown.innerHTML = matches.map(m => `
+          <div class="pinjaman-autocomplete-item" onclick="selectPinjeminSkuCandidate('${encodeURIComponent(JSON.stringify(m))}')">
+            <div class="pinjaman-ac-name">${escapeHtml(m.productName)}</div>
+            <div class="pinjaman-ac-meta">
+              <span>SKU: ${escapeHtml(m.sku)}</span>
+              <span>•</span>
+              <span>📍 SLOC: ${escapeHtml(m.sloc)}</span>
+            </div>
+          </div>
+        `).join('');
+        dropdown.classList.remove('hidden');
+      }, 140);
+    };
+
+    input.onchange = function () {
+      applyPinjeminSku(input.value.trim());
+    };
+
+    document.addEventListener('click', (e) => {
+      if (!input.contains(e.target) && !dropdown.contains(e.target)) {
+        dropdown.classList.add('hidden');
+      }
+    });
+  }
+
+  window.selectPinjeminSkuCandidate = function (encodedItem) {
+    try {
+      const item = JSON.parse(decodeURIComponent(encodedItem));
+      const input = document.getElementById('pinjeminSkuInput');
+      const dropdown = document.getElementById('pinjeminSkuDropdown');
+      if (input) input.value = item.sku;
+      if (dropdown) dropdown.classList.add('hidden');
+      applyPinjeminSku(item.sku, item);
+    } catch (e) {
+      console.warn('selectPinjeminSkuCandidate error:', e);
+    }
+  };
+
+  function applyPinjeminSku(sku, preloadedItem = null) {
+    if (!sku) return;
+    const item = preloadedItem || lookupSkuDetails(sku);
+    const clearBtn = document.getElementById('pinjeminClearSkuBtn');
+    if (clearBtn) clearBtn.classList.remove('hidden');
+
+    const nameInput = document.getElementById('pinjeminNamaProdukInput');
+    const slocInput = document.getElementById('pinjeminSlocInput');
+    const previewBox = document.getElementById('pinjeminProductPreview');
+    const previewName = document.getElementById('pinjeminPreviewName');
+    const previewSku = document.getElementById('pinjeminPreviewSku');
+    const previewSloc = document.getElementById('pinjeminPreviewSloc');
+    const previewStock = document.getElementById('pinjeminPreviewStock');
+
+    if (item) {
+      if (nameInput) nameInput.value = item.productName || '';
+      if (slocInput) slocInput.value = item.sloc || '';
+      if (previewBox) previewBox.classList.remove('hidden');
+      if (previewName) previewName.textContent = item.productName || '-';
+      if (previewSku) previewSku.textContent = item.sku || sku;
+      if (previewSloc) previewSloc.textContent = item.sloc || 'Belum Ada Rak';
+      if (previewStock) previewStock.textContent = item.qty || '0';
+    } else {
+      if (previewBox) previewBox.classList.add('hidden');
+    }
+  }
+
+  window.clearPinjeminSku = function () {
+    const input = document.getElementById('pinjeminSkuInput');
+    const nameInput = document.getElementById('pinjeminNamaProdukInput');
+    const slocInput = document.getElementById('pinjeminSlocInput');
+    const previewBox = document.getElementById('pinjeminProductPreview');
+    const clearBtn = document.getElementById('pinjeminClearSkuBtn');
+    const dropdown = document.getElementById('pinjeminSkuDropdown');
+
+    if (input) input.value = '';
+    if (nameInput) nameInput.value = '';
+    if (slocInput) slocInput.value = '';
+    if (previewBox) previewBox.classList.add('hidden');
+    if (clearBtn) clearBtn.classList.add('hidden');
+    if (dropdown) dropdown.classList.add('hidden');
+    if (input) input.focus();
+  };
+
+  window.openPinjeminScanner = function () {
+    if (typeof openUniversalScanner === 'function') {
+      openUniversalScanner((decodedText) => {
+        const sku = String(decodedText || '').trim();
+        const input = document.getElementById('pinjeminSkuInput');
+        if (input) {
+          input.value = sku;
+          applyPinjeminSku(sku);
+        }
+      });
+    }
+  };
+
+  window.stepPinjeminQty = function (delta) {
+    const qtyInput = document.getElementById('pinjeminQtyInput');
+    if (!qtyInput) return;
+    const current = parseInt(qtyInput.value, 10) || 1;
+    qtyInput.value = Math.max(1, current + delta);
+  };
+
+  window.handlePinjeminHubChange = function (val) {
+    const customContainer = document.getElementById('pinjeminCustomHubContainer');
+    const customInput = document.getElementById('pinjeminCustomHubInput');
+    if (val === 'custom') {
+      if (customContainer) customContainer.classList.remove('hidden');
+      if (customInput) customInput.focus();
+    } else {
+      if (customContainer) customContainer.classList.add('hidden');
+      if (customInput) customInput.value = '';
+    }
+  };
+
+  window.triggerPinjeminCamera = function () {
+    const input = document.getElementById('pinjeminPhotoCameraInput');
+    if (input) input.click();
+  };
+
+  window.triggerPinjeminGallery = function () {
+    const input = document.getElementById('pinjeminPhotoGalleryInput');
+    if (input) input.click();
+  };
+
+  window.handlePinjeminPhotoSelected = function (event) {
+    const file = event.target.files && event.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = function (e) {
+      const img = new Image();
+      img.onload = function () {
+        const canvas = document.createElement('canvas');
+        const MAX_DIM = 800;
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > MAX_DIM) {
+            height *= MAX_DIM / width;
+            width = MAX_DIM;
+          }
+        } else {
+          if (height > MAX_DIM) {
+            width *= MAX_DIM / height;
+            height = MAX_DIM;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, width, height);
+
+        pinjeminPhotoBase64 = canvas.toDataURL('image/jpeg', 0.70);
+        const approxKb = Math.round((pinjeminPhotoBase64.length * 3 / 4) / 1024);
+
+        const dropzone = document.getElementById('pinjeminPhotoDropzone');
+        const previewWrap = document.getElementById('pinjeminPhotoPreviewContainer');
+        const previewImg = document.getElementById('pinjeminPhotoPreviewImg');
+        const metaText = document.getElementById('pinjeminPhotoMetaText');
+
+        if (previewImg) previewImg.src = pinjeminPhotoBase64;
+        if (metaText) metaText.textContent = `✅ Foto bukti siap (${approxKb} KB)`;
+        if (dropzone) dropzone.classList.add('hidden');
+        if (previewWrap) previewWrap.classList.remove('hidden');
+
+        if (typeof playSuccessBeep === 'function') playSuccessBeep();
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  };
+
+  window.removePinjeminPhoto = function () {
+    pinjeminPhotoBase64 = '';
+    const camInput = document.getElementById('pinjeminPhotoCameraInput');
+    const galInput = document.getElementById('pinjeminPhotoGalleryInput');
+    if (camInput) camInput.value = '';
+    if (galInput) galInput.value = '';
+
+    const dropzone = document.getElementById('pinjeminPhotoDropzone');
+    const previewWrap = document.getElementById('pinjeminPhotoPreviewContainer');
+    const previewImg = document.getElementById('pinjeminPhotoPreviewImg');
+
+    if (previewImg) previewImg.src = '';
+    if (previewWrap) previewWrap.classList.add('hidden');
+    if (dropzone) dropzone.classList.remove('hidden');
+  };
+
+  // ── 8C. Setup Autocomplete & Helper Form MTG Terima Pengembalian ──
+  function initTerimaSkuAutocomplete() {
+    const input = document.getElementById('terimaSkuInput');
+    const dropdown = document.getElementById('terimaSkuDropdown');
+    const clearBtn = document.getElementById('terimaClearSkuBtn');
+    if (!input || !dropdown) return;
+
+    input.oninput = function () {
+      const val = input.value.trim();
+      if (clearBtn) clearBtn.classList.toggle('hidden', !val);
+
+      clearTimeout(pinjamanAutocompleteTimer);
+      if (val.length < 2) {
+        dropdown.classList.add('hidden');
+        dropdown.innerHTML = '';
+        return;
+      }
+
+      pinjamanAutocompleteTimer = setTimeout(() => {
+        const matches = searchSkuCandidates(val);
+        if (matches.length === 0) {
+          dropdown.classList.add('hidden');
+          dropdown.innerHTML = '';
+          return;
+        }
+
+        dropdown.innerHTML = matches.map(m => `
+          <div class="pinjaman-autocomplete-item" onclick="selectTerimaSkuCandidate('${encodeURIComponent(JSON.stringify(m))}')">
+            <div class="pinjaman-ac-name">${escapeHtml(m.productName)}</div>
+            <div class="pinjaman-ac-meta">
+              <span>SKU: ${escapeHtml(m.sku)}</span>
+              <span>•</span>
+              <span>📍 SLOC: ${escapeHtml(m.sloc)}</span>
+            </div>
+          </div>
+        `).join('');
+        dropdown.classList.remove('hidden');
+      }, 140);
+    };
+
+    input.onchange = function () {
+      applyTerimaSku(input.value.trim());
+    };
+
+    document.addEventListener('click', (e) => {
+      if (!input.contains(e.target) && !dropdown.contains(e.target)) {
+        dropdown.classList.add('hidden');
+      }
+    });
+  }
+
+  window.selectTerimaSkuCandidate = function (encodedItem) {
+    try {
+      const item = JSON.parse(decodeURIComponent(encodedItem));
+      const input = document.getElementById('terimaSkuInput');
+      const dropdown = document.getElementById('terimaSkuDropdown');
+      if (input) input.value = item.sku;
+      if (dropdown) dropdown.classList.add('hidden');
+      applyTerimaSku(item.sku, item);
+    } catch (e) {
+      console.warn('selectTerimaSkuCandidate error:', e);
+    }
+  };
+
+  function applyTerimaSku(sku, preloadedItem = null) {
+    if (!sku) return;
+    const item = preloadedItem || lookupSkuDetails(sku);
+    const clearBtn = document.getElementById('terimaClearSkuBtn');
+    if (clearBtn) clearBtn.classList.remove('hidden');
+
+    const nameInput = document.getElementById('terimaNamaProdukInput');
+    const slocInput = document.getElementById('terimaSlocInput');
+    const previewBox = document.getElementById('terimaProductPreview');
+    const previewName = document.getElementById('terimaPreviewName');
+    const previewSku = document.getElementById('terimaPreviewSku');
+    const previewSloc = document.getElementById('terimaPreviewSloc');
+    const previewStock = document.getElementById('terimaPreviewStock');
+
+    if (item) {
+      if (nameInput) nameInput.value = item.productName || '';
+      if (slocInput) slocInput.value = item.sloc || '';
+      if (previewBox) previewBox.classList.remove('hidden');
+      if (previewName) previewName.textContent = item.productName || '-';
+      if (previewSku) previewSku.textContent = item.sku || sku;
+      if (previewSloc) previewSloc.textContent = item.sloc || 'Belum Ada Rak';
+      if (previewStock) previewStock.textContent = item.qty || '0';
+    } else {
+      if (previewBox) previewBox.classList.add('hidden');
+    }
+  }
+
+  window.clearTerimaSku = function () {
+    const input = document.getElementById('terimaSkuInput');
+    const nameInput = document.getElementById('terimaNamaProdukInput');
+    const slocInput = document.getElementById('terimaSlocInput');
+    const previewBox = document.getElementById('terimaProductPreview');
+    const clearBtn = document.getElementById('terimaClearSkuBtn');
+    const dropdown = document.getElementById('terimaSkuDropdown');
+
+    if (input) input.value = '';
+    if (nameInput) nameInput.value = '';
+    if (slocInput) slocInput.value = '';
+    if (previewBox) previewBox.classList.add('hidden');
+    if (clearBtn) clearBtn.classList.add('hidden');
+    if (dropdown) dropdown.classList.add('hidden');
+    if (input) input.focus();
+  };
+
+  window.openTerimaScanner = function () {
+    if (typeof openUniversalScanner === 'function') {
+      openUniversalScanner((decodedText) => {
+        const sku = String(decodedText || '').trim();
+        const input = document.getElementById('terimaSkuInput');
+        if (input) {
+          input.value = sku;
+          applyTerimaSku(sku);
+        }
+      });
+    }
+  };
+
+  window.stepTerimaQty = function (delta) {
+    const qtyInput = document.getElementById('terimaQtyInput');
+    if (!qtyInput) return;
+    const current = parseInt(qtyInput.value, 10) || 1;
+    qtyInput.value = Math.max(1, current + delta);
+  };
+
+  window.handleTerimaHubChange = function (val) {
+    const customContainer = document.getElementById('terimaCustomHubContainer');
+    const customInput = document.getElementById('terimaCustomHubInput');
+    if (val === 'custom') {
+      if (customContainer) customContainer.classList.remove('hidden');
+      if (customInput) customInput.focus();
+    } else {
+      if (customContainer) customContainer.classList.add('hidden');
+      if (customInput) customInput.value = '';
+    }
+  };
+
+  window.triggerTerimaCamera = function () {
+    const input = document.getElementById('terimaPhotoCameraInput');
+    if (input) input.click();
+  };
+
+  window.triggerTerimaGallery = function () {
+    const input = document.getElementById('terimaPhotoGalleryInput');
+    if (input) input.click();
+  };
+
+  window.handleTerimaPhotoSelected = function (event) {
+    const file = event.target.files && event.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = function (e) {
+      const img = new Image();
+      img.onload = function () {
+        const canvas = document.createElement('canvas');
+        const MAX_DIM = 800;
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > MAX_DIM) {
+            height *= MAX_DIM / width;
+            width = MAX_DIM;
+          }
+        } else {
+          if (height > MAX_DIM) {
+            width *= MAX_DIM / height;
+            height = MAX_DIM;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, width, height);
+
+        terimaPhotoBase64 = canvas.toDataURL('image/jpeg', 0.70);
+        const approxKb = Math.round((terimaPhotoBase64.length * 3 / 4) / 1024);
+
+        const dropzone = document.getElementById('terimaPhotoDropzone');
+        const previewWrap = document.getElementById('terimaPhotoPreviewContainer');
+        const previewImg = document.getElementById('terimaPhotoPreviewImg');
+        const metaText = document.getElementById('terimaPhotoMetaText');
+
+        if (previewImg) previewImg.src = terimaPhotoBase64;
+        if (metaText) metaText.textContent = `✅ Foto barang siap (${approxKb} KB)`;
+        if (dropzone) dropzone.classList.add('hidden');
+        if (previewWrap) previewWrap.classList.remove('hidden');
+
+        if (typeof playSuccessBeep === 'function') playSuccessBeep();
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  };
+
+  window.removeTerimaPhoto = function () {
+    terimaPhotoBase64 = '';
+    const camInput = document.getElementById('terimaPhotoCameraInput');
+    const galInput = document.getElementById('terimaPhotoGalleryInput');
+    if (camInput) camInput.value = '';
+    if (galInput) galInput.value = '';
+
+    const dropzone = document.getElementById('terimaPhotoDropzone');
+    const previewWrap = document.getElementById('terimaPhotoPreviewContainer');
+    const previewImg = document.getElementById('terimaPhotoPreviewImg');
+
+    if (previewImg) previewImg.src = '';
+    if (previewWrap) previewWrap.classList.add('hidden');
+    if (dropzone) dropzone.classList.remove('hidden');
+  };
+
   // ── 9. Submit Form Peminjaman ──
   window.submitFormPinjam = async function (e) {
     if (e && e.preventDefault) e.preventDefault();
@@ -13515,7 +13973,267 @@
     }
   };
 
-  // ── 11. Fetch & Render Riwayat Transaksi ──
+  // ── 10B. Submit Form MTG Pinjemin ke Hub Lain ──
+  window.submitFormPinjemin = async function (e) {
+    if (e && e.preventDefault) e.preventDefault();
+
+    const skuInput = document.getElementById('pinjeminSkuInput');
+    const nameInput = document.getElementById('pinjeminNamaProdukInput');
+    const slocInput = document.getElementById('pinjeminSlocInput');
+    const qtyInput = document.getElementById('pinjeminQtyInput');
+    const hubSelect = document.getElementById('pinjeminHubSelect');
+    const customHubInput = document.getElementById('pinjeminCustomHubInput');
+    const picInput = document.getElementById('pinjeminPicInput');
+    const driverInput = document.getElementById('pinjeminDriverInput');
+    const remarksInput = document.getElementById('pinjeminRemarksInput');
+    const submitBtn = document.getElementById('btnSubmitPinjemin');
+
+    const sku = (skuInput ? skuInput.value : '').trim();
+    const productName = (nameInput ? nameInput.value : '').trim();
+    const sloc = (slocInput ? slocInput.value : '').trim();
+    const qty = parseInt(qtyInput ? qtyInput.value : '1', 10) || 1;
+    let hub = (hubSelect ? hubSelect.value : '').trim();
+    if (hub === 'custom') {
+      hub = (customHubInput ? customHubInput.value : '').trim();
+    }
+    const pic = (picInput ? picInput.value : '').trim();
+    const picHub = (driverInput ? driverInput.value : '').trim();
+    const remarks = (remarksInput ? remarksInput.value : '').trim();
+
+    if (!sku) {
+      alert('Silakan masukkan Nomor SKU Produk.');
+      if (skuInput) skuInput.focus();
+      return;
+    }
+    if (!productName) {
+      alert('Silakan masukkan Nama Produk.');
+      if (nameInput) nameInput.focus();
+      return;
+    }
+    if (!sloc) {
+      alert('Silakan tentukan SLOC (Lokasi Rak) asal barang.');
+      if (slocInput) slocInput.focus();
+      return;
+    }
+    if (qty < 1) {
+      alert('Jumlah QTY minimal 1.');
+      if (qtyInput) qtyInput.focus();
+      return;
+    }
+    if (!hub) {
+      alert('Silakan pilih atau ketik HUB peminjam.');
+      if (hubSelect) hubSelect.focus();
+      return;
+    }
+    if (!pic) {
+      alert('Silakan masukkan nama PIC Petugas MTG yang meminjamkan.');
+      if (picInput) picInput.focus();
+      return;
+    }
+
+    const payload = {
+      action: 'savePinjeminKeHub',
+      module: 'pinjaman',
+      formType: 'pinjemin',
+      type: 'pinjemin',
+      sku: sku,
+      productName: productName,
+      sloc: sloc,
+      qty: qty,
+      hub: hub,
+      pic: pic,
+      picHub: picHub,
+      imageBase64: pinjeminPhotoBase64,
+      remarks: remarks,
+      status: 'DIPINJAMKAN'
+    };
+
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      submitBtn.innerHTML = '<span>⏳ Menyimpan Pinjaman Keluar...</span>';
+    }
+
+    try {
+      await fetch(DCC_WEBAPP_URL, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'text/plain' },
+        body: JSON.stringify(payload)
+      });
+
+      localStorage.setItem('SUPERAPP_LAST_PIC_PINJEMIN', pic);
+
+      if (typeof playSaveSuccessChime === 'function') playSaveSuccessChime();
+      if (navigator.vibrate) try { navigator.vibrate([60, 40, 60]); } catch (e) {}
+      if (typeof showDccToast === 'function') {
+        showDccToast('success', 'Pinjaman Keluar Berhasil!', `SKU ${sku} (${productName}) QTY ${qty} dipinjamkan ke ${hub}.`);
+      } else {
+        alert(`✅ MTG Pinjemin Berhasil!\n\nSKU: ${sku}\nProduk: ${productName}\nQTY: ${qty}\nPeminjam: ${hub}\nPIC MTG: ${pic}`);
+      }
+
+      if (skuInput) skuInput.value = '';
+      if (nameInput) nameInput.value = '';
+      if (slocInput) slocInput.value = '';
+      if (qtyInput) qtyInput.value = '1';
+      if (hubSelect) hubSelect.value = '';
+      if (customHubInput) customHubInput.value = '';
+      document.getElementById('pinjeminCustomHubContainer')?.classList.add('hidden');
+      if (driverInput) driverInput.value = '';
+      if (remarksInput) remarksInput.value = '';
+      document.getElementById('pinjeminProductPreview')?.classList.add('hidden');
+      document.getElementById('pinjeminClearSkuBtn')?.classList.add('hidden');
+      removePinjeminPhoto();
+
+    } catch (err) {
+      console.error('Gagal simpan pinjemin:', err);
+      alert('Gagal mengirim data. Silakan periksa koneksi internet Anda.');
+    } finally {
+      if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = `
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+            <circle cx="8.5" cy="7" r="4"></circle>
+            <line x1="20" y1="8" x2="20" y2="14"></line>
+            <line x1="23" y1="11" x2="17" y2="11"></line>
+          </svg>
+          <span>Submit MTG Pinjemin</span>
+        `;
+      }
+    }
+  };
+
+  // ── 10C. Submit Form MTG Terima Pengembalian dari Hub Lain ──
+  window.submitFormTerima = async function (e) {
+    if (e && e.preventDefault) e.preventDefault();
+
+    const skuInput = document.getElementById('terimaSkuInput');
+    const nameInput = document.getElementById('terimaNamaProdukInput');
+    const slocInput = document.getElementById('terimaSlocInput');
+    const qtyInput = document.getElementById('terimaQtyInput');
+    const hubSelect = document.getElementById('terimaHubSelect');
+    const customHubInput = document.getElementById('terimaCustomHubInput');
+    const kondisiSelect = document.getElementById('terimaKondisiSelect');
+    const picInput = document.getElementById('terimaPicInput');
+    const driverInput = document.getElementById('terimaDriverInput');
+    const remarksInput = document.getElementById('terimaRemarksInput');
+    const submitBtn = document.getElementById('btnSubmitTerima');
+
+    const sku = (skuInput ? skuInput.value : '').trim();
+    const productName = (nameInput ? nameInput.value : '').trim();
+    const sloc = (slocInput ? slocInput.value : '').trim();
+    const qty = parseInt(qtyInput ? qtyInput.value : '1', 10) || 1;
+    let hub = (hubSelect ? hubSelect.value : '').trim();
+    if (hub === 'custom') {
+      hub = (customHubInput ? customHubInput.value : '').trim();
+    }
+    const kondisi = (kondisiSelect ? kondisiSelect.value : 'Good').trim();
+    const pic = (picInput ? picInput.value : '').trim();
+    const picHub = (driverInput ? driverInput.value : '').trim();
+    const remarks = (remarksInput ? remarksInput.value : '').trim();
+
+    if (!sku) {
+      alert('Silakan masukkan Nomor SKU Produk yang diterima.');
+      if (skuInput) skuInput.focus();
+      return;
+    }
+    if (!productName) {
+      alert('Silakan masukkan Nama Produk.');
+      if (nameInput) nameInput.focus();
+      return;
+    }
+    if (!sloc) {
+      alert('Silakan masukkan SLOC (Lokasi Rak) penempatan kembali produk.');
+      if (slocInput) slocInput.focus();
+      return;
+    }
+    if (qty < 1) {
+      alert('Jumlah QTY minimal 1.');
+      if (qtyInput) qtyInput.focus();
+      return;
+    }
+    if (!hub) {
+      alert('Silakan pilih atau ketik HUB asal pengembalian.');
+      if (hubSelect) hubSelect.focus();
+      return;
+    }
+    if (!pic) {
+      alert('Silakan masukkan nama PIC Petugas MTG penerima.');
+      if (picInput) picInput.focus();
+      return;
+    }
+
+    const payload = {
+      action: 'saveTerimaKembali',
+      module: 'pinjaman',
+      formType: 'terima',
+      type: 'terima',
+      sku: sku,
+      productName: productName,
+      sloc: sloc,
+      qty: qty,
+      hub: hub,
+      kondisi: kondisi,
+      pic: pic,
+      picHub: picHub,
+      imageBase64: terimaPhotoBase64,
+      remarks: remarks,
+      status: 'DITERIMA KEMBALI'
+    };
+
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      submitBtn.innerHTML = '<span>⏳ Menyimpan Penerimaan Kembali...</span>';
+    }
+
+    try {
+      await fetch(DCC_WEBAPP_URL, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'text/plain' },
+        body: JSON.stringify(payload)
+      });
+
+      localStorage.setItem('SUPERAPP_LAST_PIC_TERIMA', pic);
+
+      if (typeof playSaveSuccessChime === 'function') playSaveSuccessChime();
+      if (navigator.vibrate) try { navigator.vibrate([60, 40, 60]); } catch (e) {}
+      if (typeof showDccToast === 'function') {
+        showDccToast('success', 'Penerimaan Kembali Berhasil!', `SKU ${sku} (${productName}) QTY ${qty} dari ${hub} diterima.`);
+      } else {
+        alert(`✅ Terima Pengembalian Berhasil!\n\nSKU: ${sku}\nProduk: ${productName}\nSLOC: ${sloc}\nQTY: ${qty}\nHUB Asal: ${hub}\nPIC MTG: ${pic}`);
+      }
+
+      if (skuInput) skuInput.value = '';
+      if (nameInput) nameInput.value = '';
+      if (slocInput) slocInput.value = '';
+      if (qtyInput) qtyInput.value = '1';
+      if (hubSelect) hubSelect.value = '';
+      if (customHubInput) customHubInput.value = '';
+      document.getElementById('terimaCustomHubContainer')?.classList.add('hidden');
+      if (driverInput) driverInput.value = '';
+      if (remarksInput) remarksInput.value = '';
+      document.getElementById('terimaProductPreview')?.classList.add('hidden');
+      document.getElementById('terimaClearSkuBtn')?.classList.add('hidden');
+      removeTerimaPhoto();
+
+    } catch (err) {
+      console.error('Gagal simpan terima pengembalian:', err);
+      alert('Gagal mengirim data. Silakan periksa koneksi internet Anda.');
+    } finally {
+      if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = `
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="20 6 9 17 4 12"></polyline>
+          </svg>
+          <span>Submit Terima Pengembalian</span>
+        `;
+      }
+    }
+  };
+
+  // ── 11. Fetch & Render Riwayat Transaksi (4 Flows) ──
   window.refreshPinjamanData = function (showToast = false) {
     fetchStockUpdateSheet();
     fetchPinjamanHistory();
@@ -13552,17 +14270,28 @@
       if (Array.isArray(dataP)) {
         dataP.forEach(row => {
           if (row['NOMOR SKU'] || row['TIMESTAMP']) {
+            const jenis = String(row['JENIS TRANSAKSI'] || '').trim();
+            const status = String(row['STATUS'] || '').trim().toUpperCase();
+            let type = 'pinjam';
+            if (jenis.includes('Pinjemin') || status === 'DIPINJAMKAN') {
+              type = 'pinjemin';
+            } else {
+              type = 'pinjam';
+            }
+
             combined.push({
-              type: 'pinjam',
+              type: type,
               timestamp: row['TIMESTAMP'] || '',
+              jenis: jenis || (type === 'pinjemin' ? 'MTG Pinjemin ke Hub Lain' : 'MTG Pinjam ke Hub Lain'),
               sku: row['NOMOR SKU'] || '',
               productName: row['NAMA PRODUK'] || '',
-              qty: row['QTY PINJAM'] || '1',
-              hub: row['PINJAM KE HUB'] || '-',
-              pic: row['PIC PEMINJAM'] || '-',
-              sloc: '',
-              photoUrl: '',
-              status: row['STATUS'] || 'DIPINJAM',
+              qty: row['QTY'] || row['QTY PINJAM'] || '1',
+              hub: row['HUB TARGET / ASAL'] || row['PINJAM KE HUB'] || '-',
+              pic: row['PIC PETUGAS MTG'] || row['PIC PEMINJAM'] || '-',
+              picHub: row['PIC / DRIVER HUB'] || '',
+              sloc: row['SLOC (LOKASI RAK)'] || '',
+              photoUrl: row['BUKTI FOTO (DRIVE)'] || '',
+              status: row['STATUS'] || (type === 'pinjemin' ? 'DIPINJAMKAN' : 'DIPINJAM'),
               remarks: row['CATATAN'] || ''
             });
           }
@@ -13572,17 +14301,29 @@
       if (Array.isArray(dataK)) {
         dataK.forEach(row => {
           if (row['NOMOR SKU'] || row['TIMESTAMP']) {
+            const jenis = String(row['JENIS TRANSAKSI'] || '').trim();
+            const status = String(row['STATUS'] || '').trim().toUpperCase();
+            let type = 'kembali';
+            if (jenis.includes('Terima') || status === 'DITERIMA KEMBALI') {
+              type = 'terima';
+            } else {
+              type = 'kembali';
+            }
+
             combined.push({
-              type: 'kembali',
+              type: type,
               timestamp: row['TIMESTAMP'] || '',
+              jenis: jenis || (type === 'terima' ? 'MTG Terima Pengembalian' : 'MTG Kembalikan ke Hub Lain'),
               sku: row['NOMOR SKU'] || '',
               productName: row['NAMA PRODUK'] || '',
-              qty: row['QTY KEMBALI'] || '1',
-              hub: row['KEMBALIKAN KE HUB'] || '-',
-              pic: row['PIC PENGEMBALIAN'] || '-',
+              qty: row['QTY'] || row['QTY KEMBALI'] || '1',
+              hub: row['HUB TARGET / ASAL'] || row['KEMBALIKAN KE HUB'] || '-',
+              kondisi: row['KONDISI BARANG'] || 'Good',
+              pic: row['PIC PETUGAS MTG'] || row['PIC PENGEMBALIAN'] || '-',
+              picHub: row['PIC / DRIVER HUB'] || '',
               sloc: row['SLOC (LOKASI RAK)'] || '',
-              photoUrl: row['FOTO PRODUK (DRIVE)'] || '',
-              status: row['STATUS'] || 'DIKEMBALIKAN',
+              photoUrl: row['BUKTI FOTO (DRIVE)'] || row['FOTO PRODUK (DRIVE)'] || '',
+              status: row['STATUS'] || (type === 'terima' ? 'DITERIMA KEMBALI' : 'DIKEMBALIKAN'),
               remarks: row['CATATAN'] || ''
             });
           }
@@ -13615,11 +14356,15 @@
 
     let filtered = pinjamanHistoryData;
 
-    // Filter tipe
+    // Filter tipe (5 opsi filter: all, pinjam, kembali, pinjemin, terima)
     if (pinjamanHistoryFilter === 'pinjam') {
       filtered = filtered.filter(it => it.type === 'pinjam');
     } else if (pinjamanHistoryFilter === 'kembali') {
       filtered = filtered.filter(it => it.type === 'kembali');
+    } else if (pinjamanHistoryFilter === 'pinjemin') {
+      filtered = filtered.filter(it => it.type === 'pinjemin');
+    } else if (pinjamanHistoryFilter === 'terima') {
+      filtered = filtered.filter(it => it.type === 'terima');
     }
 
     // Filter search text
@@ -13628,7 +14373,8 @@
         return (it.sku && it.sku.toLowerCase().includes(query)) ||
                (it.productName && it.productName.toLowerCase().includes(query)) ||
                (it.hub && it.hub.toLowerCase().includes(query)) ||
-               (it.pic && it.pic.toLowerCase().includes(query));
+               (it.pic && it.pic.toLowerCase().includes(query)) ||
+               (it.picHub && it.picHub.toLowerCase().includes(query));
       });
     }
 
@@ -13643,10 +14389,23 @@
     }
 
     listContainer.innerHTML = filtered.map(it => {
-      const isPinjam = it.type === 'pinjam';
-      const badgeClass = isPinjam ? 'pinjam' : 'kembali';
-      const badgeText = isPinjam ? '📦 DIPINJAM' : '🔄 DIKEMBALIKAN';
-      const cardClass = isPinjam ? 'pinjam' : 'kembali';
+      let badgeClass = 'pinjam';
+      let badgeText = '📤 MTG PINJAM';
+      let cardClass = 'pinjam';
+
+      if (it.type === 'kembali') {
+        badgeClass = 'kembali';
+        badgeText = '🔄 MTG KEMBALIKAN';
+        cardClass = 'kembali';
+      } else if (it.type === 'pinjemin') {
+        badgeClass = 'pinjemin';
+        badgeText = '🤝 MTG PINJEMIN';
+        cardClass = 'pinjemin';
+      } else if (it.type === 'terima') {
+        badgeClass = 'terima';
+        badgeText = '📦 TERIMA KEMBALI';
+        cardClass = 'terima';
+      }
 
       return `
         <div class="pinjaman-history-card ${cardClass}">
@@ -13659,7 +14418,9 @@
             <span><strong>SKU:</strong> ${escapeHtml(it.sku)}</span>
             <span><strong>QTY:</strong> ${escapeHtml(String(it.qty))}</span>
             <span><strong>HUB:</strong> ${escapeHtml(it.hub)}</span>
-            <span><strong>PIC:</strong> ${escapeHtml(it.pic)}</span>
+            <span><strong>PIC MTG:</strong> ${escapeHtml(it.pic)}</span>
+            ${it.picHub ? `<span><strong>PIC HUB:</strong> ${escapeHtml(it.picHub)}</span>` : ''}
+            ${it.kondisi ? `<span><strong>Kondisi:</strong> ${escapeHtml(it.kondisi)}</span>` : ''}
             ${it.sloc ? `<span><strong>📍 SLOC:</strong> ${escapeHtml(it.sloc)}</span>` : ''}
             ${it.photoUrl ? `<span><a href="${escapeHtml(it.photoUrl)}" target="_blank" class="pinjaman-hist-photo-link">📷 Lihat Bukti Foto</a></span>` : ''}
             ${it.remarks ? `<span><em>"${escapeHtml(it.remarks)}"</em></span>` : ''}

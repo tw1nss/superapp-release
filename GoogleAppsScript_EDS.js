@@ -1448,6 +1448,15 @@ function doPost(e) {
       return handleEdsSubmit(payload);
     }
 
+    // Jika request adalah Pinjaman / Pengembalian Barang MTG (4 Alur)
+    if (payload.action === 'savePinjamanBarang' || payload.action === 'savePengembalianBarang' || payload.module === 'pinjaman' ||
+        payload.action === 'savePinjamKeHub' || payload.action === 'saveKembalikanKeHub' || 
+        payload.action === 'savePinjeminKeHub' || payload.action === 'saveTerimaKembali') {
+      if (typeof handlePinjamanSubmit === 'function') {
+        return handlePinjamanSubmit(payload);
+      }
+    }
+
     // Default adalah DCC Screening
     return handleDccSubmit(payload);
   } catch (err) {

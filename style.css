@@ -10586,15 +10586,22 @@ select.dcc-field-input option {
 }
 
 /* ── Segmented Navigation Tabs ── */
+/* ── Segmented Navigation Tabs (5 Flows) ── */
 .pinjaman-nav {
-  display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
+  display: flex;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
   gap: 6px;
   background: rgba(10, 15, 29, 0.9);
   padding: 4px;
   border-radius: 14px;
   border: 1px solid rgba(255, 255, 255, 0.07);
   margin-bottom: 16px;
+  scrollbar-width: none;
+}
+
+.pinjaman-nav::-webkit-scrollbar {
+  display: none;
 }
 
 .pinjaman-tab-btn {
@@ -10602,16 +10609,18 @@ select.dcc-field-input option {
   align-items: center;
   justify-content: center;
   gap: 6px;
-  padding: 10px 8px;
+  padding: 9px 12px;
   background: transparent;
-  border: none;
+  border: 1px solid transparent;
   border-radius: 10px;
   color: #94a3b8;
-  font-size: 0.8rem;
+  font-size: 0.78rem;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
   text-align: center;
+  flex: 0 0 auto;
+  white-space: nowrap;
 }
 
 .pinjaman-tab-btn:hover {
@@ -10633,11 +10642,25 @@ select.dcc-field-input option {
   border-color: rgba(16, 185, 129, 0.3);
 }
 
-.pinjaman-tab-btn.active.history-tab {
-  background: rgba(168, 85, 247, 0.16);
+.pinjaman-tab-btn.active.pinjemin-tab {
+  background: rgba(139, 92, 246, 0.16);
   color: #c084fc;
-  box-shadow: 0 2px 10px rgba(168, 85, 247, 0.2);
-  border-color: rgba(168, 85, 247, 0.3);
+  box-shadow: 0 2px 10px rgba(139, 92, 246, 0.2);
+  border-color: rgba(139, 92, 246, 0.3);
+}
+
+.pinjaman-tab-btn.active.terima-tab {
+  background: rgba(245, 158, 11, 0.16);
+  color: #fbbf24;
+  box-shadow: 0 2px 10px rgba(245, 158, 11, 0.2);
+  border-color: rgba(245, 158, 11, 0.3);
+}
+
+.pinjaman-tab-btn.active.history-tab {
+  background: rgba(56, 189, 248, 0.16);
+  color: #38bdf8;
+  box-shadow: 0 2px 10px rgba(56, 189, 248, 0.2);
+  border-color: rgba(56, 189, 248, 0.3);
 }
 
 /* ── Form Card ── */
@@ -10658,6 +10681,14 @@ select.dcc-field-input option {
 
 .pinjaman-form-card.accent-kembali {
   border-top: 3px solid #10b981;
+}
+
+.pinjaman-form-card.accent-pinjemin {
+  border-top: 3px solid #8b5cf6;
+}
+
+.pinjaman-form-card.accent-terima {
+  border-top: 3px solid #f59e0b;
 }
 
 .pinjaman-card-header {
@@ -10687,6 +10718,16 @@ select.dcc-field-input option {
 .pinjaman-badge-icon.kembali {
   background: rgba(16, 185, 129, 0.15);
   border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.pinjaman-badge-icon.pinjemin {
+  background: rgba(139, 92, 246, 0.15);
+  border: 1px solid rgba(139, 92, 246, 0.3);
+}
+
+.pinjaman-badge-icon.terima {
+  background: rgba(245, 158, 11, 0.15);
+  border: 1px solid rgba(245, 158, 11, 0.3);
 }
 
 .pinjaman-card-title {
@@ -11133,6 +11174,28 @@ select.dcc-field-input option {
   transform: translateY(-2px);
 }
 
+.btn-pinjaman-submit.pinjemin {
+  background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%);
+  box-shadow: 0 6px 20px rgba(124, 58, 237, 0.35);
+}
+
+.btn-pinjaman-submit.pinjemin:hover {
+  background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+  box-shadow: 0 8px 25px rgba(124, 58, 237, 0.5);
+  transform: translateY(-2px);
+}
+
+.btn-pinjaman-submit.terima {
+  background: linear-gradient(135deg, #d97706 0%, #b45309 100%);
+  box-shadow: 0 6px 20px rgba(217, 119, 6, 0.35);
+}
+
+.btn-pinjaman-submit.terima:hover {
+  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+  box-shadow: 0 8px 25px rgba(217, 119, 6, 0.5);
+  transform: translateY(-2px);
+}
+
 .btn-pinjaman-submit:active {
   transform: scale(0.97);
 }
@@ -11203,6 +11266,14 @@ select.dcc-field-input option {
   border-left: 4px solid #10b981;
 }
 
+.pinjaman-history-card.pinjemin {
+  border-left: 4px solid #8b5cf6;
+}
+
+.pinjaman-history-card.terima {
+  border-left: 4px solid #f59e0b;
+}
+
 .pinjaman-hist-header {
   display: flex;
   align-items: center;
@@ -11229,6 +11300,18 @@ select.dcc-field-input option {
   background: rgba(16, 185, 129, 0.15);
   color: #34d399;
   border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.pinjaman-hist-badge.pinjemin {
+  background: rgba(139, 92, 246, 0.15);
+  color: #c084fc;
+  border: 1px solid rgba(139, 92, 246, 0.3);
+}
+
+.pinjaman-hist-badge.terima {
+  background: rgba(245, 158, 11, 0.15);
+  color: #fbbf24;
+  border: 1px solid rgba(245, 158, 11, 0.3);
 }
 
 .pinjaman-hist-time {

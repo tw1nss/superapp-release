@@ -1,14 +1,14 @@
 {
-  "versionCode": 26,
-  "versionName": "1.3.0",
+  "versionCode": 27,
+  "versionName": "1.3.1",
   "apkUrl": "https://github.com/tw1nss/superapp-release/raw/main/app-debug.apk",
   "forceUpdate": false,
-  "title": "Pembaruan Superapp MTG v1.3.0",
+  "title": "Pembaruan Superapp MTG v1.3.1",
   "changelog": [
-    "Menu baru: Pinjaman & Pengembalian Barang MTG terintegrasi ke Dashboard STK MTG 2K26",
-    "Formulir Peminjaman Barang ke HUB (MGR, SAL, SLP, GPL, Custom) dengan auto-fill SKU & Nama Produk",
-    "Formulir Pengembalian Barang dengan auto-lookup SLOC dan upload bukti foto Google Drive",
-    "Riwayat transaksi live, sinkronisasi Superset & perapian backend DCC Master"
+    "Fitur baru: Menu MTG Pinjemin ke Hub Lain (catat stok keluar)",
+    "Fitur baru: Menu MTG Terima Pengembalian dari Hub Lain (catat stok masuk kembali)",
+    "Perbaikan routing backend Google Apps Script: transaksi Pinjaman & Pengembalian tersimpan akurat ke spreadsheet",
+    "Filter riwayat transaksi 5 flow (Semua, MTG Pinjam, MTG Kembalikan, MTG Pinjemin, Terima Kembali)"
   ],
   "releasedAt": "2026-10-03"
 }
