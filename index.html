@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <meta name="description" content="Superapp Hub Space — Portal Akses Terpusat Operasional Warehouse: Hub Menteng (MTG), Hub Cawang (CWG), dan Hub Cinere (CNR).">
+  <meta name="description" content="Superapp Hub Space — Portal Akses Terpusat Operasional Warehouse: Hub Menteng (MTG) dan Hub Cawang (CWG).">
   <meta name="theme-color" content="#05070e">
   <meta name="robots" content="noindex, nofollow">
   <title>Superapp Hub Portal — Astro Operations</title>
@@ -525,39 +525,6 @@
         </div>
       </a>
 
-      <!-- 3. HUB CINERE (CNR) -->
-      <a href="./cnr/" class="hub-card" onclick="savePreferredHub('cnr')">
-        <div>
-          <div class="hub-card-header">
-            <div class="hub-icon-box">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
-                <polyline points="9 22 9 12 15 12 15 22"></polyline>
-              </svg>
-            </div>
-            <span class="hub-badge ready">● Ready</span>
-          </div>
-
-          <div class="hub-content" style="margin-top: 14px;">
-            <span class="hub-code">HUB-03 • DEPOK / SELATAN</span>
-            <h3 class="hub-title">Hub Cinere (CNR)</h3>
-            <p class="hub-desc">Fasilitas operasional warehouse Cinere dengan pelacakan expiry date dan manajemen stok.</p>
-
-            <div class="hub-modules">
-              <span class="module-pill">Barcode SLOC</span>
-              <span class="module-pill">DCC Master</span>
-              <span class="module-pill">ED Sweeper</span>
-              <span class="module-pill">Pinjaman</span>
-            </div>
-          </div>
-        </div>
-
-        <div class="hub-action">
-          <span class="path-hint">/cnr</span>
-          <span class="btn-enter">Buka Superapp CNR <span>→</span></span>
-        </div>
-      </a>
-
     </div>
 
     <!-- ══ Bottom Preference & APK Section ══ -->
@@ -630,13 +597,12 @@
       const savedHub = localStorage.getItem('astro_preferred_hub');
       const prefCheck = document.getElementById('prefRememberHub');
 
-      if (savedHub && ['mtg', 'cwg', 'cnr'].includes(savedHub)) {
+      if (savedHub && ['mtg', 'cwg'].includes(savedHub)) {
         if (prefCheck) prefCheck.checked = true;
 
         const hubNames = {
           'mtg': 'Hub Menteng (MTG)',
-          'cwg': 'Hub Cawang (CWG)',
-          'cnr': 'Hub Cinere (CNR)'
+          'cwg': 'Hub Cawang (CWG)'
         };
 
         const banner = document.getElementById('redirectBanner');
