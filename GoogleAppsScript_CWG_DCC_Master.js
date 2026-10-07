@@ -90,6 +90,9 @@ function onOpen() {
   if (typeof buildEdCorrectionMenu === 'function') {
     buildEdCorrectionMenu(ui);
   }
+  if (typeof buildKoliInboundMenu === 'function') {
+    buildKoliInboundMenu(ui);
+  }
 }
 
 function buildSupersetMenu(ui) {
