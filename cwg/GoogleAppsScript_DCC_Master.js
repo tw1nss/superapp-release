@@ -645,14 +645,14 @@ function pullSupersetData(chartId, sheetName) {
   var urlVariants = [];
   if (formDataKey) {
     urlVariants.push(CONFIG.BASE_URL + "superset/explore_json/?form_data_key=" + encodeURIComponent(formDataKey) + "&slice_id=" + effectiveChartId + "&force=true&_t=" + timestamp);
-    urlVariants.push(CONFIG.BASE_URL + "superset/explore_json/?form_data_key=" + encodeURIComponent(formDataKey) + "&force=true&_t=" + timestamp);
   }
   if (pageId) {
     urlVariants.push(CONFIG.BASE_URL + "superset/explore_json/?form_data=" + encodeURIComponent(JSON.stringify({ slice_id: Number(effectiveChartId), dashboard_page_id: pageId })) + "&force=true&_t=" + timestamp);
     urlVariants.push(CONFIG.BASE_URL + "superset/explore_json/?dashboard_page_id=" + encodeURIComponent(pageId) + "&slice_id=" + effectiveChartId + "&force=true&_t=" + timestamp);
   }
+  urlVariants.push(CONFIG.BASE_URL + "superset/explore_json/?form_data=" + encodeURIComponent(JSON.stringify({ slice_id: Number(effectiveChartId) })) + "&force=true&_t=" + timestamp);
+  urlVariants.push(CONFIG.BASE_URL + "api/v1/chart/" + effectiveChartId + "/data/?force=true&_t=" + timestamp);
   urlVariants.push(CONFIG.BASE_URL + "api/v1/chart/" + effectiveChartId + "/data?force=true&_t=" + timestamp);
-  urlVariants.push(CONFIG.BASE_URL + "superset/explore_json/?form_data={\"slice_id\":" + effectiveChartId + "}&force=true&_t=" + timestamp);
 
   var response;
   var data;
@@ -678,6 +678,13 @@ function pullSupersetData(chartId, sheetName) {
           return alertUser("❌ COOKIE EXPIRED!\n\nSilakan perbarui cookie Superset Anda di menu '🔑 Set / Ganti Cookie Superset'.");
         }
 
+        if (code === 302) {
+          var redirectLoc = (response.getHeaders && response.getHeaders()['Location']) ? response.getHeaders()['Location'] : '';
+          if (redirectLoc.indexOf('login') !== -1) {
+            return alertUser("❌ COOKIE EXPIRED / INVALID!\n\nSuperset mengarahkan ke Login. Silakan perbarui cookie Superset Anda di menu '🔑 Set / Ganti Cookie Superset'.");
+          }
+        }
+
         if (code !== 200) {
           lastError = "HTTP " + code;
           Utilities.sleep(CONFIG.RETRY_DELAY);
@@ -692,6 +699,12 @@ function pullSupersetData(chartId, sheetName) {
           data = json.result[0].records;
         } else if (json.data && json.data.records) {
           data = json.data.records;
+        } else if (Array.isArray(json.data)) {
+          data = json.data;
+        } else if (Array.isArray(json)) {
+          data = json;
+        } else if (json.records && Array.isArray(json.records)) {
+          data = json.records;
         } else if (json.colnames && json.data) {
           data = json.data.map(function(row) {
             var obj = {};
@@ -705,6 +718,7 @@ function pullSupersetData(chartId, sheetName) {
         if (data && data.length > 0) {
           processToSheet(data, sheetName);
           success = true;
+          alertUser("✅ Berhasil menarik " + data.length + " data ke sheet '" + sheetName + "'!");
           break;
         }
 
@@ -733,15 +747,25 @@ function processToSheet(data, sheetName) {
     return;
   }
 
-  // 🛡️ Safety filter untuk Hub CWG: jika data mengandung location_name dan terdapat data 'CWG', filter hanya 'CWG'
-  if (data.length > 0 && data[0].hasOwnProperty('location_name')) {
-    var cwgOnly = data.filter(function(r) {
-      var loc = String(r.location_name || '').toUpperCase();
-      return loc.includes('CWG') || loc.includes('CAWANG');
-    });
-    if (cwgOnly.length > 0) {
-      console.log("🔍 [FILTER CWG] Memfilter " + cwgOnly.length + " dari " + data.length + " baris khusus Hub Cawang.");
-      data = cwgOnly;
+  // 🛡️ Safety filter untuk Hub CWG: jika data mengandung location_name, utamakan filter baris Hub Cawang
+  if (data.length > 0) {
+    var sample = data[0];
+    var locKey = null;
+    for (var k in sample) {
+      if (k.toLowerCase() === 'location_name' || k.toLowerCase() === 'location') {
+        locKey = k;
+        break;
+      }
+    }
+    if (locKey) {
+      var cwgOnly = data.filter(function(r) {
+        var loc = String(r[locKey] || '').toUpperCase();
+        return loc.includes('CWG') || loc.includes('CAWANG');
+      });
+      if (cwgOnly.length > 0) {
+        console.log("🔍 [FILTER CWG] Memfilter " + cwgOnly.length + " dari " + data.length + " baris khusus Hub Cawang.");
+        data = cwgOnly;
+      }
     }
   }
 
