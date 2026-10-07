@@ -809,6 +809,10 @@ function processToSheet(data, sheetName) {
         return (value !== "" && value !== null && !isNaN(value)) ? Number(value) : value;
       }
 
+      if (value === undefined || value === null) {
+        return "";
+      }
+
       return value;
     });
   });
@@ -824,7 +828,11 @@ function processToSheet(data, sheetName) {
   }
 
   sheet.setFrozenRows(1);
-  sheet.autoResizeColumns(1, headers.length);
+  try {
+    sheet.autoResizeColumns(1, headers.length);
+  } catch (eR) {}
+
+  SpreadsheetApp.flush(); // 🚀 WAJIB: Paksa Google Sheets langsung render 1.843 baris ke layar fisik sebelum modal muncul!
 }
 
 // ==============================================================================
@@ -2271,6 +2279,7 @@ function onEdit(e) {
 // =============================
 function alertUser(msg) {
   try {
+    SpreadsheetApp.flush();
     SpreadsheetApp.getUi().alert(msg);
   } catch (e) {
     // Aman saat dipanggil dari Pemicu Waktu (Time-driven Trigger / Background tanpa UI)
