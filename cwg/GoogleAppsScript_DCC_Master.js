@@ -50,9 +50,9 @@ var CONFIG = {
 // 📊 CHART CONFIG (SUPERSET CWG)
 // =============================
 var CHARTS = [
-  { id: 27916, sheet: "STOCK UPDATE", pageId: "4x69tbSms9lxcDJvFjiO-" },
-  { id: 27917, sheet: "SLOC MASTER", pageId: "HJLwJyIZoESIxcJkoFY7H" },
+  { id: 27917, sheet: "STOCK UPDATE", pageId: "LS7AcEEnOypTdotAb3wev" },
   { id: 27915, sheet: "RACK UPDATE", formDataKey: "HhcUoZUsOVeXAFG0NxFaQHErtmE8-hBsWLZnPqGEOXUyxWS7-ahg2DYndOpwpA4N", pageId: "V62TMAeHKU6ZLMBACLq9V" },
+  { id: 27916, sheet: "SLOC MASTER", pageId: "4x69tbSms9lxcDJvFjiO-" },
   { id: 27954, sheet: "SEQUENCING", pageId: "j4LWezcnd7bllS1NZ4phz" },
   { id: 27922, sheet: "Mainlist Sku ED Corection", formDataKey: "5ZR5jnQ44RUZEAbSmsxhmjrJfhATEhbYNAbzHuVz-yngwq4UFN2xO9zO9QPNf8zl", pageId: "mnOYdW-iXxrCQAOeuBKTk" },
   { id: 11861, sheet: "BAD & LOST" },
@@ -97,15 +97,13 @@ function buildSupersetMenu(ui) {
   ui.createMenu('📈 Superset Control')
     .addItem('🚀 Update Semua Data Superset', 'update_all')
     .addSeparator()
-    .addItem('1. STOCK UPDATE (CWG 27916)', 'menu_stock')
+    .addItem('1. STOCK UPDATE (CWG 27917)', 'menu_stock')
     .addItem('2. RACK MASTER / UPDATE (CWG 27915)', 'Menu_rack_update')
-    .addItem('3. SLOC MASTER (CWG 27917)', 'menu_sloc_master')
+    .addItem('3. SLOC MASTER (CWG 27916)', 'menu_sloc_master')
     .addItem('4. SEQUENCING (CWG 27954)', 'menu_sequencing')
     .addItem('5. ED CORRECTION (CWG 27922)', 'menu_ed_correction')
     .addItem('6. BAD & LOST', 'menu_bad_lost')
     .addItem('7. MSLTC', 'menu_msltc')
-    .addSeparator()
-    .addItem('⚠️ STOCK UPDATE Alternatif (Slice 27917)', 'menu_stock_alt')
     .addSeparator()
     .addItem('🔑 Set / Ganti Cookie Superset', 'setSupersetCookiePrompt')
     .addSeparator()
@@ -145,10 +143,6 @@ function buildPinjamanMenu(ui) {
 // 🔘 MENU WRAPPERS (SUPERSET)
 // =============================
 function menu_stock() {
-  update_single(27916, "STOCK UPDATE");
-}
-
-function menu_stock_alt() {
   update_single(27917, "STOCK UPDATE");
 }
 
@@ -157,7 +151,7 @@ function Menu_rack_update() {
 }
 
 function menu_sloc_master() {
-  update_single(27917, "SLOC MASTER");
+  update_single(27916, "SLOC MASTER");
 }
 
 function menu_sequencing() {
@@ -655,6 +649,7 @@ function pullSupersetData(chartId, sheetName) {
   }
   if (pageId) {
     urlVariants.push(CONFIG.BASE_URL + "superset/explore_json/?form_data=" + encodeURIComponent(JSON.stringify({ slice_id: Number(effectiveChartId), dashboard_page_id: pageId })) + "&force=true&_t=" + timestamp);
+    urlVariants.push(CONFIG.BASE_URL + "superset/explore_json/?dashboard_page_id=" + encodeURIComponent(pageId) + "&slice_id=" + effectiveChartId + "&force=true&_t=" + timestamp);
   }
   urlVariants.push(CONFIG.BASE_URL + "api/v1/chart/" + effectiveChartId + "/data?force=true&_t=" + timestamp);
   urlVariants.push(CONFIG.BASE_URL + "superset/explore_json/?form_data={\"slice_id\":" + effectiveChartId + "}&force=true&_t=" + timestamp);
@@ -736,6 +731,18 @@ function processToSheet(data, sheetName) {
     sheet.clearContents();
     sheet.getRange(1, 1).setValue("⚠️ Data kosong");
     return;
+  }
+
+  // 🛡️ Safety filter untuk Hub CWG: jika data mengandung location_name dan terdapat data 'CWG', filter hanya 'CWG'
+  if (data.length > 0 && data[0].hasOwnProperty('location_name')) {
+    var cwgOnly = data.filter(function(r) {
+      var loc = String(r.location_name || '').toUpperCase();
+      return loc.includes('CWG') || loc.includes('CAWANG');
+    });
+    if (cwgOnly.length > 0) {
+      console.log("🔍 [FILTER CWG] Memfilter " + cwgOnly.length + " dari " + data.length + " baris khusus Hub Cawang.");
+      data = cwgOnly;
+    }
   }
 
   var headers = Object.keys(data[0]);
