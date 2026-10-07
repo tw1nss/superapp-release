@@ -46,14 +46,16 @@ var CONFIG = {
 };
 
 // =============================
-// 📊 CHART CONFIG (SUPERSET)
+// 📊 CHART CONFIG (SUPERSET CWG)
 // =============================
 var CHARTS = [
-  { id: 11860, sheet: "STOCK UPDATE" },
+  { id: 27917, sheet: "STOCK UPDATE", pageId: "HJLwJyIZoESIxcJkoFY7H" },
+  { id: 27915, sheet: "RACK UPDATE", formDataKey: "HhcUoZUsOVeXAFG0NxFaQHErtmE8-hBsWLZnPqGEOXUyxWS7-ahg2DYndOpwpA4N", pageId: "V62TMAeHKU6ZLMBACLq9V" },
+  { id: 27916, sheet: "SLOC MASTER", pageId: "4x69tbSms9lxcDJvFjiO-" },
+  { id: 27954, sheet: "SEQUENCING", pageId: "j4LWezcnd7bllS1NZ4phz" },
+  { id: 27922, sheet: "Mainlist Sku ED Corection", formDataKey: "5ZR5jnQ44RUZEAbSmsxhmjrJfhATEhbYNAbzHuVz-yngwq4UFN2xO9zO9QPNf8zl", pageId: "mnOYdW-iXxrCQAOeuBKTk" },
   { id: 11861, sheet: "BAD & LOST" },
-  { id: 11815, sheet: "MSLTC" },
-  { id: 12422, sheet: "RACK UPDATE" },
-  { id: 12077, sheet: "Mainlist Sku ED Corection" }
+  { id: 11815, sheet: "MSLTC" }
 ];
 
 // Helper: Ambil spreadsheet target (Bisa bound atau standalone ID)
@@ -94,10 +96,13 @@ function buildSupersetMenu(ui) {
   ui.createMenu('📈 Superset Control')
     .addItem('🚀 Update Semua Data Superset', 'update_all')
     .addSeparator()
-    .addItem('1. STOCK UPDATE', 'menu_stock')
-    .addItem('2. BAD & LOST', 'menu_bad_lost')
-    .addItem('3. MSLTC', 'menu_msltc')
-    .addItem('4. RACK UPDATE', 'Menu_rack_update')
+    .addItem('1. STOCK UPDATE (CWG 27917)', 'menu_stock')
+    .addItem('2. RACK MASTER / UPDATE (CWG 27915)', 'Menu_rack_update')
+    .addItem('3. SLOC MASTER (CWG 27916)', 'menu_sloc_master')
+    .addItem('4. SEQUENCING (CWG 27954)', 'menu_sequencing')
+    .addItem('5. ED CORRECTION (CWG 27922)', 'menu_ed_correction')
+    .addItem('6. BAD & LOST', 'menu_bad_lost')
+    .addItem('7. MSLTC', 'menu_msltc')
     .addSeparator()
     .addItem('🔑 Set / Ganti Cookie Superset', 'setSupersetCookiePrompt')
     .addSeparator()
@@ -137,11 +142,23 @@ function buildPinjamanMenu(ui) {
 // 🔘 MENU WRAPPERS (SUPERSET)
 // =============================
 function menu_stock() {
-  update_single(11860, "STOCK UPDATE");
+  update_single(27917, "STOCK UPDATE");
 }
 
 function Menu_rack_update() {
-  update_single(12422, "RACK UPDATE");
+  update_single(27915, "RACK UPDATE");
+}
+
+function menu_sloc_master() {
+  update_single(27916, "SLOC MASTER");
+}
+
+function menu_sequencing() {
+  update_single(27954, "SEQUENCING");
+}
+
+function menu_ed_correction() {
+  update_single(27922, "Mainlist Sku ED Corection");
 }
 
 function menu_bad_lost() {
@@ -150,10 +167,6 @@ function menu_bad_lost() {
 
 function menu_msltc() {
   update_single(11815, "MSLTC");
-}
-
-function menu_ed_correction() {
-  update_single(12077, "Mainlist Sku ED Corection");
 }
 
 function update_all() {
@@ -599,29 +612,36 @@ function pullSupersetData(chartId, sheetName) {
   var timestamp = new Date().getTime();
   var props = PropertiesService.getScriptProperties();
 
-  // Dukungan kustom form_data_key & chart ID untuk RACK UPDATE (SLOC MASTER)
+  // Cari konfigurasi chart dari daftar CHARTS CWG
+  var currentChartConfig = null;
+  for (var cIdx = 0; cIdx < CHARTS.length; cIdx++) {
+    if (CHARTS[cIdx].id === chartId || CHARTS[cIdx].sheet === sheetName) {
+      currentChartConfig = CHARTS[cIdx];
+      break;
+    }
+  }
+
+  var effectiveChartId = (currentChartConfig && currentChartConfig.id) ? currentChartConfig.id : chartId;
+  var formDataKey = (currentChartConfig && currentChartConfig.formDataKey) ? currentChartConfig.formDataKey : "";
+  var pageId = (currentChartConfig && currentChartConfig.pageId) ? currentChartConfig.pageId : "";
+
+  // Dukungan kustom form_data_key & chart ID untuk RACK UPDATE jika pernah di-override via properties
   var rackFormDataKey = props.getProperty('RACK_UPDATE_FORM_DATA_KEY') || "";
   var rackPageId = props.getProperty('RACK_UPDATE_PAGE_ID') || "";
   var rackCustomChartId = props.getProperty('RACK_UPDATE_CHART_ID');
-  var effectiveChartId = (sheetName === 'RACK UPDATE' && rackCustomChartId) ? Number(rackCustomChartId) : chartId;
-
-  var formDataKey = (effectiveChartId === 12077) 
-    ? "FGnMPSQjzn-IkTT_ZdewtmeAw3D7uPCz56ErrkOHEZT-KyQ5BLwbb8-QXzzmQpaL" 
-    : ((sheetName === 'RACK UPDATE' && rackFormDataKey) ? rackFormDataKey : "");
-
-  var pageId = (effectiveChartId === 12077) 
-    ? "OuCI-jVWZVevhI7VLi-Uh" 
-    : ((sheetName === 'RACK UPDATE' && rackPageId) ? rackPageId : "");
+  if (sheetName === 'RACK UPDATE' && rackCustomChartId) effectiveChartId = Number(rackCustomChartId);
+  if (sheetName === 'RACK UPDATE' && rackFormDataKey) formDataKey = rackFormDataKey;
+  if (sheetName === 'RACK UPDATE' && rackPageId) pageId = rackPageId;
 
   var urlVariants = [];
   if (formDataKey) {
     urlVariants.push(CONFIG.BASE_URL + "superset/explore_json/?form_data_key=" + encodeURIComponent(formDataKey) + "&slice_id=" + effectiveChartId + "&force=true&_t=" + timestamp);
     urlVariants.push(CONFIG.BASE_URL + "superset/explore_json/?form_data_key=" + encodeURIComponent(formDataKey) + "&force=true&_t=" + timestamp);
   }
-  urlVariants.push(CONFIG.BASE_URL + "api/v1/chart/" + effectiveChartId + "/data?force=true&_t=" + timestamp);
   if (pageId) {
     urlVariants.push(CONFIG.BASE_URL + "superset/explore_json/?form_data=" + encodeURIComponent(JSON.stringify({ slice_id: Number(effectiveChartId), dashboard_page_id: pageId })) + "&force=true&_t=" + timestamp);
   }
+  urlVariants.push(CONFIG.BASE_URL + "api/v1/chart/" + effectiveChartId + "/data?force=true&_t=" + timestamp);
   urlVariants.push(CONFIG.BASE_URL + "superset/explore_json/?form_data={\"slice_id\":" + effectiveChartId + "}&force=true&_t=" + timestamp);
 
   var response;
