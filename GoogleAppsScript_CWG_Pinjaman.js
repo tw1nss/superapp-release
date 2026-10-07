@@ -24,7 +24,7 @@
 
 var PINJAMAN_CONFIG = {
   TARGET_FILE_ID: "1T6YcctafqzppSyblW17Gm8zXBrwyXJKi81niF66CXCQ",
-  EVIDENCE_FOLDER_ID: "1RtRFC7XfgLNr7EV76rRn-hScNYW4hOb3", // Google Drive Folder Bukti
+  EVIDENCE_FOLDER_ID: "", // Google Drive Folder Bukti
   TIMEZONE: "Asia/Jakarta"
 };
 
@@ -115,7 +115,7 @@ function handlePinjamanSubmit(payload) {
           folder = DriveApp.getFolderById(folderId);
         } catch (errF) {}
         if (!folder) {
-          var folderName = 'PINJAMAN_MTG_EVIDENCE';
+          var folderName = 'PINJAMAN_CWG_EVIDENCE';
           var folders = DriveApp.getFoldersByName(folderName);
           folder = folders.hasNext() ? folders.next() : DriveApp.createFolder(folderName);
           folder.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);

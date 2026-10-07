@@ -39,7 +39,7 @@
 var CONFIG = {
   BASE_URL: "https://dash.astronauts.id/",
   TARGET_FILE_ID: "1T6YcctafqzppSyblW17Gm8zXBrwyXJKi81niF66CXCQ",
-  EVIDENCE_FOLDER_ID: "1RtRFC7XfgLNr7EV76rRn-hScNYW4hOb3", // 📁 Folder Google Drive Bukti Foto DCC & Pinjaman
+  EVIDENCE_FOLDER_ID: "", // 📁 Folder Google Drive Bukti Foto DCC & Pinjaman
   MAX_RETRY: 3,
   RETRY_DELAY: 2000,
   TIMEZONE: "Asia/Jakarta"
@@ -449,7 +449,7 @@ function doPost(e) {
           }
         }
         if (!folder) {
-          var folderName = 'DCC_MTG_EVIDANCE';
+          var folderName = 'DCC_CWG_EVIDENCE';
           var folders = DriveApp.getFoldersByName(folderName);
           if (folders.hasNext()) {
             folder = folders.next();
@@ -2296,7 +2296,7 @@ function handlePinjamanSubmit(payload) {
           folder = DriveApp.getFolderById(folderId);
         } catch (errF) {}
         if (!folder) {
-          var folderName = 'PINJAMAN_MTG_EVIDENCE';
+          var folderName = 'PINJAMAN_CWG_EVIDENCE';
           var folders = DriveApp.getFoldersByName(folderName);
           folder = folders.hasNext() ? folders.next() : DriveApp.createFolder(folderName);
           folder.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);

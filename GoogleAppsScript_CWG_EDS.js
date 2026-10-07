@@ -1207,7 +1207,7 @@ function handleEdsSubmit(payload) {
 
     if (payload.imageBase64) {
       try {
-        const folderName = 'ED_SWEEPER_MTG_EVIDANCE';
+        const folderName = 'ED_SWEEPER_CWG_EVIDENCE';
         let folder;
         const folders = DriveApp.getFoldersByName(folderName);
         if (folders.hasNext()) {
@@ -1352,7 +1352,7 @@ function handleDccSubmit(payload) {
 
     if (payload.imageBase64) {
       try {
-        const folderName = 'DCC_MTG_EVIDANCE';
+        const folderName = 'DCC_CWG_EVIDENCE';
         let folder;
         const folders = DriveApp.getFoldersByName(folderName);
         if (folders.hasNext()) {

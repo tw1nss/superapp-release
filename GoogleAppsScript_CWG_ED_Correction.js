@@ -31,7 +31,7 @@
 var EDC_CONFIG = {
   // ID Spreadsheet default Dashboard STK CWG
   DEFAULT_TARGET_ID: "1T6YcctafqzppSyblW17Gm8zXBrwyXJKi81niF66CXCQ",
-  EVIDENCE_FOLDER_ID: "1RtRFC7XfgLNr7EV76rRn-hScNYW4hOb3", // Folder Drive Foto Bukti
+  EVIDENCE_FOLDER_ID: "", // Folder Drive Foto Bukti
   TIMEZONE: "Asia/Jakarta",
   // ── Konfigurasi AstroDash Superset ED Correction ──
   SUPERSET_BASE_URL: "https://dash.astronauts.id/",
@@ -2262,7 +2262,16 @@ function handleEdCorrectionSubmit(payload) {
     // Simpan foto jika dikirim dalam bentuk base64
     if (payload.photoBase64 && payload.photoBase64.length > 50) {
       try {
-        var folder = DriveApp.getFolderById(EDC_CONFIG.EVIDENCE_FOLDER_ID);
+        var folder;
+        if (EDC_CONFIG.EVIDENCE_FOLDER_ID) {
+          try { folder = DriveApp.getFolderById(EDC_CONFIG.EVIDENCE_FOLDER_ID); } catch (errF) {}
+        }
+        if (!folder) {
+          var folderName = "EDC_CWG_EVIDENCE";
+          var folders = DriveApp.getFoldersByName(folderName);
+          folder = folders.hasNext() ? folders.next() : DriveApp.createFolder(folderName);
+          folder.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+        }
         var base64Data = payload.photoBase64.replace(/^data:image\/\w+;base64,/, '');
         var decoded = Utilities.base64Decode(base64Data);
         var blob = Utilities.newBlob(decoded, "image/jpeg", "EDC_" + sku + "_" + Utilities.formatDate(now, EDC_CONFIG.TIMEZONE, "yyyyMMdd_HHmmss") + ".jpg");
