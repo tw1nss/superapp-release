@@ -79,20 +79,23 @@ function getSpreadsheet() {
 // =============================
 // 🔘 TRIGGER ON OPEN (MENU)
 // =============================
+// Satu-satunya onOpen di project ini. File EDS, ED Correction, dan Koli Inbound
+// tidak boleh punya onOpen sendiri, karena onOpen yang terakhir dimuat akan menimpa yang lain.
 function onOpen() {
   var ui = SpreadsheetApp.getUi();
-  buildSupersetMenu(ui);
-  buildDccMenu(ui);
-  buildPinjamanMenu(ui);
-  if (typeof buildEdSweeperMenu === 'function') {
-    buildEdSweeperMenu(ui);
-  }
-  if (typeof buildEdCorrectionMenu === 'function') {
-    buildEdCorrectionMenu(ui);
-  }
-  if (typeof buildKoliInboundMenu === 'function') {
-    buildKoliInboundMenu(ui);
-  }
+  var menus = [
+    function() { buildSupersetMenu(ui); },
+    function() { buildDccMenu(ui); },
+    function() { if (typeof buildEdSweeperMenu === 'function') buildEdSweeperMenu(ui); },
+    function() { if (typeof buildEdCorrectionMenu === 'function') buildEdCorrectionMenu(ui); },
+    function() { if (typeof buildKoliInboundMenu === 'function') buildKoliInboundMenu(ui); },
+    function() { if (typeof ensureDailyBackupTrigger === 'function') ensureDailyBackupTrigger(); },
+    function() { if (typeof ensureAutoSupersetTrigger === 'function') ensureAutoSupersetTrigger(); },
+    function() { if (typeof ensureDailyBackupTriggerEdCorrection === 'function') ensureDailyBackupTriggerEdCorrection(); }
+  ];
+  menus.forEach(function(step) {
+    try { step(); } catch (e) { console.warn('onOpen step dilewati:', e); }
+  });
 }
 
 function buildSupersetMenu(ui) {

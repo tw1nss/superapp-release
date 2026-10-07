@@ -106,7 +106,9 @@ function getEdCorrectionSheet(type) {
 // ==============================================================================
 // 🔘 TRIGGER ON OPEN & PEMBUATAN MENU
 // ==============================================================================
-function onOpen() {
+// onOpen dipusatkan di DCC_Master (yang memanggil buildEdCorrectionMenu).
+// Fungsi ini sengaja tidak bernama onOpen agar tidak menimpa onOpen DCC_Master.
+function onOpenEdCorrectionStandalone() {
   var ui = SpreadsheetApp.getUi();
   // Panggil menu Superset, DCC, EDS, dan Pinjaman jika terintegrasi dalam 1 project
   if (typeof buildSupersetMenu === 'function') buildSupersetMenu(ui);

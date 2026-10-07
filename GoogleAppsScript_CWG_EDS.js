@@ -78,7 +78,9 @@ function getEdsSheet(type) {
 }
 
 // ── 1. MENU CUSTOM DI GOOGLE SHEETS ──
-function onOpen() {
+// onOpen dipusatkan di DCC_Master (yang memanggil buildEdSweeperMenu).
+// Fungsi ini sengaja tidak bernama onOpen agar tidak menimpa onOpen DCC_Master.
+function onOpenEdSweeperStandalone() {
   try {
     ensureDailyBackupTrigger();
     ensureAutoSupersetTrigger();
