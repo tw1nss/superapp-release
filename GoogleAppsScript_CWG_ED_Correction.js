@@ -20,7 +20,7 @@
  *    - Bersihkan Validasi Sel yang Memblokir (Hapus batasan Shift agar data Superset masuk).
  * 
  * 4. ⚙️ PENGATURAN KONEKSI & SUPERSET:
- *    - Tarik Data Superset ke Mainlist Sku (Chart ID 12077).
+ *    - Tarik Data Superset ke Mainlist Sku (Chart ID 27922).
  *    - Set / Ganti Cookie Superset & Link Spreadsheet via Popup.
  * ==============================================================================
  */
@@ -175,7 +175,7 @@ function buildEdCorrectionMenu(ui) {
 
     // ── PENGATURAN KONEKSI & PANDUAN ──
     .addItem('🔑 Set / Ganti Cookie Superset', 'setEdCorrectionCookiePrompt')
-    .addItem('🎯 Set ID Chart Superset (Default: 12077)', 'setEdCorrectionChartIdPrompt')
+    .addItem('🎯 Set ID Chart Superset (Default: 27922)', 'setEdCorrectionChartIdPrompt')
     .addItem('🔗 Set / Ganti Link Spreadsheet ED Correction', 'setEdCorrectionSheetUrlPrompt')
     .addItem('📋 Panduan Pasang WebApp URL ke SuperApp', 'showEdCorrectionDeployGuidePrompt')
     .addToUi();
@@ -242,7 +242,7 @@ function updateEdCorrectionFromSupersetManual() {
   }
 
   if (ss && typeof ss.toast === "function") {
-    ss.toast("⚡ Menghubungkan ke AstroDash Superset (Chart ID 12077)...", "Loading", 4);
+    ss.toast("⚡ Menghubungkan ke AstroDash Superset (Chart ID 27922)...", "Loading", 4);
   }
 
   pullEdCorrectionSupersetDataToSheet(targetName, false);
@@ -295,7 +295,7 @@ function setEdCorrectionCookiePrompt() {
 }
 
 /**
- * Set ID Chart / Slice ID Superset ED Correction (Default: 12077)
+ * Set ID Chart / Slice ID Superset ED Correction (Default: 27922)
  */
 function setEdCorrectionChartIdPrompt() {
   var ui = SpreadsheetApp.getUi();
@@ -305,7 +305,7 @@ function setEdCorrectionChartIdPrompt() {
   var response = ui.prompt(
     '🎯 Set ID Chart Superset ED Correction',
     'Masukkan ID Chart (Slice ID) untuk data ED Correction (Default: ' + currentId + '):\n\n' +
-    'Chart saat ini: 12077 (Dashboard STK CWG)',
+    'Chart saat ini: 27922 (Dashboard STK CWG)',
     ui.ButtonSet.OK_CANCEL
   );
 
@@ -325,8 +325,11 @@ function pullEdCorrectionSupersetDataToSheet(sheetName, isSilent) {
   var props = PropertiesService.getScriptProperties();
   var cookie = props.getProperty('MY_COOKIE');
   var chartId = props.getProperty('SUPERSET_CHART_ID_EDC') || EDC_CONFIG.DEFAULT_CHART_ID;
+  if (chartId === '12077') chartId = EDC_CONFIG.DEFAULT_CHART_ID;
   var formDataKey = props.getProperty('SUPERSET_FORM_DATA_KEY_EDC') || EDC_CONFIG.FORM_DATA_KEY;
+  if (formDataKey === 'FGnMPSQjzn-IkTT_ZdewtmeAw3D7uPCz56ErrkOHEZT-KyQ5BLwbb8-QXzzmQpaL') formDataKey = EDC_CONFIG.FORM_DATA_KEY;
   var dashboardPageId = props.getProperty('SUPERSET_PAGE_ID_EDC') || EDC_CONFIG.DASHBOARD_PAGE_ID;
+  if (dashboardPageId === 'OuCI-jVWZVevhI7VLi-Uh') dashboardPageId = EDC_CONFIG.DASHBOARD_PAGE_ID;
 
   if (!cookie) {
     if (!isSilent) {

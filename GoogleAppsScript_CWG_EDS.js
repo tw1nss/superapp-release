@@ -237,7 +237,7 @@ function pullSupersetDataToSheet(sheetName, isSilent) {
   const props = PropertiesService.getScriptProperties();
   const cookie = props.getProperty('MY_COOKIE');
   let chartId = props.getProperty('SUPERSET_CHART_ID_EDS') || props.getProperty('SUPERSET_CHART_ID');
-  if (!chartId || chartId === '11815') {
+  if (!chartId || chartId === '11815' || chartId === '24592') {
     chartId = SUPERSET_CONFIG.DEFAULT_CHART_ID;
   }
 
@@ -258,8 +258,8 @@ function pullSupersetDataToSheet(sheetName, isSilent) {
   });
 
   const urlVariants = [
-    SUPERSET_CONFIG.BASE_URL + "api/v1/chart/" + chartId + "/data?force=true&_t=" + timestamp,
     SUPERSET_CONFIG.BASE_URL + "superset/explore_json/?form_data=" + encodeURIComponent(formDataPage) + "&force=true&_t=" + timestamp,
+    SUPERSET_CONFIG.BASE_URL + "api/v1/chart/" + chartId + "/data?force=true&_t=" + timestamp,
     SUPERSET_CONFIG.BASE_URL + "superset/explore_json/?form_data=" + encodeURIComponent(formDataBasic) + "&force=true&_t=" + timestamp
   ];
 
