@@ -8,8 +8,8 @@
 (function () {
   'use strict';
 
-  // ── Config ──
-  const SHEET_ID = '1fVQwSOoIU9pT5RHWi6-m8qCf_T0rQPZxEf_WuhlaD2g';
+  // ── Config CWG ──
+  const SHEET_ID = '1T6YcctafqzppSyblW17Gm8zXBrwyXJKi81niF66CXCQ';
   // Selective column query for Master Rack (from 'RACK UPDATE' - real-time latest SLOC from Superset SLOC MASTER)
   // Kolom RACK UPDATE: A=location_name, C=sku_number, D=product_name, F=rack_name, H=stock, J=product_type_name
   const MASTER_CSV_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent('RACK UPDATE')}&tq=${encodeURIComponent("SELECT A, C, D, F, H, J WHERE F IS NOT NULL AND F != ''")}`;
@@ -17,7 +17,7 @@
   const MSLTC_CSV_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=MSLTC`;
 
   const MAX_HISTORY = 8;
-  const DB_NAME = 'QRSLOC_DB_MTG_V4';
+  const DB_NAME = 'QRSLOC_DB_CWG_V1';
   const DB_VERSION = 1;
   const STORE_NAME = 'master_cache';
 
@@ -3355,7 +3355,7 @@
   //  DCC SCREENING LOGIC (HIGH SPEED CACHING)
   // ══════════════════════════════════════════════
 
-  const DCC_SPREADSHEET_ID = '1fVQwSOoIU9pT5RHWi6-m8qCf_T0rQPZxEf_WuhlaD2g';
+  const DCC_SPREADSHEET_ID = '1T6YcctafqzppSyblW17Gm8zXBrwyXJKi81niF66CXCQ';
   const DCC_BASE_SHEET_URL = `https://docs.google.com/spreadsheets/d/${DCC_SPREADSHEET_ID}/gviz/tq?tqx=out:csv`;
   const DCC_MAIN_SHEET_URL = DCC_BASE_SHEET_URL + '&sheet=' + encodeURIComponent('Mainlist SKU');
   const DCC_HASIL_SHEET_URL = DCC_BASE_SHEET_URL + '&sheet=' + encodeURIComponent('Hasil DCC');
@@ -3363,15 +3363,15 @@
   const DCC_TASK2_URL = DCC_BASE_SHEET_URL + '&sheet=Task%202';
   const DCC_HASIL1_URL = DCC_BASE_SHEET_URL + '&sheet=Hasil%20Task%201';
   const DCC_HASIL2_URL = DCC_BASE_SHEET_URL + '&sheet=Hasil%20Task%202';
-  const DCC_MTG_SHEET_URL = DCC_BASE_SHEET_URL + '&sheet=MTG';
+  const DCC_MTG_SHEET_URL = DCC_BASE_SHEET_URL + '&sheet=Hasil%20DCC';
   const DCC_REPORT_URL = DCC_BASE_SHEET_URL + '&sheet=Report';
-  const DCC_WEBAPP_URL = 'https://script.google.com/macros/s/AKfycbzRhVQZEv3TJwTfUhKKV0QtzexKvMS8mfz-iE72LiVRLKulE4_IlU4IW10rII8k7ICpLQ/exec';
+  const DCC_WEBAPP_URL = 'https://script.google.com/macros/s/AKfycbygTPu8soPeO8j0l88UMUcBQrSi7WFCjSe-G2PJV5vg_JLsEim1q2mHuaV9nT6GSQj3sw/exec';
 
-  const DCC_MAIN_CACHE_KEY = 'DCC_MAIN_CACHE_MTG_V11';
-  const DCC_REPORT_CACHE_KEY = 'DCC_REPORT_CACHE_MTG_V9';
-  const DCC_SUBMITTED_CACHE_KEY = 'DCC_SUBMITTED_CACHE_MTG_V9';
-  const DCC_PETUGAS2_KEY = 'DCC_PETUGAS2_NAME_V1';
-  const DCC_PIN_KEY = 'DCC_AUTH_PIN_KEY_V1';
+  const DCC_MAIN_CACHE_KEY = 'DCC_MAIN_CACHE_CWG_V1';
+  const DCC_REPORT_CACHE_KEY = 'DCC_REPORT_CACHE_CWG_V1';
+  const DCC_SUBMITTED_CACHE_KEY = 'DCC_SUBMITTED_CACHE_CWG_V1';
+  const DCC_PETUGAS2_KEY = 'DCC_PETUGAS2_NAME_CWG_V1';
+  const DCC_PIN_KEY = 'DCC_AUTH_PIN_KEY_CWG_V1';
   const DCC_PIN_DEFAULT = '071107';
 
   let currentDccTab = 'main';
@@ -7775,19 +7775,19 @@
   //  EXPIRED DATE SWEEPER (EDS) MODULE ENGINE
   // ══════════════════════════════════════════════
 
-  const EDS_SPREADSHEET_ID = '1fVQwSOoIU9pT5RHWi6-m8qCf_T0rQPZxEf_WuhlaD2g';
+  const EDS_SPREADSHEET_ID = '1T6YcctafqzppSyblW17Gm8zXBrwyXJKi81niF66CXCQ';
   const EDS_BASE_SHEET_URL = `https://docs.google.com/spreadsheets/d/${EDS_SPREADSHEET_ID}/gviz/tq?tqx=out:csv`;
   const EDS_MAIN_URL = EDS_BASE_SHEET_URL + '&sheet=' + encodeURIComponent('Main List SKU ED Sweeper');
   const EDS_HASIL_URL = EDS_BASE_SHEET_URL + '&sheet=' + encodeURIComponent('Hasil EDS ED Sweeper');
   const EDS_UPDATE_URL = EDS_BASE_SHEET_URL + '&sheet=' + encodeURIComponent('Data Update ED Sweeper');
   const EDS_REPORT_URL = EDS_BASE_SHEET_URL + '&sheet=Report';
-  const EDS_DEFAULT_WEBAPP_URL = 'https://script.google.com/macros/s/AKfycbztOsGIAVVfd2SjvkW_euEa7PyU76A4_PJ0HdJgw80eUOHe4XuRuLKoftL9ZxgrDfFLcw/exec';
+  const EDS_DEFAULT_WEBAPP_URL = 'https://script.google.com/macros/s/AKfycbygTPu8soPeO8j0l88UMUcBQrSi7WFCjSe-G2PJV5vg_JLsEim1q2mHuaV9nT6GSQj3sw/exec';
 
-  const EDS_MAIN_CACHE_KEY = 'EDS_MAIN_CACHE_MTG_V4';
-  const EDS_SUBMITTED_CACHE_KEY = 'EDS_SUBMITTED_CACHE_MTG_V4';
-  const EDS_LOCAL_AUDITS_KEY = 'EDS_LOCAL_AUDITS_V4';
-  const EDS_PIC_KEY = 'EDS_DEFAULT_PIC_V2';
-  const EDS_WEBAPP_KEY = 'EDS_CUSTOM_WEBAPP_URL_V3';
+  const EDS_MAIN_CACHE_KEY = 'EDS_MAIN_CACHE_CWG_V1';
+  const EDS_SUBMITTED_CACHE_KEY = 'EDS_SUBMITTED_CACHE_CWG_V1';
+  const EDS_LOCAL_AUDITS_KEY = 'EDS_LOCAL_AUDITS_CWG_V1';
+  const EDS_PIC_KEY = 'EDS_DEFAULT_PIC_CWG_V1';
+  const EDS_WEBAPP_KEY = 'EDS_CUSTOM_WEBAPP_URL_CWG_V1';
 
   // Bersihkan cache usang V2 & V3 agar tidak ada status Done hantu yang nyangkut
   try {
@@ -9696,13 +9696,13 @@
   //  ED CORRECTION (EDC) MODULE ENGINE
   // ══════════════════════════════════════════════
 
-  const EDC_SPREADSHEET_ID_DEFAULT = '1fVQwSOoIU9pT5RHWi6-m8qCf_T0rQPZxEf_WuhlaD2g';
-  const EDC_WEBAPP_KEY = 'EDC_CUSTOM_WEBAPP_URL_V1';
-  const EDC_SPREADSHEET_KEY = 'EDC_CUSTOM_SPREADSHEET_URL_V1';
-  const EDC_MAIN_CACHE_KEY = 'EDC_MAIN_CACHE_MTG_V3';
-  const EDC_SUBMITTED_CACHE_KEY = 'EDC_SUBMITTED_CACHE_MTG_V3';
-  const EDC_PIC_KEY = 'EDC_DEFAULT_PIC_V1';
-  const EDC_OFFLINE_KEY = 'EDC_OFFLINE_QUEUE_LOCAL';
+  const EDC_SPREADSHEET_ID_DEFAULT = '1T6YcctafqzppSyblW17Gm8zXBrwyXJKi81niF66CXCQ';
+  const EDC_WEBAPP_KEY = 'EDC_CUSTOM_WEBAPP_URL_CWG_V1';
+  const EDC_SPREADSHEET_KEY = 'EDC_CUSTOM_SPREADSHEET_URL_CWG_V1';
+  const EDC_MAIN_CACHE_KEY = 'EDC_MAIN_CACHE_CWG_V1';
+  const EDC_SUBMITTED_CACHE_KEY = 'EDC_SUBMITTED_CACHE_CWG_V1';
+  const EDC_PIC_KEY = 'EDC_DEFAULT_PIC_CWG_V1';
+  const EDC_OFFLINE_KEY = 'EDC_OFFLINE_QUEUE_CWG_LOCAL';
 
   try {
     localStorage.removeItem('EDC_MAIN_CACHE_MTG_V1');
@@ -12812,7 +12812,7 @@
   let stockUpdateCacheMap = new Map();
   let isStockUpdateFetching = false;
   let pinjamanAutocompleteTimer = null;
-  const PINJAMAN_WEBAPP_URL = 'https://script.google.com/macros/s/AKfycbzRhVQZEv3TJwTfUhKKV0QtzexKvMS8mfz-iE72LiVRLKulE4_IlU4IW10rII8k7ICpLQ/exec';
+  const PINJAMAN_WEBAPP_URL = 'https://script.google.com/macros/s/AKfycbygTPu8soPeO8j0l88UMUcBQrSi7WFCjSe-G2PJV5vg_JLsEim1q2mHuaV9nT6GSQj3sw/exec';
 
   // ── 1. Fetch & Cache Data dari Sheet 'STOCK UPDATE' ──
   async function fetchStockUpdateSheet() {

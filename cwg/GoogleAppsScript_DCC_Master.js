@@ -4,6 +4,7 @@
  * =========================================================================
  * Spreadsheet: Dashboard STK CWG 2K26
  * URL: https://docs.google.com/spreadsheets/d/1T6YcctafqzppSyblW17Gm8zXBrwyXJKi81niF66CXCQ/edit
+ * Web App URL: https://script.google.com/macros/s/AKfycbygTPu8soPeO8j0l88UMUcBQrSi7WFCjSe-G2PJV5vg_JLsEim1q2mHuaV9nT6GSQj3sw/exec
  *
  * FITUR UNGGULAN:
  * 1. 📈 SUPERSET ENGINE:
