@@ -55,7 +55,7 @@ var CHARTS = [
   { id: 27916, sheet: "SLOC MASTER", pageId: "4x69tbSms9lxcDJvFjiO-" },
   { id: 27954, sheet: "SEQUENCING", pageId: "j4LWezcnd7bllS1NZ4phz" },
   { id: 27922, sheet: "Mainlist Sku ED Corection", formDataKey: "5ZR5jnQ44RUZEAbSmsxhmjrJfhATEhbYNAbzHuVz-yngwq4UFN2xO9zO9QPNf8zl", pageId: "mnOYdW-iXxrCQAOeuBKTk" },
-  { id: 11861, sheet: "BAD & LOST" },
+  { id: 0, sheet: "BAD & LOST", isCombinedBadLdp: true },
   { id: 11815, sheet: "MSLTC" }
 ];
 
@@ -89,6 +89,7 @@ function onOpen() {
     function() { if (typeof buildEdSweeperMenu === 'function') buildEdSweeperMenu(ui); },
     function() { if (typeof buildEdCorrectionMenu === 'function') buildEdCorrectionMenu(ui); },
     function() { if (typeof buildKoliInboundMenu === 'function') buildKoliInboundMenu(ui); },
+    function() { if (typeof buildJadwalMenu === 'function') buildJadwalMenu(ui); },
     function() { if (typeof ensureDailyBackupTrigger === 'function') ensureDailyBackupTrigger(); },
     function() { if (typeof ensureAutoSupersetTrigger === 'function') ensureAutoSupersetTrigger(); },
     function() { if (typeof ensureDailyBackupTriggerEdCorrection === 'function') ensureDailyBackupTriggerEdCorrection(); }
@@ -112,6 +113,7 @@ function buildSupersetMenu(ui) {
     .addItem('7. MSLTC', 'menu_msltc')
     .addSeparator()
     .addItem('🔑 Set / Ganti Cookie Superset', 'setSupersetCookiePrompt')
+    .addItem('🔗 Set Link / Slice ID BAD & LDP', 'setBadLostChartPrompt')
     .addSeparator()
     .addItem('⏰ Aktifkan Pemicu Auto-Sync (Setiap Jam)', 'setupSupersetHourlyTrigger')
     .addItem('🛑 Matikan Pemicu Auto-Sync', 'removeSupersetAutoSyncTriggerPrompt')
@@ -169,7 +171,88 @@ function menu_ed_correction() {
 }
 
 function menu_bad_lost() {
-  update_single(11861, "BAD & LOST");
+  console.log("🚀 [BAD & LOST] Memulai penggabungan data DETAIL BAD dan LDP DETAILS CWG...");
+  var props = PropertiesService.getScriptProperties();
+
+  // 1. DETAIL BAD (CWG)
+  var badFormDataKey = props.getProperty('BAD_FORM_DATA_KEY') || "t6x9bADlyyKPWqOaGJs3kEUex4ypzB-2NWGcltkRMUSfwcPGreBFEKbtlhW71uHcs";
+  var badPageId = props.getProperty('BAD_PAGE_ID') || "ObknBDbUzUg";
+  var badSliceId = props.getProperty('BAD_SLICE_ID') || null;
+
+  // 2. LDP DETAILS CWG
+  var ldpFormDataKey = props.getProperty('LDP_FORM_DATA_KEY') || "1URv13iH9YvjxBZeVHFk3Yg5nAIX6GJsOyBAPYdwObxCEBO_Kml6m7FjwWNCT3dB";
+  var ldpPageId = props.getProperty('LDP_PAGE_ID') || "2fRGZnGpTZsZnXlZ";
+  var ldpSliceId = props.getProperty('LDP_SLICE_ID') || null;
+
+  var badData = [];
+  var ldpData = [];
+  var errors = [];
+
+  try {
+    badData = fetchSupersetData(badSliceId, badFormDataKey, badPageId) || [];
+  } catch (errBad) {
+    if (errBad.message === "COOKIE_EXPIRED") {
+      return alertUser("❌ COOKIE EXPIRED!\n\nSilakan perbarui cookie Superset Anda di menu '📈 Superset Control' ➔ '🔑 Set / Ganti Cookie Superset'.");
+    }
+    if (errBad.message === "MY_COOKIE_EMPTY") {
+      return alertUser("❌ MY_COOKIE belum di-set!\n\nGunakan menu '📈 Superset Control' ➔ '🔑 Set / Ganti Cookie Superset' untuk memasukkan cookie.");
+    }
+    console.warn("⚠️ Gagal tarik DETAIL BAD:", errBad.message);
+    errors.push("DETAIL BAD: " + errBad.message);
+  }
+
+  try {
+    ldpData = fetchSupersetData(ldpSliceId, ldpFormDataKey, ldpPageId) || [];
+  } catch (errLdp) {
+    if (errLdp.message === "COOKIE_EXPIRED") {
+      return alertUser("❌ COOKIE EXPIRED!\n\nSilakan perbarui cookie Superset Anda di menu '📈 Superset Control' ➔ '🔑 Set / Ganti Cookie Superset'.");
+    }
+    if (errLdp.message === "MY_COOKIE_EMPTY") {
+      return alertUser("❌ MY_COOKIE belum di-set!\n\nGunakan menu '📈 Superset Control' ➔ '🔑 Set / Ganti Cookie Superset' untuk memasukkan cookie.");
+    }
+    console.warn("⚠️ Gagal tarik LDP DETAILS CWG:", errLdp.message);
+    errors.push("LDP CWG: " + errLdp.message);
+  }
+
+  if (badData.length === 0 && ldpData.length === 0) {
+    var is404 = errors.some(function(e) { return e.indexOf("404") !== -1; });
+    if (is404) {
+      return alertUser("❌ GAGAL TARIK DATA (HTTP 404 - Link/Key Expired)!\n\n" +
+        "Key Superset sementara yang sebelumnya sudah kedaluwarsa di server.\n\n" +
+        "👉 SOLUSI CEPAT:\n" +
+        "1. Buka chart 'DETAIL BAD' dan 'LDP DETAILS CWG' di tab browser dash.astronauts.id Anda.\n" +
+        "2. Klik tombol 'Save' di kanan atas untuk menyimpan permanen (atau klik 'UPDATE CHART').\n" +
+        "3. Copy URL baru / Slice ID-nya.\n" +
+        "4. Masukkan ke menu Google Sheets: '📈 Superset Control' ➔ '🔗 Set Link / Slice ID BAD & LDP'.");
+    }
+    return alertUser("❌ Gagal menarik kedua data (DETAIL BAD & LDP CWG):\n" + errors.join("\n"));
+  }
+
+  // Gabungkan kedua data dengan kolom penanda KATEGORI: "BAD" atau "LDP" di posisi pertama
+  var combinedData = [];
+
+  badData.forEach(function(row) {
+    var item = Object.assign({ KATEGORI: "BAD" }, row);
+    combinedData.push(item);
+  });
+
+  ldpData.forEach(function(row) {
+    var item = Object.assign({ KATEGORI: "LDP" }, row);
+    combinedData.push(item);
+  });
+
+  // Tulis ke sheet tujuan
+  processToSheet(combinedData, "BAD & LOST");
+
+  var msg = "✅ Berhasil menggabungkan data BAD & LDP ke sheet 'BAD & LOST'!\n\n" +
+            "• DETAIL BAD: " + badData.length + " baris\n" +
+            "• LDP CWG: " + ldpData.length + " baris\n" +
+            "• Total Digabung: " + combinedData.length + " baris";
+  if (errors.length > 0) {
+    msg += "\n\n⚠️ Catatan: " + errors.join("; ");
+  }
+  console.log("✅ [BAD & LOST] " + msg);
+  alertUser(msg);
 }
 
 function menu_msltc() {
@@ -179,7 +262,11 @@ function menu_msltc() {
 function update_all() {
   console.log("🚀 [AUTO-SYNC] Memulai penarikan data Superset...");
   CHARTS.forEach(function(c) {
-    update_single(c.id, c.sheet);
+    if (c.sheet === "BAD & LOST" || c.sheet === "Bad & Lost" || c.isCombinedBadLdp) {
+      menu_bad_lost();
+    } else {
+      update_single(c.id, c.sheet);
+    }
   });
 
   alertUser("✅ Semua data Superset berhasil diperbarui!");
@@ -607,16 +694,102 @@ function doPost(e) {
 // ============================================================
 // 🧠 CORE ENGINE (SUPERSET DATA FETCHER)
 // ============================================================
-function pullSupersetData(chartId, sheetName) {
+function fetchSupersetData(chartId, formDataKey, pageId) {
   var cookie = PropertiesService
     .getScriptProperties()
     .getProperty('MY_COOKIE');
 
   if (!cookie) {
-    return alertUser("❌ MY_COOKIE belum di-set!\n\nGunakan menu '📈 Superset Control' ➔ '🔑 Set / Ganti Cookie Superset' untuk memasukkan cookie.");
+    throw new Error("MY_COOKIE_EMPTY");
   }
 
+  var baseUrl = (CONFIG.BASE_URL || "https://dash.astronauts.id/").replace(/\/+$/, '') + '/';
   var timestamp = new Date().getTime();
+  var urlVariants = [];
+
+  // Jika ada chartId (slice_id), prioritaskan karena permanen tidak pernah expired
+  if (chartId) {
+    if (pageId) {
+      urlVariants.push(baseUrl + "superset/explore_json/?dashboard_page_id=" + encodeURIComponent(pageId) + "&slice_id=" + chartId + "&force=true&_t=" + timestamp);
+    }
+    urlVariants.push(baseUrl + "superset/explore_json/?form_data=" + encodeURIComponent(JSON.stringify({ slice_id: Number(chartId) })) + "&force=true&_t=" + timestamp);
+    urlVariants.push(baseUrl + "api/v1/chart/" + chartId + "/data/?force=true&_t=" + timestamp);
+  }
+
+  if (formDataKey) {
+    if (pageId) {
+      urlVariants.push(baseUrl + "superset/explore_json/?form_data_key=" + encodeURIComponent(formDataKey) + "&dashboard_page_id=" + encodeURIComponent(pageId) + (chartId ? "&slice_id=" + chartId : "") + "&force=true&_t=" + timestamp);
+    }
+    urlVariants.push(baseUrl + "superset/explore_json/?form_data_key=" + encodeURIComponent(formDataKey) + (chartId ? "&slice_id=" + chartId : "") + "&force=true&_t=" + timestamp);
+  }
+
+  var data = null;
+  var lastError = "";
+
+  for (var u = 0; u < urlVariants.length; u++) {
+    for (var i = 0; i < CONFIG.MAX_RETRY; i++) {
+      try {
+        var response = UrlFetchApp.fetch(urlVariants[u], {
+          method: "get",
+          headers: {
+            "Cookie": cookie,
+            "X-Requested-With": "XMLHttpRequest",
+            "Accept": "application/json"
+          },
+          muteHttpExceptions: true
+        });
+
+        var code = response.getResponseCode();
+        if (code === 401) throw new Error("COOKIE_EXPIRED");
+        if (code === 302) {
+          var redirectLoc = (response.getHeaders && response.getHeaders()['Location']) ? response.getHeaders()['Location'] : '';
+          if (redirectLoc.indexOf('login') !== -1) {
+            throw new Error("COOKIE_EXPIRED");
+          }
+        }
+        if (code !== 200) {
+          lastError = "HTTP " + code;
+          Utilities.sleep(CONFIG.RETRY_DELAY);
+          continue;
+        }
+
+        var json = JSON.parse(response.getContentText());
+        if (json.result && json.result[0] && json.result[0].data) {
+          data = json.result[0].data;
+        } else if (json.result && json.result[0] && json.result[0].records) {
+          data = json.result[0].records;
+        } else if (json.data && json.data.records) {
+          data = json.data.records;
+        } else if (Array.isArray(json.data)) {
+          data = json.data;
+        } else if (Array.isArray(json)) {
+          data = json;
+        } else if (json.records && Array.isArray(json.records)) {
+          data = json.records;
+        } else if (json.colnames && json.data) {
+          data = json.data.map(function(row) {
+            var obj = {};
+            json.colnames.forEach(function(col, idx) {
+              obj[col] = row[idx];
+            });
+            return obj;
+          });
+        }
+
+        if (data && data.length > 0) {
+          return data;
+        }
+      } catch (e) {
+        if (e.message === "COOKIE_EXPIRED") throw e;
+        lastError = e.message;
+      }
+    }
+  }
+
+  throw new Error(lastError || "Respon kosong atau data tidak ditemukan");
+}
+
+function pullSupersetData(chartId, sheetName) {
   var props = PropertiesService.getScriptProperties();
 
   // Cari konfigurasi chart dari daftar CHARTS CWG (Prioritas ID lalu sheet)
@@ -648,95 +821,22 @@ function pullSupersetData(chartId, sheetName) {
   if (sheetName === 'RACK UPDATE' && rackFormDataKey) formDataKey = rackFormDataKey;
   if (sheetName === 'RACK UPDATE' && rackPageId) pageId = rackPageId;
 
-  var urlVariants = [];
-  if (formDataKey) {
-    urlVariants.push(CONFIG.BASE_URL + "superset/explore_json/?form_data_key=" + encodeURIComponent(formDataKey) + "&slice_id=" + effectiveChartId + "&force=true&_t=" + timestamp);
-  }
-  if (pageId) {
-    urlVariants.push(CONFIG.BASE_URL + "superset/explore_json/?form_data=" + encodeURIComponent(JSON.stringify({ slice_id: Number(effectiveChartId), dashboard_page_id: pageId })) + "&force=true&_t=" + timestamp);
-    urlVariants.push(CONFIG.BASE_URL + "superset/explore_json/?dashboard_page_id=" + encodeURIComponent(pageId) + "&slice_id=" + effectiveChartId + "&force=true&_t=" + timestamp);
-  }
-  urlVariants.push(CONFIG.BASE_URL + "superset/explore_json/?form_data=" + encodeURIComponent(JSON.stringify({ slice_id: Number(effectiveChartId) })) + "&force=true&_t=" + timestamp);
-  urlVariants.push(CONFIG.BASE_URL + "api/v1/chart/" + effectiveChartId + "/data/?force=true&_t=" + timestamp);
-  urlVariants.push(CONFIG.BASE_URL + "api/v1/chart/" + effectiveChartId + "/data?force=true&_t=" + timestamp);
-
-  var response;
-  var data;
-  var success = false;
-  var lastError = "";
-
-  for (var u = 0; u < urlVariants.length; u++) {
-    for (var i = 0; i < CONFIG.MAX_RETRY; i++) {
-      try {
-        response = UrlFetchApp.fetch(urlVariants[u], {
-          method: "get",
-          headers: {
-            "Cookie": cookie,
-            "X-Requested-With": "XMLHttpRequest",
-            "Accept": "application/json"
-          },
-          muteHttpExceptions: true
-        });
-
-        var code = response.getResponseCode();
-
-        if (code === 401) {
-          return alertUser("❌ COOKIE EXPIRED!\n\nSilakan perbarui cookie Superset Anda di menu '🔑 Set / Ganti Cookie Superset'.");
-        }
-
-        if (code === 302) {
-          var redirectLoc = (response.getHeaders && response.getHeaders()['Location']) ? response.getHeaders()['Location'] : '';
-          if (redirectLoc.indexOf('login') !== -1) {
-            return alertUser("❌ COOKIE EXPIRED / INVALID!\n\nSuperset mengarahkan ke Login. Silakan perbarui cookie Superset Anda di menu '🔑 Set / Ganti Cookie Superset'.");
-          }
-        }
-
-        if (code !== 200) {
-          lastError = "HTTP " + code;
-          Utilities.sleep(CONFIG.RETRY_DELAY);
-          continue;
-        }
-
-        var json = JSON.parse(response.getContentText());
-
-        if (json.result && json.result[0] && json.result[0].data) {
-          data = json.result[0].data;
-        } else if (json.result && json.result[0] && json.result[0].records) {
-          data = json.result[0].records;
-        } else if (json.data && json.data.records) {
-          data = json.data.records;
-        } else if (Array.isArray(json.data)) {
-          data = json.data;
-        } else if (Array.isArray(json)) {
-          data = json;
-        } else if (json.records && Array.isArray(json.records)) {
-          data = json.records;
-        } else if (json.colnames && json.data) {
-          data = json.data.map(function(row) {
-            var obj = {};
-            json.colnames.forEach(function(col, idx) {
-              obj[col] = row[idx];
-            });
-            return obj;
-          });
-        }
-
-        if (data && data.length > 0) {
-          processToSheet(data, sheetName);
-          success = true;
-          alertUser("✅ Berhasil menarik " + data.length + " data ke sheet '" + sheetName + "'!");
-          break;
-        }
-
-      } catch (e) {
-        lastError = e.message;
-      }
+  try {
+    var data = fetchSupersetData(effectiveChartId, formDataKey, pageId);
+    if (data && data.length > 0) {
+      processToSheet(data, sheetName);
+      alertUser("✅ Berhasil menarik " + data.length + " data ke sheet '" + sheetName + "'!");
+    } else {
+      alertUser("⚠️ Data Superset untuk '" + sheetName + "' kosong.");
     }
-    if (success) break;
-  }
-
-  if (!success) {
-    alertUser("❌ Gagal tarik data (" + sheetName + ")\n" + lastError);
+  } catch (err) {
+    if (err.message === "COOKIE_EXPIRED") {
+      return alertUser("❌ COOKIE EXPIRED!\n\nSilakan perbarui cookie Superset Anda di menu '📈 Superset Control' ➔ '🔑 Set / Ganti Cookie Superset'.");
+    }
+    if (err.message === "MY_COOKIE_EMPTY") {
+      return alertUser("❌ MY_COOKIE belum di-set!\n\nGunakan menu '📈 Superset Control' ➔ '🔑 Set / Ganti Cookie Superset' untuk memasukkan cookie.");
+    }
+    alertUser("❌ Gagal tarik data (" + sheetName + ")\n" + err.message);
   }
 }
 
@@ -745,7 +845,16 @@ function pullSupersetData(chartId, sheetName) {
 // =============================
 function processToSheet(data, sheetName) {
   var ss = getSpreadsheet();
-  var sheet = ss.getSheetByName(sheetName) || ss.insertSheet(sheetName);
+  var sheet = ss.getSheetByName(sheetName);
+  if (!sheet && (sheetName.toUpperCase() === "BAD & LOST" || sheetName.toUpperCase() === "BAD AND LOST")) {
+    sheet = ss.getSheetByName("BAD & LOST") || 
+            ss.getSheetByName("Bad & Lost") || 
+            ss.getSheetByName("MRG - Bad & Lost") || 
+            ss.getSheetByName("BAD & LOST CWG");
+  }
+  if (!sheet) {
+    sheet = ss.insertSheet(sheetName);
+  }
 
   if (!data || data.length === 0) {
     sheet.clearContents();
@@ -775,7 +884,18 @@ function processToSheet(data, sheetName) {
     }
   }
 
-  var headers = Object.keys(data[0]);
+  // Kumpulkan semua keys unik dari seluruh baris (menjaga KATEGORI tetap di kolom pertama jika ada)
+  var headerSet = [];
+  var seenKeys = {};
+  data.forEach(function(item) {
+    Object.keys(item).forEach(function(key) {
+      if (!seenKeys[key]) {
+        seenKeys[key] = true;
+        headerSet.push(key);
+      }
+    });
+  });
+  var headers = headerSet;
 
   // FIX KHUSUS ED CORRECTION / SUPERSET: Jika ada qr_code (SKU;DDMMYYYY) dan belum ada kolom sku_number, buat kolom sku_number otomatis
   var qrIdx = headers.indexOf('qr_code');
@@ -809,9 +929,9 @@ function processToSheet(data, sheetName) {
         } catch(e) {}
       }
 
-      // FIX 3: Pastikan quantity & price bertipe number murni
+      // FIX 3: Pastikan quantity, stock, cogs, stock_value & price bertipe number murni
       var cleanKey = key.toLowerCase();
-      if (cleanKey === "quantity" || cleanKey === "reserved_quantity" || cleanKey.includes("qty") || cleanKey === "price") {
+      if (cleanKey === "quantity" || cleanKey === "reserved_quantity" || cleanKey.includes("qty") || cleanKey === "price" || cleanKey === "stock" || cleanKey === "cogs" || cleanKey === "stock_value") {
         return (value !== "" && value !== null && !isNaN(value)) ? Number(value) : value;
       }
 
@@ -1392,6 +1512,71 @@ function setRackUpdateChartPrompt() {
       ui.alert('✅ form_data_key RACK UPDATE berhasil disimpan!');
     }
   }
+}
+
+// ==============================================================================
+// ⚙️ SET URL / SLICE ID CHART BAD & LDP (CWG)
+// ==============================================================================
+function setBadLostChartPrompt() {
+  var ui = SpreadsheetApp.getUi();
+  var props = PropertiesService.getScriptProperties();
+
+  var curBadKey = props.getProperty('BAD_FORM_DATA_KEY') || '';
+  var curBadId = props.getProperty('BAD_SLICE_ID') || '';
+  var curLdpKey = props.getProperty('LDP_FORM_DATA_KEY') || '';
+  var curLdpId = props.getProperty('LDP_SLICE_ID') || '';
+
+  // 1. DETAIL BAD
+  var resBad = ui.prompt(
+    '🔗 Set Link / Slice ID: DETAIL BAD (1/2)',
+    'Paste URL Explore dari dash.astronauts.id atau form_data_key atau nomor Slice ID untuk DETAIL BAD:\n\n' +
+    'Saat Ini:\n• Slice ID: ' + (curBadId || '-') + '\n• Key: ' + (curBadKey ? (curBadKey.substring(0, 25) + '...') : '(Default CWG Key)'),
+    ui.ButtonSet.OK_CANCEL
+  );
+
+  if (resBad.getSelectedButton() === ui.Button.OK) {
+    var valBad = resBad.getResponseText().trim();
+    if (valBad) {
+      if (/^\d+$/.test(valBad)) {
+        props.setProperty('BAD_SLICE_ID', valBad);
+      } else {
+        var kM = valBad.match(/form_data_key=([a-zA-Z0-9_\-]+)/);
+        var sM = valBad.match(/slice_id=(\d+)/);
+        var pM = valBad.match(/dashboard_page_id=([a-zA-Z0-9_\-]+)/);
+        if (kM) props.setProperty('BAD_FORM_DATA_KEY', kM[1]);
+        if (sM) props.setProperty('BAD_SLICE_ID', sM[1]);
+        if (pM) props.setProperty('BAD_PAGE_ID', pM[1]);
+        if (!kM && !sM) props.setProperty('BAD_FORM_DATA_KEY', valBad);
+      }
+    }
+  }
+
+  // 2. LDP CWG
+  var resLdp = ui.prompt(
+    '🔗 Set Link / Slice ID: LDP CWG (2/2)',
+    'Paste URL Explore dari dash.astronauts.id atau form_data_key atau nomor Slice ID untuk LDP CWG:\n\n' +
+    'Saat Ini:\n• Slice ID: ' + (curLdpId || '-') + '\n• Key: ' + (curLdpKey ? (curLdpKey.substring(0, 25) + '...') : '(Default CWG Key)'),
+    ui.ButtonSet.OK_CANCEL
+  );
+
+  if (resLdp.getSelectedButton() === ui.Button.OK) {
+    var valLdp = resLdp.getResponseText().trim();
+    if (valLdp) {
+      if (/^\d+$/.test(valLdp)) {
+        props.setProperty('LDP_SLICE_ID', valLdp);
+      } else {
+        var kM2 = valLdp.match(/form_data_key=([a-zA-Z0-9_\-]+)/);
+        var sM2 = valLdp.match(/slice_id=(\d+)/);
+        var pM2 = valLdp.match(/dashboard_page_id=([a-zA-Z0-9_\-]+)/);
+        if (kM2) props.setProperty('LDP_FORM_DATA_KEY', kM2[1]);
+        if (sM2) props.setProperty('LDP_SLICE_ID', sM2[1]);
+        if (pM2) props.setProperty('LDP_PAGE_ID', pM2[1]);
+        if (!kM2 && !sM2) props.setProperty('LDP_FORM_DATA_KEY', valLdp);
+      }
+    }
+  }
+
+  ui.alert('✅ Konfigurasi Link BAD & LDP berhasil disimpan!\n\nSilakan jalankan menu: "📈 Superset Control" ➔ "6. BAD & LOST".');
 }
 
 // ==============================================================================

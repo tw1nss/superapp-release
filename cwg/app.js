@@ -3047,6 +3047,16 @@
       clockInterval = null;
     }
 
+    // 🛡️ Guard: Fitur dinonaktifkan sementara khusus Hub CWG
+    if (menu === 'complain' || menu === 'slip_gaji' || menu === 'hk' || menu === 'pinjaman') {
+      if (typeof showDccToast === 'function') {
+        showDccToast('info', 'Menu Dinonaktifkan', 'Fitur ini dinonaktifkan sementara khusus untuk Hub Cawang.');
+      } else {
+        alert('Fitur ini dinonaktifkan sementara khusus untuk Hub Cawang.');
+      }
+      return;
+    }
+
     const hideAllWorkspaces = () => {
       const workspaces = [
         'homeMenuSection',
