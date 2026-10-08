@@ -10,16 +10,23 @@
 
   // ── Config CWG ──
   const SHEET_ID = '1T6YcctafqzppSyblW17Gm8zXBrwyXJKi81niF66CXCQ';
-  // Selective column query for Master Rack (from 'RACK UPDATE' - real-time latest SLOC from Superset SLOC MASTER)
-  // Kolom RACK UPDATE: A=location_name, C=sku_number, D=product_name, F=rack_name, H=stock, J=product_type_name
-  const MASTER_CSV_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent('RACK UPDATE')}&tq=${encodeURIComponent("SELECT A, C, D, F, H, J WHERE F IS NOT NULL AND F != ''")}`;
-  // CSV Query for MSLTC sheet
+  // Selective column query for Master Rack (from 'SLOC MASTER' and 'STOCK UPDATE' - real-time latest SLOC from Superset)
+  // Kolom SLOC MASTER: A=location_name, C=sku_number, D=product_name, F=rack_name, I=stock
+  const SLOC_MASTER_CSV_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent('SLOC MASTER')}&tq=${encodeURIComponent("SELECT A, C, D, F, I WHERE F IS NOT NULL AND F != ''")}`;
+  // Kolom STOCK UPDATE: A=location_name, C=sku_number, D=product_name, F=rack_name, I=stock, J=l1_category_name
+  const STOCK_UPDATE_CSV_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent('STOCK UPDATE')}&tq=${encodeURIComponent("SELECT A, C, D, F, I, J WHERE F IS NOT NULL AND F != ''")}`;
+  // CSV Query for MSLTC sheet (for shelf-life days validation)
   const MSLTC_CSV_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=MSLTC`;
 
   const MAX_HISTORY = 8;
-  const DB_NAME = 'QRSLOC_DB_CWG_V1';
-  const DB_VERSION = 1;
+  const DB_NAME = 'QRSLOC_DB_CWG_V2';
+  const DB_VERSION = 2;
   const STORE_NAME = 'master_cache';
+
+  // Wipe legacy V1 cache to prevent stale Menteng data
+  if (typeof window !== 'undefined' && window.indexedDB && window.indexedDB.deleteDatabase) {
+    try { window.indexedDB.deleteDatabase('QRSLOC_DB_CWG_V1'); } catch (e) {}
+  }
 
   // ── State ──
   let dataMap = new Map(); // Master Rack SKU → Array of { sloc, productName, masterSloc, type, left }
@@ -171,38 +178,44 @@
     return rows;
   }
 
-  function buildMasterMap(rows) {
+  function inferCategoryFromSloc(sloc) {
+    if (!sloc) return '';
+    const upper = sloc.toUpperCase();
+    if (upper.includes('CHL') || upper.includes('CHILLER')) return 'Fresh';
+    if (upper.includes('FRZ') || upper.includes('FREEZER')) return 'Frozen';
+    if (upper.includes('AMD') || upper.includes('AMBIENT')) return 'Ambient';
+    return '';
+  }
+
+  function buildMasterMap(slocRows, stockRows = []) {
     const map = new Map();
     const masterArray = [];
     let count = 0;
-    if (!rows || rows.length < 2) return { map, count, masterArray };
+    if (!slocRows || slocRows.length < 2) return { map, count, masterArray };
 
-    const header = rows[0].map(h => (h || '').toLowerCase().trim());
-    
-    // Find column indexes dynamically by header name
+    // 1. Process SLOC MASTER rows (9,000+ mapped SKUs for Hub CWG)
+    const header = slocRows[0].map(h => (h || '').toLowerCase().trim());
     let skuIdx = header.findIndex(h => h === 'sku_number' || h === 'sku' || h.includes('sku'));
     let slocIdx = header.findIndex(h => h === 'rack_name' || h === 'sloc sistem' || h === 'sloc' || h.includes('rack') || h.includes('sloc'));
     let prodIdx = header.findIndex(h => h === 'product_name' || h === 'nama produk' || h.includes('product') || h.includes('nama'));
-    let typeIdx = header.findIndex(h => h === 'product_type_name' || h === 'type' || h.includes('type') || h.includes('kategori'));
+    let typeIdx = header.findIndex(h => h === 'product_type_name' || h === 'type' || h.includes('type') || h.includes('kategori') || h.includes('category'));
     let masterSlocIdx = header.findIndex(h => h === 'master sloc' || h === 'master_sloc');
     let leftIdx = header.findIndex(h => h === 'left' || h === 'location_name');
     let qtyIdx = header.findIndex(h => h === 'quantity' || h === 'qty' || h.includes('stok') || h.includes('stock'));
 
-    // Fallbacks if header matching is not found
     if (skuIdx === -1) skuIdx = 1;
-    if (slocIdx === -1) slocIdx = 2;
-    if (prodIdx === -1) prodIdx = 3;
-    if (typeIdx === -1) typeIdx = 5;
+    if (slocIdx === -1) slocIdx = 3;
+    if (prodIdx === -1) prodIdx = 2;
 
-    for (let i = 1; i < rows.length; i++) {
-      const row = rows[i];
+    for (let i = 1; i < slocRows.length; i++) {
+      const row = slocRows[i];
       const sku = (row[skuIdx] || '').trim();
       const sloc = (row[slocIdx] || '').trim();
       const productName = prodIdx !== -1 ? (row[prodIdx] || '').trim() : '';
-      const type = typeIdx !== -1 ? (row[typeIdx] || '').trim() : '';
+      let type = typeIdx !== -1 ? (row[typeIdx] || '').trim() : '';
+      if (!type) type = inferCategoryFromSloc(sloc);
       const masterSloc = masterSlocIdx !== -1 && row[masterSlocIdx] ? row[masterSlocIdx].trim() : sloc;
 
-      // Extract floor / aisle prefix (e.g. L1-, L2-, L3-) for barcode card printing
       let left = '';
       if (sloc) {
         const m = sloc.match(/^L\d+-/i);
@@ -218,10 +231,61 @@
         const item = { sku, sloc, productName, masterSloc, type, left, qty };
         if (!map.has(sku)) {
           map.set(sku, []);
+          count++;
         }
         map.get(sku).push(item);
         masterArray.push([sku, item]);
-        count++;
+      }
+    }
+
+    // 2. Process STOCK UPDATE rows (Enrich with latest active stock & categories)
+    if (stockRows && stockRows.length > 1) {
+      const sHeader = stockRows[0].map(h => (h || '').toLowerCase().trim());
+      let sSkuIdx = sHeader.findIndex(h => h === 'sku_number' || h === 'sku' || h.includes('sku'));
+      let sSlocIdx = sHeader.findIndex(h => h === 'rack_name' || h === 'sloc sistem' || h === 'sloc' || h.includes('rack') || h.includes('sloc'));
+      let sProdIdx = sHeader.findIndex(h => h === 'product_name' || h === 'nama produk' || h.includes('product') || h.includes('nama'));
+      let sTypeIdx = sHeader.findIndex(h => h === 'product_type_name' || h === 'type' || h.includes('type') || h.includes('kategori') || h.includes('category') || h === 'l1_category_name');
+      let sQtyIdx = sHeader.findIndex(h => h === 'quantity' || h === 'qty' || h.includes('stok') || h.includes('stock'));
+
+      if (sSkuIdx === -1) sSkuIdx = 1;
+      if (sSlocIdx === -1) sSlocIdx = 3;
+      if (sProdIdx === -1) sProdIdx = 2;
+
+      for (let i = 1; i < stockRows.length; i++) {
+        const row = stockRows[i];
+        const sku = (row[sSkuIdx] || '').trim();
+        const sloc = (row[sSlocIdx] || '').trim();
+        const productName = sProdIdx !== -1 ? (row[sProdIdx] || '').trim() : '';
+        const cat = sTypeIdx !== -1 ? (row[sTypeIdx] || '').trim() : '';
+        const type = cat || inferCategoryFromSloc(sloc);
+        const qty = sQtyIdx !== -1 ? (row[sQtyIdx] || '').trim() : '';
+
+        if (sku && sloc) {
+          let left = '';
+          const m = sloc.match(/^L\d+-/i);
+          if (m) left = m[0];
+
+          if (!map.has(sku)) {
+            const item = { sku, sloc, productName, masterSloc: sloc, type, left, qty };
+            map.set(sku, [item]);
+            masterArray.push([sku, item]);
+            count++;
+          } else {
+            const items = map.get(sku);
+            const match = items.find(it => it.sloc === sloc);
+            if (match) {
+              if (qty) match.qty = qty;
+              if (type) match.type = type;
+              if (productName && (!match.productName || match.productName.length < productName.length)) {
+                match.productName = productName;
+              }
+            } else {
+              const item = { sku, sloc, productName, masterSloc: sloc, type, left, qty };
+              items.push(item);
+              masterArray.push([sku, item]);
+            }
+          }
+        }
       }
     }
 
@@ -235,6 +299,7 @@
   function buildMsltcMap(rows) {
     const map = new Map();
     const msltcArray = [];
+    if (!rows || rows.length < 2) return { map, msltcArray };
 
     // Header: location_id, location_name, product_id, sku_number, product_name, rack_name, Product Type, msltc
     for (let i = 1; i < rows.length; i++) {
@@ -243,13 +308,23 @@
       const productId = (row[2] || '').trim();
       const sku = (row[3] || '').trim();
       const productName = (row[4] || '').trim();
-      const rackName = (row[5] || '').trim();
+      // For Hub CWG: If data comes from MTG / Menteng, do NOT use Menteng's rack or Menteng's location name as CWG SLOC!
+      const isMtg = locationName.toUpperCase().includes('MTG') || locationName.toUpperCase().includes('MENTENG');
+      const rackName = isMtg ? '' : (row[5] || '').trim();
       const type = (row[6] || '').trim();
       const msltcDays = parseInt((row[7] || '0').trim(), 10) || 0;
 
       if (sku || productId) {
         const primaryKey = sku || productId;
-        const item = { locationName, productId, sku: primaryKey, productName, rackName, type, msltcDays };
+        const item = {
+          locationName: isMtg ? 'CWG - Cawang' : locationName,
+          productId,
+          sku: primaryKey,
+          productName,
+          rackName,
+          type,
+          msltcDays
+        };
 
         if (!map.has(primaryKey)) {
           map.set(primaryKey, []);
@@ -268,7 +343,7 @@
     }
 
     for (const [, items] of map.entries()) {
-      items.sort((a, b) => compareSlocNatural(a.rackName || a.locationName, b.rackName || b.locationName));
+      items.sort((a, b) => compareSlocNatural(a.rackName, b.rackName));
     }
 
     return { map, msltcArray };
@@ -329,24 +404,28 @@
 
     try {
       const fetchTime = Date.now();
-      const masterUrlWithTs = MASTER_CSV_URL + '&_nocache=' + fetchTime;
+      const slocUrlWithTs = SLOC_MASTER_CSV_URL + '&_nocache=' + fetchTime;
+      const stockUrlWithTs = STOCK_UPDATE_CSV_URL + '&_nocache=' + fetchTime;
       const msltcUrlWithTs = MSLTC_CSV_URL + '&_nocache=' + fetchTime;
-      const [masterRes, msltcRes] = await Promise.all([
-        fetch(masterUrlWithTs, { cache: 'no-store' }),
+      const [slocRes, stockRes, msltcRes] = await Promise.all([
+        fetch(slocUrlWithTs, { cache: 'no-store' }),
+        fetch(stockUrlWithTs, { cache: 'no-store' }),
         fetch(msltcUrlWithTs, { cache: 'no-store' })
       ]);
 
-      if (!masterRes.ok || !msltcRes.ok) throw new Error(`HTTP fetch error`);
+      if (!slocRes.ok && !stockRes.ok) throw new Error(`HTTP fetch error`);
 
-      const [masterCsv, msltcCsv] = await Promise.all([
-        masterRes.text(),
-        msltcRes.text()
+      const [slocCsv, stockCsv, msltcCsv] = await Promise.all([
+        slocRes.ok ? slocRes.text() : Promise.resolve(''),
+        stockRes.ok ? stockRes.text() : Promise.resolve(''),
+        msltcRes.ok ? msltcRes.text() : Promise.resolve('')
       ]);
 
-      const masterRows = parseCSV(masterCsv);
-      const msltcRows = parseCSV(msltcCsv);
+      const slocRows = slocCsv ? parseCSV(slocCsv) : [];
+      const stockRows = stockCsv ? parseCSV(stockCsv) : [];
+      const msltcRows = msltcCsv ? parseCSV(msltcCsv) : [];
 
-      const masterResult = buildMasterMap(masterRows);
+      const masterResult = buildMasterMap(slocRows, stockRows);
       const msltcResult = buildMsltcMap(msltcRows);
 
       dataMap = masterResult.map;
@@ -614,7 +693,7 @@
       const itemsToUse = withRack.length > 0 ? withRack : msltcFound;
       const mapped = itemsToUse.map(m => ({
         sku: m.sku || m.productId || cleaned,
-        sloc: m.rackName || 'Belum Ada SLOC di Sistem',
+        sloc: m.rackName || 'Belum Ada SLOC di CWG',
         productName: m.productName || 'Produk MSLTC',
         masterSloc: m.rackName || '',
         type: m.type || 'Fresh',
@@ -625,14 +704,14 @@
       return mapped;
     }
 
-    // 2b. Search by SLOC (Lokasi Rak) in Master Data (RACK UPDATE) & MSLTC
+    // 2b. Search by SLOC (Lokasi Rak) in Master Data (SLOC MASTER) & MSLTC
     const rawLower = cleaned.toLowerCase();
     const noHyphenQuery = rawLower.replace(/[^a-z0-9]/g, '');
     const slocMatches = [];
     const seenSlocKeys = new Set();
 
     if (cleaned.length >= 2) {
-      // Cari di dataMap (RACK UPDATE)
+      // Cari di dataMap (SLOC MASTER)
       for (const [key, items] of dataMap) {
         for (const item of items) {
           const sloc = (item.sloc || item.masterSloc || '').trim();
@@ -675,7 +754,7 @@
       // Cari di msltcMap
       for (const [key, items] of msltcMap) {
         for (const item of items) {
-          const sloc = (item.rackName || item.locationName || '').trim();
+          const sloc = (item.rackName || '').trim();
           if (!sloc) continue;
           const lowerSloc = sloc.toLowerCase();
           const noHyphenSloc = lowerSloc.replace(/[^a-z0-9]/g, '');
@@ -759,13 +838,13 @@
       for (const item of items) {
         const score = matchProductName(item.productName, lowerQuery, queryWords);
         if (score > 0) {
-          const uniqueId = `${item.sku || key}_${item.rackName || item.locationName}`;
+          const uniqueId = `${item.sku || key}_${item.rackName || ''}`;
           if (!seenMsltcKeys.has(uniqueId)) {
             seenMsltcKeys.add(uniqueId);
             msltcScored.push({
               item: {
                 sku: item.sku || item.productId || cleaned,
-                sloc: item.rackName || 'Belum Ada SLOC di Sistem',
+                sloc: item.rackName || 'Belum Ada SLOC di CWG',
                 productName: item.productName || 'Produk MSLTC',
                 masterSloc: item.rackName || '',
                 type: item.type || 'Fresh',
@@ -828,13 +907,13 @@
       }
     }
     for (const [skuKey, items] of msltcMap) {
-      const bestItem = items.find(it => !isBadSloc(it.rackName || it.locationName)) || items[0] || {};
+      const bestItem = items.find(it => it.rackName && !isBadSloc(it.rackName)) || items[0] || {};
       const actualSku = bestItem.sku || skuKey;
       if (skuKey.toLowerCase().trim() === cleaned.toLowerCase() && items.length > 0 && !suggestionMap.has(actualSku)) {
         suggestionMap.set(actualSku, {
           sku: actualSku,
           productName: bestItem.productName || skuKey,
-          sloc: bestItem.rackName || bestItem.locationName || '',
+          sloc: bestItem.rackName || '',
           type: bestItem.type || '',
           expDate: expDate,
           score: 95
@@ -842,7 +921,7 @@
       }
     }
 
-    // 1b. Search by SLOC (Rak) in dataMap (RACK UPDATE) & MSLTC
+    // 1b. Search by SLOC (Rak) in dataMap (SLOC MASTER) & MSLTC
     const rawLower = cleaned.toLowerCase();
     const noHyphenQuery = rawLower.replace(/[^a-z0-9]/g, '');
 
@@ -883,7 +962,7 @@
 
       for (const [skuKey, items] of msltcMap) {
         for (const item of items) {
-          const sloc = (item.rackName || item.locationName || '').trim();
+          const sloc = (item.rackName || '').trim();
           if (!sloc) continue;
           const lowerSloc = sloc.toLowerCase();
           const noHyphenSloc = lowerSloc.replace(/[^a-z0-9]/g, '');
@@ -937,7 +1016,7 @@
 
     // 3. Search in MSLTC map
     for (const [skuKey, items] of msltcMap) {
-      const bestItem = items.find(it => !isBadSloc(it.rackName || it.locationName)) || items[0] || {};
+      const bestItem = items.find(it => it.rackName && !isBadSloc(it.rackName)) || items[0] || {};
       const actualSku = bestItem.sku || skuKey;
       if (suggestionMap.has(actualSku)) continue;
 
@@ -946,7 +1025,7 @@
         suggestionMap.set(actualSku, {
           sku: actualSku,
           productName: bestItem.productName || skuKey,
-          sloc: bestItem.rackName || bestItem.locationName || '',
+          sloc: bestItem.rackName || '',
           type: bestItem.type || '',
           expDate: expDate,
           score: score
@@ -1062,7 +1141,7 @@
       const msltcFound = msltcMap.get(sku);
       results = msltcFound.map(m => ({
         sku: m.sku || m.productId || sku,
-        sloc: m.rackName || 'Belum Ada SLOC di Sistem',
+        sloc: m.rackName || 'Belum Ada SLOC di CWG',
         productName: m.productName || 'Produk MSLTC',
         masterSloc: m.rackName || '',
         type: m.type || 'Fresh',
@@ -3610,14 +3689,14 @@
 
       if (candidates.length > 0) {
         const good = candidates.find(it => {
-          const r = (it.rackName || it.locationName || '').trim();
+          const r = (it.rackName || '').trim();
           return r && !isBadSloc(r);
         });
-        if (good) return (good.rackName || good.locationName || '').trim();
+        if (good) return (good.rackName || '').trim();
 
         for (const it of candidates) {
-          const r = (it.rackName || it.locationName || '').trim();
-          if (r && r !== 'Belum Ada SLOC di Sistem' && r !== 'Belum ada SLOC') return r;
+          const r = (it.rackName || '').trim();
+          if (r && r !== 'Belum Ada SLOC di Sistem' && r !== 'Belum ada SLOC' && r !== 'Belum Ada SLOC di CWG') return r;
         }
       }
     }
@@ -7386,8 +7465,8 @@
   //  IN-APP UPDATE & VERSION CHECKING ENGINE
   // ══════════════════════════════════════════════
 
-  const APP_VERSION_CODE = 28; // Local current version code (v1.3.2 Master OTA)
-  const APP_VERSION_NAME = '1.3.2';
+  const APP_VERSION_CODE = 29; // Local current version code (v1.3.3 CWG Master Data Fix)
+  const APP_VERSION_NAME = '1.3.3';
   const UPDATE_MANIFEST_URL = 'https://raw.githubusercontent.com/tw1nss/superapp-release/main/version.json';
 
   let currentUpdateData = null;
@@ -8897,7 +8976,7 @@
         item = {
           sku: clean,
           productName: master.productName,
-          lokasiRack: master.rackName || master.locationName || '-',
+          lokasiRack: master.rackName || '-',
           qty_system: 0,
           expiryDate: '',
           msltc: master.msltcDays,
@@ -12829,7 +12908,7 @@
     if (isStockUpdateFetching || stockUpdateCacheMap.size > 0) return;
     isStockUpdateFetching = true;
     try {
-      const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent('STOCK UPDATE')}&tq=${encodeURIComponent('SELECT C, D, E, F WHERE C IS NOT NULL')}`;
+      const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent('STOCK UPDATE')}&tq=${encodeURIComponent('SELECT C, D, F, I WHERE C IS NOT NULL')}`;
       const res = await fetch(url, { cache: 'no-store' });
       if (!res.ok) throw new Error('HTTP ' + res.status);
       const csvText = await res.text();
@@ -12837,8 +12916,8 @@
       for (let i = 1; i < rows.length; i++) {
         const row = rows[i];
         const sku = String(row[0] || '').trim();
-        const sloc = String(row[1] || '').trim();
-        const productName = String(row[2] || '').trim();
+        const productName = String(row[1] || '').trim();
+        const sloc = String(row[2] || '').trim();
         const qty = String(row[3] || '0').trim();
         if (sku) {
           stockUpdateCacheMap.set(sku.toLowerCase(), { sku, sloc, productName, qty });

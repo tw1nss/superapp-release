@@ -1,9 +1,9 @@
 {
-  "versionCode": 28,
-  "versionName": "1.3.2",
+  "versionCode": 29,
+  "versionName": "1.3.3",
   "apkUrl": "https://github.com/tw1nss/superapp-release/raw/main/app-debug.apk",
   "forceUpdate": false,
-  "title": "Pembaruan Superapp MTG v1.3.2",
+  "title": "Pembaruan Superapp CWG v1.3.3",
   "changelog": [
     "Perbaikan UI/UX Android: Layout 5 tab navigasi responsive 2 baris (tidak terpotong)",
     "Perbaikan input QTY: Stepper (-) dan (+) simetris rapi, tidak terlempar keluar layar",
