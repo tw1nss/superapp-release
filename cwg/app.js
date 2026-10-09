@@ -459,6 +459,15 @@
         performSearch(lastSearchQuery);
       }
 
+      // Re-enrich open DCC workspace if active
+      if (typeof enrichAllDccListsWithSupersheet === 'function') {
+        const didEnrich = enrichAllDccListsWithSupersheet();
+        const dccWs = document.getElementById('dccWorkspace');
+        if (didEnrich && dccWs && !dccWs.classList.contains('hidden') && typeof filterDccMainList === 'function') {
+          filterDccMainList();
+        }
+      }
+
     } catch (err) {
       console.error('Failed to fetch sheet data:', err);
       if (!dataLoaded) {
@@ -3162,11 +3171,21 @@
       const bBtn = document.getElementById('backToMenuBtn');
       if (bBtn) bBtn.classList.remove('hidden');
     } else if (menu === 'dcc') {
-      if (typeof window.openDccLockModal === 'function') {
-        window.openDccLockModal();
-      } else if (typeof openDccLockModal === 'function') {
-        openDccLockModal();
+      hideAllWorkspaces();
+      const dccWs = document.getElementById('dccWorkspace');
+      if (dccWs) {
+        dccWs.classList.remove('hidden');
+        dccWs.scrollTop = 0;
       }
+      const bBtn = document.getElementById('backToMenuBtn');
+      if (bBtn) bBtn.classList.remove('hidden');
+
+      const hr = new Date().getHours();
+      if (!selectedDccShift) {
+        selectedDccShift = (hr >= 12) ? 'siang' : 'pagi';
+      }
+      applyDccShift(selectedDccShift);
+      fetchDccMainList();
     } else if (menu === 'ed_sweeper') {
       hideAllWorkspaces();
       const edsWs = document.getElementById('edSweeperWorkspace');
@@ -3456,7 +3475,7 @@
   const DCC_REPORT_URL = DCC_BASE_SHEET_URL + '&sheet=Report';
   const DCC_WEBAPP_URL = 'https://script.google.com/macros/s/AKfycbygTPu8soPeO8j0l88UMUcBQrSi7WFCjSe-G2PJV5vg_JLsEim1q2mHuaV9nT6GSQj3sw/exec';
 
-  const DCC_MAIN_CACHE_KEY = 'DCC_MAIN_CACHE_CWG_V1';
+  const DCC_MAIN_CACHE_KEY = 'DCC_MAIN_CACHE_CWG_V2';
   const DCC_REPORT_CACHE_KEY = 'DCC_REPORT_CACHE_CWG_V1';
   const DCC_SUBMITTED_CACHE_KEY = 'DCC_SUBMITTED_CACHE_CWG_V1';
   const DCC_PETUGAS2_KEY = 'DCC_PETUGAS2_NAME_CWG_V1';
@@ -3706,15 +3725,114 @@
 
   function enrichDccItemWithSupersheet(item) {
     if (!item) return item;
-    const cur = (item.slocExisting || '').trim();
-    if (!cur || cur === 'Belum ada SLOC' || cur === 'Belum Ada SLOC di Sistem' || isBadSloc(cur)) {
-      const superSloc = getSuperSheetSloc(item.sku);
-      if (superSloc && !isBadSloc(superSloc)) {
-        item.slocExisting = superSloc;
-      } else if (!cur && superSloc) {
-        item.slocExisting = superSloc;
+    const cleanSku = String(item.sku || '').trim();
+    const noZero = cleanSku.replace(/^0+/, '');
+
+    // 1. Detect shifted row fields (e.g. from sheet where Col D had 'available')
+    let curName = (item.productName || '').trim();
+    let curSloc = (item.slocExisting || '').trim();
+    let curStock = String(item.stock !== undefined && item.stock !== null ? item.stock : '').trim();
+
+    // If curName is "available", then curSloc is probably the actual product name and curStock is the rack
+    if (curName.toLowerCase() === 'available') {
+      if (curSloc && curSloc.length > 3 && !/^[A-Z0-9]{1,4}-[A-Z0-9\-]+$/i.test(curSloc)) {
+        item.productName = curSloc;
+        curName = curSloc;
+        if (/^[A-Z0-9]{1,4}-[A-Z0-9\-]+$/i.test(curStock)) {
+          item.slocExisting = curStock;
+          curSloc = curStock;
+          item.stock = '0';
+        } else {
+          item.slocExisting = '';
+          curSloc = '';
+        }
+      } else {
+        item.productName = '';
+        curName = '';
       }
     }
+
+    // 2. Resolve Product Name if missing or "Tanpa Nama Produk"
+    const isBadName = !curName || 
+      curName.toLowerCase() === 'available' || 
+      curName.toLowerCase() === 'tanpa nama produk' || 
+      curName.toLowerCase() === 'null' || 
+      curName.toLowerCase() === 'undefined' ||
+      curName.toLowerCase() === '-';
+
+    if (isBadName) {
+      let foundName = '';
+      // Search in dataMap (Master Rack)
+      if (dataMap) {
+        const cands = (dataMap.has(cleanSku) ? dataMap.get(cleanSku) : [])
+          .concat(noZero && noZero !== cleanSku && dataMap.has(noZero) ? dataMap.get(noZero) : []);
+        const candWithName = cands.find(c => c && c.productName && c.productName.trim().length > 2);
+        if (candWithName) foundName = candWithName.productName.trim();
+      }
+      // Search in msltcMap
+      if (!foundName && msltcMap) {
+        const info = typeof getMsltcInfo === 'function' ? getMsltcInfo(cleanSku) : null;
+        if (info && info.productName && info.productName.trim().length > 2) {
+          foundName = info.productName.trim();
+        }
+      }
+      // Search in edsDataList or updateDataLookupMap
+      if (!foundName && typeof edsDataList !== 'undefined' && Array.isArray(edsDataList)) {
+        const edsItem = edsDataList.find(e => (e.sku || '').trim() === cleanSku || (noZero && (e.sku || '').trim() === noZero));
+        if (edsItem && edsItem.productName && edsItem.productName.trim().length > 2) {
+          foundName = edsItem.productName.trim();
+        }
+      }
+      if (foundName) {
+        item.productName = foundName;
+        curName = foundName;
+      }
+    }
+
+    // 3. Resolve Rack / SLOC
+    const isBadRack = !curSloc || 
+      curSloc === '0' || 
+      curSloc === '-' || 
+      curSloc === 'Belum ada SLOC' || 
+      curSloc === 'Belum Ada SLOC di Sistem' || 
+      curSloc === 'Belum Ada SLOC di CWG' || 
+      isBadSloc(curSloc) || 
+      (curName && curSloc.toLowerCase() === curName.toLowerCase());
+
+    if (isBadRack) {
+      const superSloc = getSuperSheetSloc(cleanSku);
+      if (superSloc && !isBadSloc(superSloc)) {
+        item.slocExisting = superSloc;
+        curSloc = superSloc;
+      } else {
+        const info = typeof getMsltcInfo === 'function' ? getMsltcInfo(cleanSku) : null;
+        if (info && info.rackName && !isBadSloc(info.rackName)) {
+          item.slocExisting = info.rackName;
+          curSloc = info.rackName;
+        }
+      }
+    }
+
+    // 4. Resolve Stock (if stock is 0 or empty or looks like a rack)
+    if (!item.stock || item.stock === '0' || isNaN(Number(item.stock))) {
+      // If stock has rack pattern and slocExisting was missing, heal it
+      if (typeof item.stock === 'string' && /^[A-Z0-9]{1,4}-[A-Z0-9\-]+$/i.test(item.stock.trim())) {
+        if (!item.slocExisting || isBadSloc(item.slocExisting)) {
+          item.slocExisting = item.stock.trim();
+        }
+        item.stock = '0';
+      }
+      // Look up stock from dataMap
+      if (dataMap) {
+        const cands = (dataMap.has(cleanSku) ? dataMap.get(cleanSku) : [])
+          .concat(noZero && noZero !== cleanSku && dataMap.has(noZero) ? dataMap.get(noZero) : []);
+        const candWithQty = cands.find(c => c && c.qty && !isNaN(Number(c.qty)) && Number(c.qty) > 0);
+        if (candWithQty) {
+          item.stock = String(candWithQty.qty);
+        }
+      }
+    }
+
     return item;
   }
 
@@ -3723,9 +3841,13 @@
     [dccTask1List, dccTask2List, dccMainListData].forEach(list => {
       if (!list || !Array.isArray(list)) return;
       list.forEach(item => {
+        const oldName = item.productName;
         const oldSloc = item.slocExisting;
+        const oldStock = item.stock;
         enrichDccItemWithSupersheet(item);
-        if (oldSloc !== item.slocExisting) updated = true;
+        if (oldName !== item.productName || oldSloc !== item.slocExisting || oldStock !== item.stock) {
+          updated = true;
+        }
       });
     });
     return updated;
@@ -3803,40 +3925,14 @@
     return { skuSet, rows: cleanRows };
   }
 
-  // ── DCC Security Lock & Shift Selection ──
+  // ── DCC Security Lock & Shift Selection (PIN DIHAPUS KHUSUS CWG) ──
   window.openDccLockModal = function () {
     const modal = document.getElementById('dccLockModal');
-    const pinInput = document.getElementById('dccPinInput');
-    const pinError = document.getElementById('dccPinError');
-    if (pinError) pinError.classList.add('hidden');
-    if (pinInput) {
-      pinInput.value = '';
-      if (!pinInput.dataset.enterBound) {
-        pinInput.dataset.enterBound = 'true';
-        pinInput.addEventListener('keydown', (e) => {
-          if (e.key === 'Enter') {
-            e.preventDefault();
-            verifyAndEnterDcc();
-          }
-        });
-      }
-      setTimeout(() => pinInput.focus(), 150);
-    }
-
-
-    // Otomatis tentukan shift default berdasarkan jam sistem
-    const hr = new Date().getHours();
-    if (hr >= 12) {
-      selectDccShift('siang');
-    } else {
-      selectDccShift('pagi');
-    }
-
-    if (modal) modal.classList.remove('hidden');
+    if (modal) modal.classList.add('hidden');
+    window.openAppMenu('dcc');
   };
 
-  window.closeDccLockModal = function (e) {
-    if (e && e.target !== e.currentTarget && !e.target.classList.contains('dcc-lock-btn-cancel')) return;
+  window.closeDccLockModal = function () {
     const modal = document.getElementById('dccLockModal');
     if (modal) modal.classList.add('hidden');
   };
@@ -3847,57 +3943,17 @@
     const cardSiang = document.getElementById('shiftCardMalam');
     if (cardPagi) cardPagi.classList.toggle('selected', shift === 'pagi');
     if (cardSiang) cardSiang.classList.toggle('selected', shift === 'siang');
+    applyDccShift(shift);
   };
 
   window.toggleDccPinVisibility = function () {
-    const pinInput = document.getElementById('dccPinInput');
-    const eyeBtn = document.getElementById('dccPinEyeBtn');
-    if (!pinInput) return;
-    if (pinInput.type === 'password') {
-      pinInput.type = 'text';
-      if (eyeBtn) eyeBtn.textContent = '🔒';
-    } else {
-      pinInput.type = 'password';
-      if (eyeBtn) eyeBtn.textContent = '👁️';
-    }
+    // PIN sudah dihapus di Hub CWG
   };
 
   window.verifyAndEnterDcc = function () {
-    const pinInput = document.getElementById('dccPinInput');
-    const pinError = document.getElementById('dccPinError');
-    const enteredPin = (pinInput ? pinInput.value : '').trim();
-
-    try {
-      localStorage.setItem(DCC_PIN_KEY, '071107');
-    } catch (e) {}
-
-    // PIN baru 071107
-    if (enteredPin !== '071107') {
-      if (pinError) {
-        pinError.textContent = '❌ PIN salah! Silakan coba lagi.';
-        pinError.classList.remove('hidden');
-      }
-      if (pinInput) {
-        pinInput.focus();
-        pinInput.classList.add('shake');
-        setTimeout(() => pinInput.classList.remove('shake'), 400);
-      }
-      return;
-    }
-
-    if (pinError) pinError.classList.add('hidden');
-    closeDccLockModal();
-
-    // Buka DCC Workspace
-    document.getElementById('homeMenuSection').classList.add('hidden');
-    document.getElementById('appWorkspace').classList.add('hidden');
-    document.getElementById('dccWorkspace').classList.remove('hidden');
-    document.getElementById('slipGajiWorkspace').classList.add('hidden');
-    document.getElementById('mpScheduleWorkspace').classList.add('hidden');
-    document.getElementById('backToMenuBtn').classList.remove('hidden');
-
-    applyDccShift(selectedDccShift);
-    fetchDccMainList();
+    const modal = document.getElementById('dccLockModal');
+    if (modal) modal.classList.add('hidden');
+    window.openAppMenu('dcc');
   };
 
   window.updateDccPicDisplay = function () {
@@ -4761,13 +4817,21 @@
             let cleanSku = rawSku.includes('|') ? rawSku.split('|')[0].trim() : rawSku;
             if (!cleanSku) continue;
 
-            const name = (row[nameIdx] || '').trim();
-            const sloc = (row[slocIdx] || '').trim();
-            const stock = (row[stockIdx] || '').trim();
-            const typeVal = typeIdx !== -1 ? (row[typeIdx] || '').trim() : '';
+            let name = (row[nameIdx] || '').trim();
+            let sloc = (row[slocIdx] || '').trim();
+            let stock = (row[stockIdx] || '').trim();
+            let typeVal = typeIdx !== -1 ? (row[typeIdx] || '').trim() : '';
             const shiftStr = shiftIdx !== -1 ? (row[shiftIdx] || '').toLowerCase().trim() : '';
             const statusVal = statusIdx !== -1 ? (row[statusIdx] || '').toUpperCase().trim() : '';
             const petugasVal = petugasIdx !== -1 ? (row[petugasIdx] || '').trim() : '';
+
+            // 🛡️ Auto-Detect Column Shifting (e.g. if Col D/row[3] is 'available')
+            if (name.toLowerCase() === 'available' || (row[3] && String(row[3]).trim().toLowerCase() === 'available')) {
+              name = (row[4] || '').trim();
+              sloc = (row[5] || '').trim();
+              stock = (row[6] && !isNaN(Number(row[6]))) ? String(row[6]).trim() : '0';
+              if (row[6] && isNaN(Number(row[6]))) typeVal = String(row[6]).trim();
+            }
 
             const isPagi = shiftStr.includes('2') || shiftStr.includes('siang')
               ? false
@@ -4785,6 +4849,8 @@
               task: isPagi ? 'task1' : 'task2',
               status: statusVal
             };
+
+            enrichDccItemWithSupersheet(item);
 
             if (isPagi) {
               dccTask1List.push(item);

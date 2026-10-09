@@ -1127,13 +1127,19 @@ function installDccMainlistFormulas(isSilent) {
     return;
   }
 
-  // 1. Detail Produk dari 'STOCK UPDATE' (Kolom D - G)
+  // 1. Detail Produk dari 'STOCK UPDATE', fallback ke 'SLOC MASTER' & 'DATA MASTER' (Kolom D - G)
   // MAP LAMBDA memastikan evaluasi akurat per baris untuk tipe Angka maupun Teks
-  sheet.getRange('D2').setFormula("=MAP(C2:C, LAMBDA(sku, IF(sku=\"\", \"\", IFERROR(XLOOKUP(VALUE(TRIM(sku)), 'STOCK UPDATE'!C:C, 'STOCK UPDATE'!E:E), IFERROR(XLOOKUP(TRIM(sku), 'STOCK UPDATE'!C:C, 'STOCK UPDATE'!E:E), \"\")))))");
-  // Kolom E (Lokasi Rak): Prioritaskan data rak terbaru dari 'RACK UPDATE' (Kolom C: SKU, Kolom F: Rack Name), fallback ke 'STOCK UPDATE'
-  sheet.getRange('E2').setFormula("=MAP(C2:C, LAMBDA(sku, IF(sku=\"\", \"\", IFERROR(XLOOKUP(VALUE(TRIM(sku)), 'RACK UPDATE'!C:C, 'RACK UPDATE'!F:F), IFERROR(XLOOKUP(TRIM(sku), 'RACK UPDATE'!C:C, 'RACK UPDATE'!F:F), IFERROR(XLOOKUP(VALUE(TRIM(sku)), 'STOCK UPDATE'!C:C, 'STOCK UPDATE'!D:D), IFERROR(XLOOKUP(TRIM(sku), 'STOCK UPDATE'!C:C, 'STOCK UPDATE'!D:D), \"\")))))))");
-  sheet.getRange('F2').setFormula("=MAP(C2:C, LAMBDA(sku, IF(sku=\"\", \"\", IFERROR(XLOOKUP(VALUE(TRIM(sku)), 'STOCK UPDATE'!C:C, 'STOCK UPDATE'!F:F), IFERROR(XLOOKUP(TRIM(sku), 'STOCK UPDATE'!C:C, 'STOCK UPDATE'!F:F), 0)))))");
-  sheet.getRange('G2').setFormula("=MAP(C2:C, LAMBDA(sku, IF(sku=\"\", \"\", IFERROR(XLOOKUP(VALUE(TRIM(sku)), 'STOCK UPDATE'!C:C, 'STOCK UPDATE'!J:J), IFERROR(XLOOKUP(TRIM(sku), 'STOCK UPDATE'!C:C, 'STOCK UPDATE'!J:J), \"-\")))))");
+  // Kolom D (Nama Produk): 'STOCK UPDATE'!D:D -> 'SLOC MASTER'!D:D -> 'DATA MASTER'!E:E
+  sheet.getRange('D2').setFormula("=MAP(C2:C, LAMBDA(sku, IF(sku=\"\", \"\", IFERROR(XLOOKUP(VALUE(TRIM(sku)), 'STOCK UPDATE'!C:C, 'STOCK UPDATE'!D:D), IFERROR(XLOOKUP(TRIM(sku), 'STOCK UPDATE'!C:C, 'STOCK UPDATE'!D:D), IFERROR(XLOOKUP(VALUE(TRIM(sku)), 'SLOC MASTER'!C:C, 'SLOC MASTER'!D:D), IFERROR(XLOOKUP(TRIM(sku), 'SLOC MASTER'!C:C, 'SLOC MASTER'!D:D), IFERROR(XLOOKUP(VALUE(TRIM(sku)), 'DATA MASTER'!D:D, 'DATA MASTER'!E:E), IFERROR(XLOOKUP(TRIM(sku), 'DATA MASTER'!D:D, 'DATA MASTER'!E:E), \"\")))))))))");
+  
+  // Kolom E (Lokasi Rak / SLOC): 'STOCK UPDATE'!F:F -> 'SLOC MASTER'!F:F -> 'DATA MASTER'!F:F
+  sheet.getRange('E2').setFormula("=MAP(C2:C, LAMBDA(sku, IF(sku=\"\", \"\", IFERROR(XLOOKUP(VALUE(TRIM(sku)), 'STOCK UPDATE'!C:C, 'STOCK UPDATE'!F:F), IFERROR(XLOOKUP(TRIM(sku), 'STOCK UPDATE'!C:C, 'STOCK UPDATE'!F:F), IFERROR(XLOOKUP(VALUE(TRIM(sku)), 'SLOC MASTER'!C:C, 'SLOC MASTER'!F:F), IFERROR(XLOOKUP(TRIM(sku), 'SLOC MASTER'!C:C, 'SLOC MASTER'!F:F), IFERROR(XLOOKUP(VALUE(TRIM(sku)), 'DATA MASTER'!D:D, 'DATA MASTER'!F:F), IFERROR(XLOOKUP(TRIM(sku), 'DATA MASTER'!D:D, 'DATA MASTER'!F:F), \"\")))))))))");
+  
+  // Kolom F (Qty Sistem): 'STOCK UPDATE'!I:I -> 'SLOC MASTER'!I:I -> 0
+  sheet.getRange('F2').setFormula("=MAP(C2:C, LAMBDA(sku, IF(sku=\"\", \"\", IFERROR(XLOOKUP(VALUE(TRIM(sku)), 'STOCK UPDATE'!C:C, 'STOCK UPDATE'!I:I), IFERROR(XLOOKUP(TRIM(sku), 'STOCK UPDATE'!C:C, 'STOCK UPDATE'!I:I), IFERROR(XLOOKUP(VALUE(TRIM(sku)), 'SLOC MASTER'!C:C, 'SLOC MASTER'!I:I), IFERROR(XLOOKUP(TRIM(sku), 'SLOC MASTER'!C:C, 'SLOC MASTER'!I:I), 0)))))))");
+  
+  // Kolom G (Type / Kategori): 'STOCK UPDATE'!J:J -> 'DATA MASTER'!G:G -> '-'
+  sheet.getRange('G2').setFormula("=MAP(C2:C, LAMBDA(sku, IF(sku=\"\", \"\", IFERROR(XLOOKUP(VALUE(TRIM(sku)), 'STOCK UPDATE'!C:C, 'STOCK UPDATE'!J:J), IFERROR(XLOOKUP(TRIM(sku), 'STOCK UPDATE'!C:C, 'STOCK UPDATE'!J:J), IFERROR(XLOOKUP(VALUE(TRIM(sku)), 'DATA MASTER'!D:D, 'DATA MASTER'!G:G), IFERROR(XLOOKUP(TRIM(sku), 'DATA MASTER'!D:D, 'DATA MASTER'!G:G), \"-\")))))))");
 
   // 2. Hasil Audit dari 'Hasil DCC' (Kolom H - P)
   // XLOOKUP search_mode = -1 mengambil audit paling terbaru untuk SKU tersebut
@@ -1148,64 +1154,88 @@ function installDccMainlistFormulas(isSilent) {
   sheet.getRange('P2').setFormula("=MAP(C2:C, LAMBDA(sku, IF(sku=\"\", \"\", IFERROR(XLOOKUP(TRIM(sku), 'Hasil DCC'!B:B, 'Hasil DCC'!K:K, \"\", 0, -1), IFERROR(XLOOKUP(VALUE(TRIM(sku)), 'Hasil DCC'!B:B, 'Hasil DCC'!K:K, \"\", 0, -1), \"\")))))");
 
   if (!isSilent) {
-    alertUser('✅ Berhasil memasang rumus otomatis di "Mainlist SKU"!\n\nSemua data dari "RACK UPDATE", "STOCK UPDATE" dan "Hasil DCC" kini tersinkronisasi secara real-time.');
+    alertUser('✅ Berhasil memasang rumus otomatis di "Mainlist SKU"!\n\nSemua data dari "STOCK UPDATE", "SLOC MASTER", "DATA MASTER" dan "Hasil DCC" kini tersinkronisasi secara real-time.');
   }
 }
 
 // ==============================================================================
-// 📋 TARIK DETAIL SKU DARI "STOCK UPDATE" & "RACK UPDATE" (OPSI HARD VALUES)
+// 📋 TARIK DETAIL SKU DARI "STOCK UPDATE" & "SLOC MASTER" (OPSI HARD VALUES)
 // ==============================================================================
 function syncDetailSkuMainlist() {
   var ss = getSpreadsheet();
   var mainSheet = ss.getSheetByName('Mainlist SKU') || ss.getSheetByName('Mainlist Sku');
   var stockSheet = ss.getSheetByName('STOCK UPDATE');
 
-  if (!mainSheet || !stockSheet) {
-    return alertUser("❌ Sheet 'Mainlist SKU' atau 'STOCK UPDATE' tidak ditemukan.");
+  if (!mainSheet) {
+    return alertUser("❌ Sheet 'Mainlist SKU' tidak ditemukan.");
   }
 
   var lastRow = mainSheet.getLastRow();
   if (lastRow < 2) return alertUser("⚠️ Tidak ada SKU di 'Mainlist SKU'.");
 
-  // Load stock update map
-  var stockData = stockSheet.getDataRange().getValues();
-  if (stockData.length < 2) return alertUser("⚠️ Sheet 'STOCK UPDATE' kosong.");
-
   var stockMap = {};
-  for (var s = 1; s < stockData.length; s++) {
-    var skuKey = String(stockData[s][2] || '').trim(); // Col C: SKU
-    if (skuKey) {
-      stockMap[skuKey.toLowerCase()] = {
-        name: stockData[s][4] || '',    // Col E: Nama
-        sloc: stockData[s][3] || '',    // Col D: Rack / Sloc
-        qty: stockData[s][5] !== '' ? stockData[s][5] : 0, // Col F: Qty
-        type: stockData[s][9] || ''     // Col J: Type
-      };
-    }
-  }
 
-  // Sinkronkan lokasi rak terbaru dari 'RACK UPDATE' jika sheet tersedia
-  var rackSheet = ss.getSheetByName('RACK UPDATE');
-  if (rackSheet) {
-    var rackData = rackSheet.getDataRange().getValues();
-    for (var r = 1; r < rackData.length; r++) {
-      var rSku = String(rackData[r][2] || '').trim().toLowerCase(); // Col C: SKU
-      var rSloc = String(rackData[r][5] || '').trim();              // Col F: Rack Name
-      if (rSku && rSloc && stockMap[rSku]) {
-        stockMap[rSku].sloc = rSloc;
+  // 1. Load dari DATA MASTER (fallback dasar)
+  var dmSheet = ss.getSheetByName('DATA MASTER');
+  if (dmSheet) {
+    var dmData = dmSheet.getDataRange().getValues();
+    for (var d = 1; d < dmData.length; d++) {
+      var dSku = String(dmData[d][3] || '').trim(); // Col D: SKU
+      if (dSku) {
+        stockMap[dSku.toLowerCase()] = {
+          name: dmData[d][4] || '', // Col E: Nama
+          sloc: dmData[d][5] || '', // Col F: Rack
+          qty: 0,
+          type: dmData[d][6] || '-' // Col G: Type
+        };
       }
     }
   }
 
-  // Loop SKU di Mainlist
+  // 2. Load dari SLOC MASTER (data master CWG)
+  var slocSheet = ss.getSheetByName('SLOC MASTER');
+  if (slocSheet) {
+    var slocData = slocSheet.getDataRange().getValues();
+    for (var sl = 1; sl < slocData.length; sl++) {
+      var slSku = String(slocData[sl][2] || '').trim(); // Col C: SKU
+      if (slSku) {
+        var existing = stockMap[slSku.toLowerCase()] || {};
+        stockMap[slSku.toLowerCase()] = {
+          name: slocData[sl][3] || existing.name || '', // Col D: Nama
+          sloc: slocData[sl][5] || existing.sloc || '', // Col F: Rack
+          qty: slocData[sl][8] !== '' && !isNaN(slocData[sl][8]) ? slocData[sl][8] : (existing.qty || 0), // Col I: Stock
+          type: existing.type || '-'
+        };
+      }
+    }
+  }
+
+  // 3. Load dari STOCK UPDATE (data prioritas utama)
+  if (stockSheet) {
+    var stockData = stockSheet.getDataRange().getValues();
+    for (var s = 1; s < stockData.length; s++) {
+      var skuKey = String(stockData[s][2] || '').trim(); // Col C: SKU
+      if (skuKey) {
+        stockMap[skuKey.toLowerCase()] = {
+          name: stockData[s][3] || '', // Col D: Nama
+          sloc: stockData[s][5] || '', // Col F: Rack / Sloc
+          qty: stockData[s][8] !== '' && !isNaN(stockData[s][8]) ? stockData[s][8] : 0, // Col I: Stock
+          type: stockData[s][9] || '-'  // Col J: Type / Kategori
+        };
+      }
+    }
+  }
+
+  // 4. Update baris di Mainlist SKU
   var skuRange = mainSheet.getRange(2, 3, lastRow - 1, 1).getValues();
   var updatedCount = 0;
 
   for (var i = 0; i < skuRange.length; i++) {
     var curSku = String(skuRange[i][0] || '').trim().toLowerCase();
-    if (curSku && stockMap[curSku]) {
+    var curSkuNoZero = curSku.replace(/^0+/, '');
+    var item = stockMap[curSku] || (curSkuNoZero ? stockMap[curSkuNoZero] : null);
+    if (item && item.name) {
       var rowIdx = i + 2;
-      var item = stockMap[curSku];
       mainSheet.getRange(rowIdx, 4).setValue(item.name);
       mainSheet.getRange(rowIdx, 5).setValue(item.sloc);
       mainSheet.getRange(rowIdx, 6).setValue(item.qty);
@@ -1214,7 +1244,7 @@ function syncDetailSkuMainlist() {
     }
   }
 
-  alertUser("✅ Berhasil menarik detail untuk " + updatedCount + " SKU dari 'STOCK UPDATE'.");
+  alertUser("✅ Berhasil menarik detail untuk " + updatedCount + " SKU dari Master Sheet.");
 }
 
 // ==============================================================================
