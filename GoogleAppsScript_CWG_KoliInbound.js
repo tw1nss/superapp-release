@@ -28,8 +28,17 @@ var KOLI_CONFIG = {
 };
 
 // =============================
-// MENU (dipanggil dari onOpen DCC_Master)
+// 🔘 TRIGGER ON OPEN & MENU
 // =============================
+function onOpen() {
+  try {
+    var ui = SpreadsheetApp.getUi();
+    buildKoliInboundMenu(ui);
+  } catch (e) {
+    Logger.log("onOpen Koli Inbound notice: " + e.message);
+  }
+}
+
 function buildKoliInboundMenu(ui) {
   if (!ui) ui = SpreadsheetApp.getUi();
   ui.createMenu('📦 Koli Inbound Control')
@@ -38,6 +47,7 @@ function buildKoliInboundMenu(ui) {
     .addItem('⏱️ Pasang Auto-Sync (Setiap 3 Jam)', 'koliSetupTrigger3Hours')
     .addItem('🛑 Hapus Auto-Sync', 'koliRemoveAutoSyncTriggerPrompt')
     .addSeparator()
+    .addItem('🔑 Set / Ganti Cookie Superset', 'koliSetCookiePrompt')
     .addItem('ℹ️ Cek Status Koneksi & Trigger', 'koliCheckStatusPrompt')
     .addToUi();
 }
@@ -264,5 +274,32 @@ function koliAlert(msg) {
     SpreadsheetApp.getUi().alert(msg);
   } catch (e) {
     Logger.log(msg);
+  }
+}
+
+function setSupersetCookiePrompt() {
+  koliSetCookiePrompt();
+}
+
+function koliSetCookiePrompt() {
+  var ui = SpreadsheetApp.getUi();
+  var currentCookie = PropertiesService.getScriptProperties().getProperty('MY_COOKIE');
+  var hasCookie = currentCookie && currentCookie.length > 10;
+
+  var prompt = ui.prompt(
+    '🔑 Set / Ganti Cookie Superset',
+    'Paste cookie session dari browser (dash.astronauts.id):\n' +
+    (hasCookie ? 'Status: Cookie sudah terpasang.' : 'Status: Belum ada cookie.'),
+    ui.ButtonSet.OK_CANCEL
+  );
+
+  if (prompt.getSelectedButton() === ui.Button.OK) {
+    var inputCookie = prompt.getResponseText().trim();
+    if (inputCookie) {
+      PropertiesService.getScriptProperties().setProperty('MY_COOKIE', inputCookie);
+      ui.alert('✅ Cookie berhasil disimpan!');
+    } else {
+      ui.alert('⚠️ Input kosong, cookie tidak diubah.');
+    }
   }
 }

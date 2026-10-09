@@ -56,7 +56,8 @@ var CHARTS = [
   { id: 27954, sheet: "SEQUENCING", pageId: "j4LWezcnd7bllS1NZ4phz" },
   { id: 27922, sheet: "Mainlist Sku ED Corection", formDataKey: "5ZR5jnQ44RUZEAbSmsxhmjrJfhATEhbYNAbzHuVz-yngwq4UFN2xO9zO9QPNf8zl", pageId: "mnOYdW-iXxrCQAOeuBKTk" },
   { id: 0, sheet: "BAD & LOST", isCombinedBadLdp: true },
-  { id: 11815, sheet: "MSLTC" }
+  { id: 11815, sheet: "MSLTC" },
+  { id: 27918, sheet: "Koli Inbound", formDataKey: "1REh3ROwg-roifIE1HTK_P290aVSDXywXIaPrz77j61Nfc0yx5Mn4cik0y2BDGv2", pageId: "mdjOJrcrCcf0KmLSnfXYb" }
 ];
 
 // Helper: Ambil spreadsheet target (Bisa bound atau standalone ID)
@@ -111,6 +112,7 @@ function buildSupersetMenu(ui) {
     .addItem('5. ED CORRECTION (CWG 27922)', 'menu_ed_correction')
     .addItem('6. BAD & LOST', 'menu_bad_lost')
     .addItem('7. MSLTC', 'menu_msltc')
+    .addItem('8. KOLI INBOUND (CWG 27918)', 'menu_koli_inbound')
     .addSeparator()
     .addItem('🔑 Set / Ganti Cookie Superset', 'setSupersetCookiePrompt')
     .addItem('🔗 Set Link / Slice ID BAD & LDP', 'setBadLostChartPrompt')
@@ -257,6 +259,10 @@ function menu_bad_lost() {
 
 function menu_msltc() {
   update_single(11815, "MSLTC");
+}
+
+function menu_koli_inbound() {
+  update_single(27918, "Koli Inbound");
 }
 
 function update_all() {
