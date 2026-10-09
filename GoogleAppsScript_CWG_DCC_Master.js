@@ -100,6 +100,11 @@ function onOpen() {
   });
 }
 
+function reloadAllMenus() {
+  onOpen();
+  alertUser('✅ Semua Menu Berhasil Dimuat Ulang!\n\nMenu yang aktif:\n1. 📈 Superset Control\n2. 📊 DCC Control\n3. 📦 Pinjaman CWG\n4. 📦 Koli Inbound Control\n5. 🧹 ED Sweeper Control\n6. ⚡ ED Correction Control\n7. 📅 Jadwal Kerja CWG');
+}
+
 function buildSupersetMenu(ui) {
   if (!ui) ui = SpreadsheetApp.getUi();
   ui.createMenu('📈 Superset Control')
@@ -126,6 +131,8 @@ function buildDccMenu(ui) {
   if (!ui) ui = SpreadsheetApp.getUi();
   ui.createMenu('📊 DCC Control')
     .addItem('🎨 Rapikan & Format Tampilan "Mainlist SKU"', 'formatMainlistSkuDcc')
+    .addItem('⚡ Pasang / Refresh Rumus Otomatis Mainlist', 'installDccMainlistFormulas')
+    .addItem('📥 Tarik Detail SKU dari Master (Hard Values)', 'syncDetailSkuMainlist')
     .addSeparator()
     .addItem('📥 Assign Tugas Baru (Multi-SKU Modal)', 'assignDccTaskPrompt')
     .addSeparator()
@@ -134,6 +141,8 @@ function buildDccMenu(ui) {
     .addItem('🔄 Kosongkan / Reset "Mainlist SKU"', 'resetMainlistSkuPrompt')
     .addSeparator()
     .addItem('📋 Siapkan 4 Sheet Pinjaman & Pengembalian', 'setupPinjamanSheets')
+    .addSeparator()
+    .addItem('🔄 Muat Ulang Semua Menu Toolbar', 'reloadAllMenus')
     .addToUi();
 
   // Panggil menu Pinjaman CWG tersendiri agar selalu muncul
@@ -489,6 +498,14 @@ function doPost(e) {
     }
 
     // ==========================================================
+    // 🛠️ 0. ROUTER DATA RECOVERY DARI PINJAMAN JIKA DIPANGGIL
+    // ==========================================================
+    if (payload.action === 'recoverMisplacedDcc' || payload.action === 'fixMisplacedDcc') {
+      var recRes = recoverMisplacedDccFromPinjaman();
+      return ContentService.createTextOutput(JSON.stringify(recRes)).setMimeType(ContentService.MimeType.JSON);
+    }
+
+    // ==========================================================
     // 📦 1. ROUTER PINJAMAN & PENGEMBALIAN BARANG MTG (4 ALUR LENGKAP)
     // ==========================================================
     if (
@@ -508,11 +525,22 @@ function doPost(e) {
       payload.type === 'pinjemin' ||
       payload.type === 'terima'
     ) {
-      return handlePinjamanSubmit(payload);
+      if (typeof handlePinjamanSubmit === 'function') {
+        return handlePinjamanSubmit(payload);
+      }
     }
 
     // ==========================================================
-    // 📊 2. ROUTER DCC AUTOFILL SUPERVISOR TASK
+    // 🧹 2. ROUTER ED SWEEPER / ED CORRECTION
+    // ==========================================================
+    if (payload.action === 'saveEdsResult' || payload.module === 'eds' || payload.module === 'ed_sweeper') {
+      if (typeof handleEdsSubmit === 'function') {
+        return handleEdsSubmit(payload);
+      }
+    }
+
+    // ==========================================================
+    // 📊 3. ROUTER DCC AUTOFILL SUPERVISOR TASK
     // ==========================================================
     if (payload.action === 'autoFillSupervisorTask' || payload.action === 'autoFillDcc') {
       if (typeof executeAutoFillTask === 'function') {
@@ -530,9 +558,27 @@ function doPost(e) {
       }
     }
 
+    // ==========================================================
+    // 🎯 4. ROUTER UTAMA: DCC SCREENING / AUDIT HASIL DCC
+    // ==========================================================
+    return handleDccSubmit(payload);
+
+  } catch (error) {
+    return ContentService.createTextOutput(JSON.stringify({
+      status: 'error',
+      message: error.toString()
+    })).setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
+/**
+ * Handler utama untuk pemrosesan submit audit DCC Screening
+ */
+function handleDccSubmit(payload) {
+  try {
     var ss = getSpreadsheet();
 
-    var skuNo = String(payload.skuNo || payload.sku || payload.sku_number || '').trim();
+    var skuNo = String(payload.skuNo || payload.sku || payload.sku_number || payload.skuNumber || '').trim();
     var namaSku = String(payload.namaSku || payload.productName || '').trim();
     var slocExisting = String(payload.slocExisting || payload.lokasiRack || '').trim();
     var slocActual = String(payload.slocActual || 'Match').trim();
@@ -694,6 +740,151 @@ function doPost(e) {
       status: 'error',
       message: error.toString()
     })).setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
+/**
+ * 🛠️ DATA RECOVERY UTILITY:
+ * Memindahkan audit DCC yang sempat salah masuk ke sheet 'Pinjaman Barang CWG'
+ * kembali ke sheet 'Hasil DCC' dan update status 'DONE' di 'Mainlist SKU'.
+ */
+function recoverMisplacedDccFromPinjaman() {
+  try {
+    var ss = getSpreadsheet();
+    var pinjamSheet = ss.getSheetByName('Pinjaman Barang CWG');
+    if (!pinjamSheet || pinjamSheet.getLastRow() < 2) {
+      return { status: 'info', message: 'Sheet Pinjaman Barang CWG kosong atau tidak ditemukan.' };
+    }
+
+    var hasilDccSheet = ss.getSheetByName('Hasil DCC') || ss.insertSheet('Hasil DCC');
+    if (hasilDccSheet.getLastRow() === 0) {
+      hasilDccSheet.appendRow([
+        "Timestamp", "SKU Number", "Nama SKU ", "SLOC Existing", "SLOC Actual",
+        "Expired Date", "Fisik Good", "Fisik Bad", "Sales (jika ada)",
+        "Reason SLOC", "Reason Bad", "Evidance 1", "Evidance 2",
+        "Evidance Link 1", "Evidance Link 2", "Fisik/System", "MSLTC",
+        "SKU No", "Input by", "Label Barcode Product", "Label Sloc"
+      ]);
+    }
+
+    var mainlistSheet = ss.getSheetByName('Mainlist SKU') || ss.getSheetByName('Mainlist Sku');
+    var mainMap = {};
+    if (mainlistSheet && mainlistSheet.getLastRow() > 1) {
+      var mData = mainlistSheet.getRange(2, 1, mainlistSheet.getLastRow() - 1, 16).getValues();
+      for (var m = 0; m < mData.length; m++) {
+        var mRow = mData[m];
+        var s = String(mRow[2] || '').trim().toLowerCase();
+        if (s) {
+          mainMap[s] = {
+            rowIdx: m + 2,
+            productName: String(mRow[3] || '').trim(),
+            sloc: String(mRow[4] || '').trim(),
+            qtySys: Number(mRow[5]) || 0
+          };
+        }
+      }
+    }
+
+    var pinjamData = pinjamSheet.getDataRange().getValues();
+    var rowsToMigrate = [];
+    var rowIndicesToDelete = [];
+
+    for (var i = 1; i < pinjamData.length; i++) {
+      var row = pinjamData[i];
+      var timeStr = String(row[0] || '').trim();
+      var jenisStr = String(row[1] || '').trim();
+      var skuStr = String(row[2] || '').trim();
+      var picStr = String(row[7] || '').trim();
+      var driveLink = String(row[9] || '').trim();
+
+      if (skuStr === '999999999999' || (!skuStr && !picStr)) {
+        rowIndicesToDelete.push(i + 1);
+        continue;
+      }
+
+      if (jenisStr === 'MTG Pinjam ke Hub Lain' && (picStr.toLowerCase().includes('bintang') || picStr === '')) {
+        var sLower = skuStr.toLowerCase();
+        var itemInfo = mainMap[sLower] || {};
+        var pName = itemInfo.productName || String(row[3] || '').trim();
+        var sloc = itemInfo.sloc || String(row[4] || '').trim() || 'Match';
+        var fisikGood = Number(row[5]) || 1;
+
+        var dccRow = [
+          timeStr || Utilities.formatDate(new Date(), CONFIG.TIMEZONE, "dd/MM/yyyy HH:mm:ss"),
+          skuStr,
+          pName,
+          sloc,
+          'Match',
+          '',
+          fisikGood,
+          '0',
+          '0',
+          '',
+          '',
+          '',
+          '',
+          driveLink,
+          '',
+          String(fisikGood),
+          '',
+          skuStr,
+          picStr || 'Bintang',
+          'Ada',
+          'Ada'
+        ];
+
+        rowsToMigrate.push({
+          dccRow: dccRow,
+          sku: skuStr,
+          fisikGood: fisikGood,
+          sloc: sloc,
+          pic: picStr || 'Bintang',
+          itemInfo: itemInfo
+        });
+
+        rowIndicesToDelete.push(i + 1);
+      }
+    }
+
+    // 1. Tulis ke Hasil DCC
+    for (var r = 0; r < rowsToMigrate.length; r++) {
+      var item = rowsToMigrate[r];
+      appendToFirstEmptyRow(hasilDccSheet, item.dccRow);
+
+      // 2. Update status ke Mainlist SKU jika ada
+      if (mainlistSheet && item.itemInfo && item.itemInfo.rowIdx) {
+        var tRow = item.itemInfo.rowIdx;
+        var fg = item.fisikGood;
+        var sysQ = item.itemInfo.qtySys || 0;
+        var diff = fg - sysQ;
+        mainlistSheet.getRange(tRow, 8).setValue(fg);
+        mainlistSheet.getRange(tRow, 9).setValue(0);
+        mainlistSheet.getRange(tRow, 10).setValue(fg);
+        mainlistSheet.getRange(tRow, 11).setValue(diff);
+        mainlistSheet.getRange(tRow, 12).setValue(item.sloc);
+        mainlistSheet.getRange(tRow, 13).setValue('MATCH');
+        mainlistSheet.getRange(tRow, 14).setValue(item.pic);
+        mainlistSheet.getRange(tRow, 15).setValue('DONE');
+        mainlistSheet.getRange(tRow, 16).setValue('Sesuai');
+      }
+    }
+
+    // 3. Hapus baris dari Pinjaman Barang CWG dari indeks terbesar
+    rowIndicesToDelete.sort(function(a, b) { return b - a; });
+    for (var d = 0; d < rowIndicesToDelete.length; d++) {
+      pinjamSheet.deleteRow(rowIndicesToDelete[d]);
+    }
+
+    return {
+      status: 'success',
+      message: 'Berhasil memindahkan ' + rowsToMigrate.length + ' data audit DCC dari sheet Pinjaman Barang CWG ke sheet Hasil DCC & update Mainlist SKU!',
+      migratedCount: rowsToMigrate.length
+    };
+  } catch (err) {
+    return {
+      status: 'error',
+      message: 'Gagal recovery data: ' + err.toString()
+    };
   }
 }
 
@@ -1133,13 +1324,19 @@ function installDccMainlistFormulas(isSilent) {
     return;
   }
 
-  // 1. Detail Produk dari 'STOCK UPDATE' (Kolom D - G)
+  // 1. Detail Produk dari 'STOCK UPDATE', fallback ke 'SLOC MASTER' & 'DATA MASTER' (Kolom D - G)
   // MAP LAMBDA memastikan evaluasi akurat per baris untuk tipe Angka maupun Teks
-  sheet.getRange('D2').setFormula("=MAP(C2:C, LAMBDA(sku, IF(sku=\"\", \"\", IFERROR(XLOOKUP(VALUE(TRIM(sku)), 'STOCK UPDATE'!C:C, 'STOCK UPDATE'!E:E), IFERROR(XLOOKUP(TRIM(sku), 'STOCK UPDATE'!C:C, 'STOCK UPDATE'!E:E), \"\")))))");
-  // Kolom E (Lokasi Rak): Prioritaskan data rak terbaru dari 'RACK UPDATE' (Kolom C: SKU, Kolom F: Rack Name), fallback ke 'STOCK UPDATE'
-  sheet.getRange('E2').setFormula("=MAP(C2:C, LAMBDA(sku, IF(sku=\"\", \"\", IFERROR(XLOOKUP(VALUE(TRIM(sku)), 'RACK UPDATE'!C:C, 'RACK UPDATE'!F:F), IFERROR(XLOOKUP(TRIM(sku), 'RACK UPDATE'!C:C, 'RACK UPDATE'!F:F), IFERROR(XLOOKUP(VALUE(TRIM(sku)), 'STOCK UPDATE'!C:C, 'STOCK UPDATE'!D:D), IFERROR(XLOOKUP(TRIM(sku), 'STOCK UPDATE'!C:C, 'STOCK UPDATE'!D:D), \"\")))))))");
-  sheet.getRange('F2').setFormula("=MAP(C2:C, LAMBDA(sku, IF(sku=\"\", \"\", IFERROR(XLOOKUP(VALUE(TRIM(sku)), 'STOCK UPDATE'!C:C, 'STOCK UPDATE'!F:F), IFERROR(XLOOKUP(TRIM(sku), 'STOCK UPDATE'!C:C, 'STOCK UPDATE'!F:F), 0)))))");
-  sheet.getRange('G2').setFormula("=MAP(C2:C, LAMBDA(sku, IF(sku=\"\", \"\", IFERROR(XLOOKUP(VALUE(TRIM(sku)), 'STOCK UPDATE'!C:C, 'STOCK UPDATE'!J:J), IFERROR(XLOOKUP(TRIM(sku), 'STOCK UPDATE'!C:C, 'STOCK UPDATE'!J:J), \"-\")))))");
+  // Kolom D (Nama Produk): 'STOCK UPDATE'!D:D -> 'SLOC MASTER'!D:D -> 'DATA MASTER'!E:E
+  sheet.getRange('D2').setFormula("=MAP(C2:C, LAMBDA(sku, IF(sku=\"\", \"\", IFERROR(XLOOKUP(VALUE(TRIM(sku)), 'STOCK UPDATE'!C:C, 'STOCK UPDATE'!D:D), IFERROR(XLOOKUP(TRIM(sku), 'STOCK UPDATE'!C:C, 'STOCK UPDATE'!D:D), IFERROR(XLOOKUP(VALUE(TRIM(sku)), 'SLOC MASTER'!C:C, 'SLOC MASTER'!D:D), IFERROR(XLOOKUP(TRIM(sku), 'SLOC MASTER'!C:C, 'SLOC MASTER'!D:D), IFERROR(XLOOKUP(VALUE(TRIM(sku)), 'DATA MASTER'!D:D, 'DATA MASTER'!E:E), IFERROR(XLOOKUP(TRIM(sku), 'DATA MASTER'!D:D, 'DATA MASTER'!E:E), \"\")))))))))");
+  
+  // Kolom E (Lokasi Rak / SLOC): 'STOCK UPDATE'!F:F -> 'SLOC MASTER'!F:F -> 'DATA MASTER'!F:F
+  sheet.getRange('E2').setFormula("=MAP(C2:C, LAMBDA(sku, IF(sku=\"\", \"\", IFERROR(XLOOKUP(VALUE(TRIM(sku)), 'STOCK UPDATE'!C:C, 'STOCK UPDATE'!F:F), IFERROR(XLOOKUP(TRIM(sku), 'STOCK UPDATE'!C:C, 'STOCK UPDATE'!F:F), IFERROR(XLOOKUP(VALUE(TRIM(sku)), 'SLOC MASTER'!C:C, 'SLOC MASTER'!F:F), IFERROR(XLOOKUP(TRIM(sku), 'SLOC MASTER'!C:C, 'SLOC MASTER'!F:F), IFERROR(XLOOKUP(VALUE(TRIM(sku)), 'DATA MASTER'!D:D, 'DATA MASTER'!F:F), IFERROR(XLOOKUP(TRIM(sku), 'DATA MASTER'!D:D, 'DATA MASTER'!F:F), \"\")))))))))");
+  
+  // Kolom F (Qty Sistem): 'STOCK UPDATE'!I:I -> 'SLOC MASTER'!I:I -> 0
+  sheet.getRange('F2').setFormula("=MAP(C2:C, LAMBDA(sku, IF(sku=\"\", \"\", IFERROR(XLOOKUP(VALUE(TRIM(sku)), 'STOCK UPDATE'!C:C, 'STOCK UPDATE'!I:I), IFERROR(XLOOKUP(TRIM(sku), 'STOCK UPDATE'!C:C, 'STOCK UPDATE'!I:I), IFERROR(XLOOKUP(VALUE(TRIM(sku)), 'SLOC MASTER'!C:C, 'SLOC MASTER'!I:I), IFERROR(XLOOKUP(TRIM(sku), 'SLOC MASTER'!C:C, 'SLOC MASTER'!I:I), 0)))))))");
+  
+  // Kolom G (Type / Kategori): 'STOCK UPDATE'!J:J -> 'DATA MASTER'!G:G -> '-'
+  sheet.getRange('G2').setFormula("=MAP(C2:C, LAMBDA(sku, IF(sku=\"\", \"\", IFERROR(XLOOKUP(VALUE(TRIM(sku)), 'STOCK UPDATE'!C:C, 'STOCK UPDATE'!J:J), IFERROR(XLOOKUP(TRIM(sku), 'STOCK UPDATE'!C:C, 'STOCK UPDATE'!J:J), IFERROR(XLOOKUP(VALUE(TRIM(sku)), 'DATA MASTER'!D:D, 'DATA MASTER'!G:G), IFERROR(XLOOKUP(TRIM(sku), 'DATA MASTER'!D:D, 'DATA MASTER'!G:G), \"-\")))))))");
 
   // 2. Hasil Audit dari 'Hasil DCC' (Kolom H - P)
   // XLOOKUP search_mode = -1 mengambil audit paling terbaru untuk SKU tersebut
@@ -1154,64 +1351,88 @@ function installDccMainlistFormulas(isSilent) {
   sheet.getRange('P2').setFormula("=MAP(C2:C, LAMBDA(sku, IF(sku=\"\", \"\", IFERROR(XLOOKUP(TRIM(sku), 'Hasil DCC'!B:B, 'Hasil DCC'!K:K, \"\", 0, -1), IFERROR(XLOOKUP(VALUE(TRIM(sku)), 'Hasil DCC'!B:B, 'Hasil DCC'!K:K, \"\", 0, -1), \"\")))))");
 
   if (!isSilent) {
-    alertUser('✅ Berhasil memasang rumus otomatis di "Mainlist SKU"!\n\nSemua data dari "RACK UPDATE", "STOCK UPDATE" dan "Hasil DCC" kini tersinkronisasi secara real-time.');
+    alertUser('✅ Berhasil memasang rumus otomatis di "Mainlist SKU"!\n\nSemua data dari "STOCK UPDATE", "SLOC MASTER", "DATA MASTER" dan "Hasil DCC" kini tersinkronisasi secara real-time.');
   }
 }
 
 // ==============================================================================
-// 📋 TARIK DETAIL SKU DARI "STOCK UPDATE" & "RACK UPDATE" (OPSI HARD VALUES)
+// 📋 TARIK DETAIL SKU DARI "STOCK UPDATE" & "SLOC MASTER" (OPSI HARD VALUES)
 // ==============================================================================
 function syncDetailSkuMainlist() {
   var ss = getSpreadsheet();
   var mainSheet = ss.getSheetByName('Mainlist SKU') || ss.getSheetByName('Mainlist Sku');
   var stockSheet = ss.getSheetByName('STOCK UPDATE');
 
-  if (!mainSheet || !stockSheet) {
-    return alertUser("❌ Sheet 'Mainlist SKU' atau 'STOCK UPDATE' tidak ditemukan.");
+  if (!mainSheet) {
+    return alertUser("❌ Sheet 'Mainlist SKU' tidak ditemukan.");
   }
 
   var lastRow = mainSheet.getLastRow();
   if (lastRow < 2) return alertUser("⚠️ Tidak ada SKU di 'Mainlist SKU'.");
 
-  // Load stock update map
-  var stockData = stockSheet.getDataRange().getValues();
-  if (stockData.length < 2) return alertUser("⚠️ Sheet 'STOCK UPDATE' kosong.");
-
   var stockMap = {};
-  for (var s = 1; s < stockData.length; s++) {
-    var skuKey = String(stockData[s][2] || '').trim(); // Col C: SKU
-    if (skuKey) {
-      stockMap[skuKey.toLowerCase()] = {
-        name: stockData[s][4] || '',    // Col E: Nama
-        sloc: stockData[s][3] || '',    // Col D: Rack / Sloc
-        qty: stockData[s][5] !== '' ? stockData[s][5] : 0, // Col F: Qty
-        type: stockData[s][9] || ''     // Col J: Type
-      };
-    }
-  }
 
-  // Sinkronkan lokasi rak terbaru dari 'RACK UPDATE' jika sheet tersedia
-  var rackSheet = ss.getSheetByName('RACK UPDATE');
-  if (rackSheet) {
-    var rackData = rackSheet.getDataRange().getValues();
-    for (var r = 1; r < rackData.length; r++) {
-      var rSku = String(rackData[r][2] || '').trim().toLowerCase(); // Col C: SKU
-      var rSloc = String(rackData[r][5] || '').trim();              // Col F: Rack Name
-      if (rSku && rSloc && stockMap[rSku]) {
-        stockMap[rSku].sloc = rSloc;
+  // 1. Load dari DATA MASTER (fallback dasar)
+  var dmSheet = ss.getSheetByName('DATA MASTER');
+  if (dmSheet) {
+    var dmData = dmSheet.getDataRange().getValues();
+    for (var d = 1; d < dmData.length; d++) {
+      var dSku = String(dmData[d][3] || '').trim(); // Col D: SKU
+      if (dSku) {
+        stockMap[dSku.toLowerCase()] = {
+          name: dmData[d][4] || '', // Col E: Nama
+          sloc: dmData[d][5] || '', // Col F: Rack
+          qty: 0,
+          type: dmData[d][6] || '-' // Col G: Type
+        };
       }
     }
   }
 
-  // Loop SKU di Mainlist
+  // 2. Load dari SLOC MASTER (data master CWG)
+  var slocSheet = ss.getSheetByName('SLOC MASTER');
+  if (slocSheet) {
+    var slocData = slocSheet.getDataRange().getValues();
+    for (var sl = 1; sl < slocData.length; sl++) {
+      var slSku = String(slocData[sl][2] || '').trim(); // Col C: SKU
+      if (slSku) {
+        var existing = stockMap[slSku.toLowerCase()] || {};
+        stockMap[slSku.toLowerCase()] = {
+          name: slocData[sl][3] || existing.name || '', // Col D: Nama
+          sloc: slocData[sl][5] || existing.sloc || '', // Col F: Rack
+          qty: slocData[sl][8] !== '' && !isNaN(slocData[sl][8]) ? slocData[sl][8] : (existing.qty || 0), // Col I: Stock
+          type: existing.type || '-'
+        };
+      }
+    }
+  }
+
+  // 3. Load dari STOCK UPDATE (data prioritas utama)
+  if (stockSheet) {
+    var stockData = stockSheet.getDataRange().getValues();
+    for (var s = 1; s < stockData.length; s++) {
+      var skuKey = String(stockData[s][2] || '').trim(); // Col C: SKU
+      if (skuKey) {
+        stockMap[skuKey.toLowerCase()] = {
+          name: stockData[s][3] || '', // Col D: Nama
+          sloc: stockData[s][5] || '', // Col F: Rack / Sloc
+          qty: stockData[s][8] !== '' && !isNaN(stockData[s][8]) ? stockData[s][8] : 0, // Col I: Stock
+          type: stockData[s][9] || '-'  // Col J: Type / Kategori
+        };
+      }
+    }
+  }
+
+  // 4. Update baris di Mainlist SKU
   var skuRange = mainSheet.getRange(2, 3, lastRow - 1, 1).getValues();
   var updatedCount = 0;
 
   for (var i = 0; i < skuRange.length; i++) {
     var curSku = String(skuRange[i][0] || '').trim().toLowerCase();
-    if (curSku && stockMap[curSku]) {
+    var curSkuNoZero = curSku.replace(/^0+/, '');
+    var item = stockMap[curSku] || (curSkuNoZero ? stockMap[curSkuNoZero] : null);
+    if (item && item.name) {
       var rowIdx = i + 2;
-      var item = stockMap[curSku];
       mainSheet.getRange(rowIdx, 4).setValue(item.name);
       mainSheet.getRange(rowIdx, 5).setValue(item.sloc);
       mainSheet.getRange(rowIdx, 6).setValue(item.qty);
@@ -1220,7 +1441,7 @@ function syncDetailSkuMainlist() {
     }
   }
 
-  alertUser("✅ Berhasil menarik detail untuk " + updatedCount + " SKU dari 'STOCK UPDATE'.");
+  alertUser("✅ Berhasil menarik detail untuk " + updatedCount + " SKU dari Master Sheet.");
 }
 
 // ==============================================================================

@@ -498,6 +498,14 @@ function doPost(e) {
     }
 
     // ==========================================================
+    // 🛠️ 0. ROUTER DATA RECOVERY DARI PINJAMAN JIKA DIPANGGIL
+    // ==========================================================
+    if (payload.action === 'recoverMisplacedDcc' || payload.action === 'fixMisplacedDcc') {
+      var recRes = recoverMisplacedDccFromPinjaman();
+      return ContentService.createTextOutput(JSON.stringify(recRes)).setMimeType(ContentService.MimeType.JSON);
+    }
+
+    // ==========================================================
     // 📦 1. ROUTER PINJAMAN & PENGEMBALIAN BARANG MTG (4 ALUR LENGKAP)
     // ==========================================================
     if (
@@ -517,11 +525,22 @@ function doPost(e) {
       payload.type === 'pinjemin' ||
       payload.type === 'terima'
     ) {
-      return handlePinjamanSubmit(payload);
+      if (typeof handlePinjamanSubmit === 'function') {
+        return handlePinjamanSubmit(payload);
+      }
     }
 
     // ==========================================================
-    // 📊 2. ROUTER DCC AUTOFILL SUPERVISOR TASK
+    // 🧹 2. ROUTER ED SWEEPER / ED CORRECTION
+    // ==========================================================
+    if (payload.action === 'saveEdsResult' || payload.module === 'eds' || payload.module === 'ed_sweeper') {
+      if (typeof handleEdsSubmit === 'function') {
+        return handleEdsSubmit(payload);
+      }
+    }
+
+    // ==========================================================
+    // 📊 3. ROUTER DCC AUTOFILL SUPERVISOR TASK
     // ==========================================================
     if (payload.action === 'autoFillSupervisorTask' || payload.action === 'autoFillDcc') {
       if (typeof executeAutoFillTask === 'function') {
@@ -539,9 +558,27 @@ function doPost(e) {
       }
     }
 
+    // ==========================================================
+    // 🎯 4. ROUTER UTAMA: DCC SCREENING / AUDIT HASIL DCC
+    // ==========================================================
+    return handleDccSubmit(payload);
+
+  } catch (error) {
+    return ContentService.createTextOutput(JSON.stringify({
+      status: 'error',
+      message: error.toString()
+    })).setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
+/**
+ * Handler utama untuk pemrosesan submit audit DCC Screening
+ */
+function handleDccSubmit(payload) {
+  try {
     var ss = getSpreadsheet();
 
-    var skuNo = String(payload.skuNo || payload.sku || payload.sku_number || '').trim();
+    var skuNo = String(payload.skuNo || payload.sku || payload.sku_number || payload.skuNumber || '').trim();
     var namaSku = String(payload.namaSku || payload.productName || '').trim();
     var slocExisting = String(payload.slocExisting || payload.lokasiRack || '').trim();
     var slocActual = String(payload.slocActual || 'Match').trim();
@@ -703,6 +740,151 @@ function doPost(e) {
       status: 'error',
       message: error.toString()
     })).setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
+/**
+ * 🛠️ DATA RECOVERY UTILITY:
+ * Memindahkan audit DCC yang sempat salah masuk ke sheet 'Pinjaman Barang CWG'
+ * kembali ke sheet 'Hasil DCC' dan update status 'DONE' di 'Mainlist SKU'.
+ */
+function recoverMisplacedDccFromPinjaman() {
+  try {
+    var ss = getSpreadsheet();
+    var pinjamSheet = ss.getSheetByName('Pinjaman Barang CWG');
+    if (!pinjamSheet || pinjamSheet.getLastRow() < 2) {
+      return { status: 'info', message: 'Sheet Pinjaman Barang CWG kosong atau tidak ditemukan.' };
+    }
+
+    var hasilDccSheet = ss.getSheetByName('Hasil DCC') || ss.insertSheet('Hasil DCC');
+    if (hasilDccSheet.getLastRow() === 0) {
+      hasilDccSheet.appendRow([
+        "Timestamp", "SKU Number", "Nama SKU ", "SLOC Existing", "SLOC Actual",
+        "Expired Date", "Fisik Good", "Fisik Bad", "Sales (jika ada)",
+        "Reason SLOC", "Reason Bad", "Evidance 1", "Evidance 2",
+        "Evidance Link 1", "Evidance Link 2", "Fisik/System", "MSLTC",
+        "SKU No", "Input by", "Label Barcode Product", "Label Sloc"
+      ]);
+    }
+
+    var mainlistSheet = ss.getSheetByName('Mainlist SKU') || ss.getSheetByName('Mainlist Sku');
+    var mainMap = {};
+    if (mainlistSheet && mainlistSheet.getLastRow() > 1) {
+      var mData = mainlistSheet.getRange(2, 1, mainlistSheet.getLastRow() - 1, 16).getValues();
+      for (var m = 0; m < mData.length; m++) {
+        var mRow = mData[m];
+        var s = String(mRow[2] || '').trim().toLowerCase();
+        if (s) {
+          mainMap[s] = {
+            rowIdx: m + 2,
+            productName: String(mRow[3] || '').trim(),
+            sloc: String(mRow[4] || '').trim(),
+            qtySys: Number(mRow[5]) || 0
+          };
+        }
+      }
+    }
+
+    var pinjamData = pinjamSheet.getDataRange().getValues();
+    var rowsToMigrate = [];
+    var rowIndicesToDelete = [];
+
+    for (var i = 1; i < pinjamData.length; i++) {
+      var row = pinjamData[i];
+      var timeStr = String(row[0] || '').trim();
+      var jenisStr = String(row[1] || '').trim();
+      var skuStr = String(row[2] || '').trim();
+      var picStr = String(row[7] || '').trim();
+      var driveLink = String(row[9] || '').trim();
+
+      if (skuStr === '999999999999' || (!skuStr && !picStr)) {
+        rowIndicesToDelete.push(i + 1);
+        continue;
+      }
+
+      if (jenisStr === 'MTG Pinjam ke Hub Lain' && (picStr.toLowerCase().includes('bintang') || picStr === '')) {
+        var sLower = skuStr.toLowerCase();
+        var itemInfo = mainMap[sLower] || {};
+        var pName = itemInfo.productName || String(row[3] || '').trim();
+        var sloc = itemInfo.sloc || String(row[4] || '').trim() || 'Match';
+        var fisikGood = Number(row[5]) || 1;
+
+        var dccRow = [
+          timeStr || Utilities.formatDate(new Date(), CONFIG.TIMEZONE, "dd/MM/yyyy HH:mm:ss"),
+          skuStr,
+          pName,
+          sloc,
+          'Match',
+          '',
+          fisikGood,
+          '0',
+          '0',
+          '',
+          '',
+          '',
+          '',
+          driveLink,
+          '',
+          String(fisikGood),
+          '',
+          skuStr,
+          picStr || 'Bintang',
+          'Ada',
+          'Ada'
+        ];
+
+        rowsToMigrate.push({
+          dccRow: dccRow,
+          sku: skuStr,
+          fisikGood: fisikGood,
+          sloc: sloc,
+          pic: picStr || 'Bintang',
+          itemInfo: itemInfo
+        });
+
+        rowIndicesToDelete.push(i + 1);
+      }
+    }
+
+    // 1. Tulis ke Hasil DCC
+    for (var r = 0; r < rowsToMigrate.length; r++) {
+      var item = rowsToMigrate[r];
+      appendToFirstEmptyRow(hasilDccSheet, item.dccRow);
+
+      // 2. Update status ke Mainlist SKU jika ada
+      if (mainlistSheet && item.itemInfo && item.itemInfo.rowIdx) {
+        var tRow = item.itemInfo.rowIdx;
+        var fg = item.fisikGood;
+        var sysQ = item.itemInfo.qtySys || 0;
+        var diff = fg - sysQ;
+        mainlistSheet.getRange(tRow, 8).setValue(fg);
+        mainlistSheet.getRange(tRow, 9).setValue(0);
+        mainlistSheet.getRange(tRow, 10).setValue(fg);
+        mainlistSheet.getRange(tRow, 11).setValue(diff);
+        mainlistSheet.getRange(tRow, 12).setValue(item.sloc);
+        mainlistSheet.getRange(tRow, 13).setValue('MATCH');
+        mainlistSheet.getRange(tRow, 14).setValue(item.pic);
+        mainlistSheet.getRange(tRow, 15).setValue('DONE');
+        mainlistSheet.getRange(tRow, 16).setValue('Sesuai');
+      }
+    }
+
+    // 3. Hapus baris dari Pinjaman Barang CWG dari indeks terbesar
+    rowIndicesToDelete.sort(function(a, b) { return b - a; });
+    for (var d = 0; d < rowIndicesToDelete.length; d++) {
+      pinjamSheet.deleteRow(rowIndicesToDelete[d]);
+    }
+
+    return {
+      status: 'success',
+      message: 'Berhasil memindahkan ' + rowsToMigrate.length + ' data audit DCC dari sheet Pinjaman Barang CWG ke sheet Hasil DCC & update Mainlist SKU!',
+      migratedCount: rowsToMigrate.length
+    };
+  } catch (err) {
+    return {
+      status: 'error',
+      message: 'Gagal recovery data: ' + err.toString()
+    };
   }
 }
 

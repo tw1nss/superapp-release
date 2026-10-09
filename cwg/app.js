@@ -5730,6 +5730,8 @@
     });
 
     const payload = {
+      action: 'saveDccAudit',
+      module: 'dcc',
       timestamp: timestamp,
       skuNumber: skuNo,
       sku: skuNo,

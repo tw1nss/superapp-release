@@ -264,7 +264,7 @@ function writePinjamanRowByHeaders(sheet, headerDefs, rowObj, headerBgColor) {
   sheet.appendRow(rowArr);
 }
 
-// Router WebApp jika file ini di-deploy langsung
+// Router WebApp jika file ini di-deploy langsung atau menimpa doPost global
 function doPost(e) {
   try {
     var payload = {};
@@ -273,13 +273,175 @@ function doPost(e) {
     } else if (e.parameter) {
       payload = e.parameter;
     }
-    // Route ED Sweeper request jika file digabung dalam 1 project Apps Script
+
+    // 0. Route Recovery request jika ada
+    if (payload.action === 'recoverMisplacedDcc' || payload.action === 'fixMisplacedDcc') {
+      if (typeof recoverMisplacedDccFromPinjaman === 'function') {
+        var recRes = recoverMisplacedDccFromPinjaman();
+        return ContentService.createTextOutput(JSON.stringify(recRes)).setMimeType(ContentService.MimeType.JSON);
+      }
+    }
+
+    // 1. Route ED Sweeper request jika file digabung dalam 1 project Apps Script
     if (payload.action === 'saveEdsResult' || payload.module === 'eds' || payload.module === 'ed_sweeper') {
       if (typeof handleEdsSubmit === 'function') {
         return handleEdsSubmit(payload);
       }
     }
+
+    // 2. Route DCC Audit / Screening request
+    var isDcc = (
+      payload.action === 'saveDccAudit' ||
+      payload.action === 'saveDccScreening' ||
+      payload.module === 'dcc' ||
+      payload.fisikGood !== undefined ||
+      payload.slocActual !== undefined ||
+      payload.expiredDate !== undefined ||
+      payload.skuNumber !== undefined ||
+      payload.shift === 'Task 1' ||
+      payload.shift === 'Task 2'
+    );
+
+    if (isDcc) {
+      if (typeof handleDccSubmit === 'function') {
+        return handleDccSubmit(payload);
+      } else {
+        return handleDccFallbackSubmit(payload);
+      }
+    }
+
+    // 3. Cek apakah ini transaksi Pinjaman yang eksplisit
+    var isPinjamanExplicit = (
+      payload.module === 'pinjaman' ||
+      payload.action === 'savePinjamKeHub' ||
+      payload.action === 'saveKembalikanKeHub' ||
+      payload.action === 'savePinjeminKeHub' ||
+      payload.action === 'saveTerimaKembali' ||
+      payload.action === 'savePinjamanBarang' ||
+      payload.action === 'savePengembalianBarang' ||
+      payload.formType || payload.type
+    );
+
+    if (isPinjamanExplicit) {
+      return handlePinjamanSubmit(payload);
+    }
+
+    // Jika tidak eksplisit, tapi handleDccSubmit ada, utamakan DCC
+    if (typeof handleDccSubmit === 'function') {
+      return handleDccSubmit(payload);
+    }
+
     return handlePinjamanSubmit(payload);
+  } catch (err) {
+    return ContentService.createTextOutput(JSON.stringify({
+      status: 'error',
+      message: err.toString()
+    })).setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
+/**
+ * Fallback writer ke Hasil DCC jika handleDccSubmit tidak ditemukan di scope
+ */
+function handleDccFallbackSubmit(payload) {
+  try {
+    var ss = getPinjamanSpreadsheet();
+    var timezone = PINJAMAN_CONFIG.TIMEZONE || "Asia/Jakarta";
+    var timestamp = Utilities.formatDate(new Date(), timezone, "dd/MM/yyyy HH:mm:ss");
+
+    var skuNo = String(payload.skuNo || payload.sku || payload.sku_number || payload.skuNumber || '').trim();
+    var namaSku = String(payload.namaSku || payload.productName || '').trim();
+    var slocExisting = String(payload.slocExisting || payload.lokasiRack || '').trim();
+    var slocActual = String(payload.slocActual || 'Match').trim();
+    var expiredDate = String(payload.expiredDate || '').trim();
+    var fisikGood = payload.fisikGood !== undefined ? payload.fisikGood : '0';
+    var fisikBad = payload.fisikBad !== undefined ? payload.fisikBad : '0';
+    var sales = payload.sales !== undefined ? payload.sales : '0';
+    var reasonSloc = String(payload.reasonSloc || '').trim();
+    var reasonBad = String(payload.reasonBad || '').trim();
+    var inputBy = String(payload.inputBy || payload.pic || payload.penginput || '').trim();
+    var labelProduct = String(payload.labelProduct || 'Ada').trim();
+    var labelSloc = String(payload.labelSloc || 'Ada').trim();
+    var msltc = String(payload.msltc || '').trim();
+
+    var hasilDccSheet = ss.getSheetByName('Hasil DCC') || ss.insertSheet('Hasil DCC');
+    if (hasilDccSheet.getLastRow() === 0) {
+      hasilDccSheet.appendRow([
+        "Timestamp", "SKU Number", "Nama SKU ", "SLOC Existing", "SLOC Actual",
+        "Expired Date", "Fisik Good", "Fisik Bad", "Sales (jika ada)",
+        "Reason SLOC", "Reason Bad", "Evidance 1", "Evidance 2",
+        "Evidance Link 1", "Evidance Link 2", "Fisik/System", "MSLTC",
+        "SKU No", "Input by", "Label Barcode Product", "Label Sloc"
+      ]);
+    }
+
+    var dccRowData = [
+      timestamp,
+      skuNo,
+      namaSku,
+      slocExisting,
+      slocActual,
+      expiredDate,
+      fisikGood,
+      fisikBad,
+      sales,
+      reasonSloc,
+      reasonBad,
+      '',
+      '',
+      '',
+      '',
+      String(fisikGood),
+      msltc,
+      skuNo,
+      inputBy,
+      labelProduct,
+      labelSloc
+    ];
+
+    hasilDccSheet.appendRow(dccRowData);
+
+    // Update Mainlist SKU
+    try {
+      var mainlistSheet = ss.getSheetByName('Mainlist SKU') || ss.getSheetByName('Mainlist Sku');
+      if (mainlistSheet && skuNo) {
+        var lastMRow = mainlistSheet.getLastRow();
+        if (lastMRow > 1) {
+          var mSkuValues = mainlistSheet.getRange(2, 3, lastMRow - 1, 1).getValues();
+          for (var r = 0; r < mSkuValues.length; r++) {
+            var rawVal = String(mSkuValues[r][0] || '').trim();
+            if (rawVal && (rawVal.toLowerCase() === skuNo.toLowerCase() || rawVal.includes(skuNo))) {
+              var targetRow = r + 2;
+              var fg = Number(fisikGood) || 0;
+              var fb = Number(fisikBad) || 0;
+              var tot = fg + fb;
+              var sysQty = Number(mainlistSheet.getRange(targetRow, 6).getValue()) || 0;
+              var diff = tot - sysQty;
+              var slocMatch = (slocActual.toLowerCase() === 'match') ? 'MATCH' : 'UNMATCH';
+              var remaksVal = reasonBad || reasonSloc || payload.remaks || 'Sesuai';
+
+              mainlistSheet.getRange(targetRow, 8).setValue(fg);
+              mainlistSheet.getRange(targetRow, 9).setValue(fb);
+              mainlistSheet.getRange(targetRow, 10).setValue(tot);
+              mainlistSheet.getRange(targetRow, 11).setValue(diff);
+              mainlistSheet.getRange(targetRow, 12).setValue(slocActual);
+              mainlistSheet.getRange(targetRow, 13).setValue(slocMatch);
+              mainlistSheet.getRange(targetRow, 14).setValue(inputBy);
+              mainlistSheet.getRange(targetRow, 15).setValue('DONE');
+              mainlistSheet.getRange(targetRow, 16).setValue(remaksVal);
+              break;
+            }
+          }
+        }
+      }
+    } catch (errSync) {
+      console.warn('Gagal auto-update Mainlist SKU di fallback Pinjaman:', errSync);
+    }
+
+    return ContentService.createTextOutput(JSON.stringify({
+      status: 'success',
+      message: 'Data audit SKU ' + skuNo + ' berhasil dicatat ke Hasil DCC & Mainlist SKU.'
+    })).setMimeType(ContentService.MimeType.JSON);
   } catch (err) {
     return ContentService.createTextOutput(JSON.stringify({
       status: 'error',

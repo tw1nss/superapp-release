@@ -1,19 +1,19 @@
 /**
  * =========================================================================
- * 📦 GOOGLE APPS SCRIPT: PINJAMAN & PENGEMBALIAN BARANG MTG (4 ALUR LENGKAP)
+ * 📦 GOOGLE APPS SCRIPT: PINJAMAN & PENGEMBALIAN BARANG CWG (HUB CAWANG) (4 ALUR LENGKAP)
  * =========================================================================
- * Spreadsheet: Dashboard STK MTG 2K26
- * URL: https://docs.google.com/spreadsheets/d/1fVQwSOoIU9pT5RHWi6-m8qCf_T0rQPZxEf_WuhlaD2g/edit
+ * Spreadsheet: Dashboard STK CWG 2K26
+ * URL: https://docs.google.com/spreadsheets/d/1T6YcctafqzppSyblW17Gm8zXBrwyXJKi81niF66CXCQ/edit
  *
  * 4 ALUR TRANSAKSI:
  * 1. 📤 MTG Pinjam ke Hub Lain (MTG butuh stok, pinjam dari Hub luar)
- *    -> Dicatat ke Sheet: 'Pinjaman Barang MTG', Status: 'DIPINJAM'
+ *    -> Dicatat ke Sheet: 'Pinjaman Barang CWG', Status: 'DIPINJAM'
  * 2. 📥 MTG Kembalikan ke Hub Lain (MTG mengembalikan barang pinjaman ke Hub luar)
- *    -> Dicatat ke Sheet: 'Pengembalian Barang MTG', Status: 'DIKEMBALIKAN'
+ *    -> Dicatat ke Sheet: 'Pengembalian Barang CWG', Status: 'DIKEMBALIKAN'
  * 3. 🤝 MTG Pinjemin ke Hub Lain (Hub luar butuh stok, MTG meminjamkan)
- *    -> Dicatat ke Sheet: 'Pinjaman Barang MTG', Status: 'DIPINJAMKAN'
+ *    -> Dicatat ke Sheet: 'Pinjaman Barang CWG', Status: 'DIPINJAMKAN'
  * 4. 📦 MTG Terima Pengembalian dari Hub Lain (Hub luar kembalikan barang ke MTG)
- *    -> Dicatat ke Sheet: 'Pengembalian Barang MTG', Status: 'DITERIMA KEMBALI'
+ *    -> Dicatat ke Sheet: 'Pengembalian Barang CWG', Status: 'DITERIMA KEMBALI'
  *
  * FITUR:
  * - Upload Bukti Foto Produk otomatis ke Google Drive
@@ -23,8 +23,8 @@
  */
 
 var PINJAMAN_CONFIG = {
-  TARGET_FILE_ID: "1fVQwSOoIU9pT5RHWi6-m8qCf_T0rQPZxEf_WuhlaD2g",
-  EVIDENCE_FOLDER_ID: "1RtRFC7XfgLNr7EV76rRn-hScNYW4hOb3", // Google Drive Folder Bukti
+  TARGET_FILE_ID: "1T6YcctafqzppSyblW17Gm8zXBrwyXJKi81niF66CXCQ",
+  EVIDENCE_FOLDER_ID: "", // Google Drive Folder Bukti
   TIMEZONE: "Asia/Jakarta"
 };
 
@@ -78,11 +78,11 @@ function handlePinjamanSubmit(payload) {
     if (isPinjamKeHub) {
       jenisLabel = 'MTG Pinjam ke Hub Lain';
       statusLabel = payload.status || 'DIPINJAM';
-      sheetTargetName = ss.getSheetByName('Pinjam ke Hub Lain') ? 'Pinjam ke Hub Lain' : 'Pinjaman Barang MTG';
+      sheetTargetName = ss.getSheetByName('Pinjam ke Hub Lain') ? 'Pinjam ke Hub Lain' : 'Pinjaman Barang CWG';
     } else if (isKembalikanKeHub) {
       jenisLabel = 'MTG Kembalikan ke Hub Lain';
       statusLabel = payload.status || 'DIKEMBALIKAN';
-      sheetTargetName = ss.getSheetByName('Kembalikan ke Hub Lain') ? 'Kembalikan ke Hub Lain' : 'Pengembalian Barang MTG';
+      sheetTargetName = ss.getSheetByName('Kembalikan ke Hub Lain') ? 'Kembalikan ke Hub Lain' : 'Pengembalian Barang CWG';
     } else if (isPinjeminKeHub) {
       jenisLabel = 'MTG Pinjemin ke Hub Lain';
       statusLabel = payload.status || 'DIPINJAMKAN';
@@ -115,7 +115,7 @@ function handlePinjamanSubmit(payload) {
           folder = DriveApp.getFolderById(folderId);
         } catch (errF) {}
         if (!folder) {
-          var folderName = 'PINJAMAN_MTG_EVIDENCE';
+          var folderName = 'PINJAMAN_CWG_EVIDENCE';
           var folders = DriveApp.getFoldersByName(folderName);
           folder = folders.hasNext() ? folders.next() : DriveApp.createFolder(folderName);
           folder.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
@@ -264,7 +264,7 @@ function writePinjamanRowByHeaders(sheet, headerDefs, rowObj, headerBgColor) {
   sheet.appendRow(rowArr);
 }
 
-// Router WebApp jika file ini di-deploy langsung
+// Router WebApp jika file ini di-deploy langsung atau menimpa doPost global
 function doPost(e) {
   try {
     var payload = {};
@@ -273,7 +273,175 @@ function doPost(e) {
     } else if (e.parameter) {
       payload = e.parameter;
     }
+
+    // 0. Route Recovery request jika ada
+    if (payload.action === 'recoverMisplacedDcc' || payload.action === 'fixMisplacedDcc') {
+      if (typeof recoverMisplacedDccFromPinjaman === 'function') {
+        var recRes = recoverMisplacedDccFromPinjaman();
+        return ContentService.createTextOutput(JSON.stringify(recRes)).setMimeType(ContentService.MimeType.JSON);
+      }
+    }
+
+    // 1. Route ED Sweeper request jika file digabung dalam 1 project Apps Script
+    if (payload.action === 'saveEdsResult' || payload.module === 'eds' || payload.module === 'ed_sweeper') {
+      if (typeof handleEdsSubmit === 'function') {
+        return handleEdsSubmit(payload);
+      }
+    }
+
+    // 2. Route DCC Audit / Screening request
+    var isDcc = (
+      payload.action === 'saveDccAudit' ||
+      payload.action === 'saveDccScreening' ||
+      payload.module === 'dcc' ||
+      payload.fisikGood !== undefined ||
+      payload.slocActual !== undefined ||
+      payload.expiredDate !== undefined ||
+      payload.skuNumber !== undefined ||
+      payload.shift === 'Task 1' ||
+      payload.shift === 'Task 2'
+    );
+
+    if (isDcc) {
+      if (typeof handleDccSubmit === 'function') {
+        return handleDccSubmit(payload);
+      } else {
+        return handleDccFallbackSubmit(payload);
+      }
+    }
+
+    // 3. Cek apakah ini transaksi Pinjaman yang eksplisit
+    var isPinjamanExplicit = (
+      payload.module === 'pinjaman' ||
+      payload.action === 'savePinjamKeHub' ||
+      payload.action === 'saveKembalikanKeHub' ||
+      payload.action === 'savePinjeminKeHub' ||
+      payload.action === 'saveTerimaKembali' ||
+      payload.action === 'savePinjamanBarang' ||
+      payload.action === 'savePengembalianBarang' ||
+      payload.formType || payload.type
+    );
+
+    if (isPinjamanExplicit) {
+      return handlePinjamanSubmit(payload);
+    }
+
+    // Jika tidak eksplisit, tapi handleDccSubmit ada, utamakan DCC
+    if (typeof handleDccSubmit === 'function') {
+      return handleDccSubmit(payload);
+    }
+
     return handlePinjamanSubmit(payload);
+  } catch (err) {
+    return ContentService.createTextOutput(JSON.stringify({
+      status: 'error',
+      message: err.toString()
+    })).setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
+/**
+ * Fallback writer ke Hasil DCC jika handleDccSubmit tidak ditemukan di scope
+ */
+function handleDccFallbackSubmit(payload) {
+  try {
+    var ss = getPinjamanSpreadsheet();
+    var timezone = PINJAMAN_CONFIG.TIMEZONE || "Asia/Jakarta";
+    var timestamp = Utilities.formatDate(new Date(), timezone, "dd/MM/yyyy HH:mm:ss");
+
+    var skuNo = String(payload.skuNo || payload.sku || payload.sku_number || payload.skuNumber || '').trim();
+    var namaSku = String(payload.namaSku || payload.productName || '').trim();
+    var slocExisting = String(payload.slocExisting || payload.lokasiRack || '').trim();
+    var slocActual = String(payload.slocActual || 'Match').trim();
+    var expiredDate = String(payload.expiredDate || '').trim();
+    var fisikGood = payload.fisikGood !== undefined ? payload.fisikGood : '0';
+    var fisikBad = payload.fisikBad !== undefined ? payload.fisikBad : '0';
+    var sales = payload.sales !== undefined ? payload.sales : '0';
+    var reasonSloc = String(payload.reasonSloc || '').trim();
+    var reasonBad = String(payload.reasonBad || '').trim();
+    var inputBy = String(payload.inputBy || payload.pic || payload.penginput || '').trim();
+    var labelProduct = String(payload.labelProduct || 'Ada').trim();
+    var labelSloc = String(payload.labelSloc || 'Ada').trim();
+    var msltc = String(payload.msltc || '').trim();
+
+    var hasilDccSheet = ss.getSheetByName('Hasil DCC') || ss.insertSheet('Hasil DCC');
+    if (hasilDccSheet.getLastRow() === 0) {
+      hasilDccSheet.appendRow([
+        "Timestamp", "SKU Number", "Nama SKU ", "SLOC Existing", "SLOC Actual",
+        "Expired Date", "Fisik Good", "Fisik Bad", "Sales (jika ada)",
+        "Reason SLOC", "Reason Bad", "Evidance 1", "Evidance 2",
+        "Evidance Link 1", "Evidance Link 2", "Fisik/System", "MSLTC",
+        "SKU No", "Input by", "Label Barcode Product", "Label Sloc"
+      ]);
+    }
+
+    var dccRowData = [
+      timestamp,
+      skuNo,
+      namaSku,
+      slocExisting,
+      slocActual,
+      expiredDate,
+      fisikGood,
+      fisikBad,
+      sales,
+      reasonSloc,
+      reasonBad,
+      '',
+      '',
+      '',
+      '',
+      String(fisikGood),
+      msltc,
+      skuNo,
+      inputBy,
+      labelProduct,
+      labelSloc
+    ];
+
+    hasilDccSheet.appendRow(dccRowData);
+
+    // Update Mainlist SKU
+    try {
+      var mainlistSheet = ss.getSheetByName('Mainlist SKU') || ss.getSheetByName('Mainlist Sku');
+      if (mainlistSheet && skuNo) {
+        var lastMRow = mainlistSheet.getLastRow();
+        if (lastMRow > 1) {
+          var mSkuValues = mainlistSheet.getRange(2, 3, lastMRow - 1, 1).getValues();
+          for (var r = 0; r < mSkuValues.length; r++) {
+            var rawVal = String(mSkuValues[r][0] || '').trim();
+            if (rawVal && (rawVal.toLowerCase() === skuNo.toLowerCase() || rawVal.includes(skuNo))) {
+              var targetRow = r + 2;
+              var fg = Number(fisikGood) || 0;
+              var fb = Number(fisikBad) || 0;
+              var tot = fg + fb;
+              var sysQty = Number(mainlistSheet.getRange(targetRow, 6).getValue()) || 0;
+              var diff = tot - sysQty;
+              var slocMatch = (slocActual.toLowerCase() === 'match') ? 'MATCH' : 'UNMATCH';
+              var remaksVal = reasonBad || reasonSloc || payload.remaks || 'Sesuai';
+
+              mainlistSheet.getRange(targetRow, 8).setValue(fg);
+              mainlistSheet.getRange(targetRow, 9).setValue(fb);
+              mainlistSheet.getRange(targetRow, 10).setValue(tot);
+              mainlistSheet.getRange(targetRow, 11).setValue(diff);
+              mainlistSheet.getRange(targetRow, 12).setValue(slocActual);
+              mainlistSheet.getRange(targetRow, 13).setValue(slocMatch);
+              mainlistSheet.getRange(targetRow, 14).setValue(inputBy);
+              mainlistSheet.getRange(targetRow, 15).setValue('DONE');
+              mainlistSheet.getRange(targetRow, 16).setValue(remaksVal);
+              break;
+            }
+          }
+        }
+      }
+    } catch (errSync) {
+      console.warn('Gagal auto-update Mainlist SKU di fallback Pinjaman:', errSync);
+    }
+
+    return ContentService.createTextOutput(JSON.stringify({
+      status: 'success',
+      message: 'Data audit SKU ' + skuNo + ' berhasil dicatat ke Hasil DCC & Mainlist SKU.'
+    })).setMimeType(ContentService.MimeType.JSON);
   } catch (err) {
     return ContentService.createTextOutput(JSON.stringify({
       status: 'error',
@@ -295,7 +463,7 @@ function doGet(e) {
       })).setMimeType(ContentService.MimeType.JSON);
     }
 
-    var sheetName = param.sheet || 'Pinjaman Barang MTG';
+    var sheetName = param.sheet || 'Pinjaman Barang CWG';
     var sheet = ss.getSheetByName(sheetName);
     if (!sheet || sheet.getLastRow() < 2) {
       return ContentService.createTextOutput(JSON.stringify([])).setMimeType(ContentService.MimeType.JSON);
@@ -364,7 +532,7 @@ function setupPinjamanSheetsManual() {
 
   var sheetConfigs = [
     {
-      name: 'Pinjaman Barang MTG',
+      name: 'Pinjaman Barang CWG',
       color: '#0284c7',
       headers: [
         'TIMESTAMP', 'JENIS TRANSAKSI', 'NOMOR SKU', 'NAMA PRODUK', 'SLOC (LOKASI RAK)', 
@@ -372,7 +540,7 @@ function setupPinjamanSheetsManual() {
       ]
     },
     {
-      name: 'Pengembalian Barang MTG',
+      name: 'Pengembalian Barang CWG',
       color: '#059669',
       headers: [
         'TIMESTAMP', 'JENIS TRANSAKSI', 'NOMOR SKU', 'NAMA PRODUK', 'SLOC (LOKASI RAK)', 
@@ -417,6 +585,6 @@ function setupPinjamanSheetsManual() {
     SpreadsheetApp.flush();
   }
   try {
-    SpreadsheetApp.getUi().alert('✅ 4 Sheet Transaksi Pinjaman & Pengembalian MTG berhasil dibuat & diformat:\n1. Pinjaman Barang MTG (Biru)\n2. Pengembalian Barang MTG (Hijau)\n3. Pinjemin ke Hub Lain (Oranye)\n4. Terima Pengembalian Hub (Ungu)');
+    SpreadsheetApp.getUi().alert('✅ 4 Sheet Transaksi Pinjaman & Pengembalian MTG berhasil dibuat & diformat:\n1. Pinjaman Barang CWG (Biru)\n2. Pengembalian Barang CWG (Hijau)\n3. Pinjemin ke Hub Lain (Oranye)\n4. Terima Pengembalian Hub (Ungu)');
   } catch(eAlert) {}
 }
