@@ -1324,6 +1324,12 @@ function installDccMainlistFormulas(isSilent) {
     return;
   }
 
+  // Bersihkan data manual lama dari D3:P agar rumus Array / MAP di baris 2 bisa menggelar (expand) seluruh data tanpa error #REF!
+  var maxRows = sheet.getMaxRows();
+  if (maxRows >= 3) {
+    sheet.getRange(3, 4, maxRows - 2, 13).clearContent();
+  }
+
   // 1. Detail Produk dari 'STOCK UPDATE', fallback ke 'SLOC MASTER' & 'DATA MASTER' (Kolom D - G)
   // MAP LAMBDA memastikan evaluasi akurat per baris untuk tipe Angka maupun Teks
   // Kolom D (Nama Produk): 'STOCK UPDATE'!D:D -> 'SLOC MASTER'!D:D -> 'DATA MASTER'!E:E

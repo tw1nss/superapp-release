@@ -5050,40 +5050,26 @@
         dccHasil1Rows = [];
         dccHasil2Rows = [];
 
-        // Fast lookup for items explicitly marked as PENDING in Mainlist SKU
-        const pendingSkuMap = new Set();
-        if (parsedFromMainlist) {
-          [...dccTask1List, ...dccTask2List].forEach(it => {
-            if (it.status === 'PENDING') {
-              if (it.sku) pendingSkuMap.add(it.sku.toLowerCase());
-            }
-          });
-        }
-
         for (const row of parsedHasilDcc.rows) {
           const sku1 = (row[1] || '').trim().toLowerCase();
           const sku17 = (row[17] || '').trim().toLowerCase();
-          const inputBy = (row[18] || '').trim().toLowerCase();
+          const targetSku = sku1 || sku17;
+          if (!targetSku) continue;
 
-          const isExplicitPending = pendingSkuMap.has(sku1) || (sku17 && pendingSkuMap.has(sku17));
-
-          const isTask1Item = (sku1 && dccTask1List.some(it => it.sku.toLowerCase() === sku1));
+          const isTask1Item = dccTask1List.some(it => it.sku.toLowerCase() === targetSku);
           if (isTask1Item) {
             dccHasil1Rows.push(row);
-            if (!isExplicitPending) {
-              if (sku1) dccSubmittedTask1Set.add(sku1);
-              if (sku17) dccSubmittedTask1Set.add(sku17);
-            }
+            dccSubmittedTask1Set.add(targetSku);
           } else {
             dccHasil2Rows.push(row);
-            if (!isExplicitPending) {
-              if (sku1) dccSubmittedTask2Set.add(sku1);
-              if (sku17) dccSubmittedTask2Set.add(sku17);
-            }
+            dccSubmittedTask2Set.add(targetSku);
           }
-          if (!isExplicitPending) {
-            if (sku1) dccSubmittedSkuSet.add(sku1);
-            if (sku17) dccSubmittedSkuSet.add(sku17);
+          dccSubmittedSkuSet.add(targetSku);
+
+          // Update status in task list directly to DONE
+          const found = [...dccTask1List, ...dccTask2List].find(it => it.sku.toLowerCase() === targetSku);
+          if (found) {
+            found.status = 'DONE';
           }
         }
       }

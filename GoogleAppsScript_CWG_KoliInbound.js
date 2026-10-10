@@ -29,8 +29,9 @@ var KOLI_CONFIG = {
 
 // =============================
 // 🔘 TRIGGER ON OPEN & MENU
-// =============================
-function onOpen() {
+// PERHATIAN: Jangan gunakan nama 'onOpen' di sini agar TIDAK menimpa menu Superset, DCC, Pinjaman, dll.
+// Menu Koli Inbound sudah otomatis dipanggil oleh onOpen() utama di GoogleAppsScript_CWG_DCC_Master.js
+function onOpenKoliInboundStandalone() {
   try {
     var ui = SpreadsheetApp.getUi();
     buildKoliInboundMenu(ui);
