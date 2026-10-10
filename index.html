@@ -12,6 +12,23 @@
   <link rel="icon" href="app-logo.jpg" type="image/jpeg">
   <link rel="apple-touch-icon" href="icon-192.png">
 
+  <!-- 🚀 Instant Launch Engine: Otomatis langsung buka Hub khusus tanpa jeda -->
+  <script>
+    (function () {
+      var search = window.location.search || '';
+      var urlParams = new URLSearchParams(search);
+      var isSwitchMode = urlParams.get('switch') === 'true' || urlParams.get('choose') === 'true' || urlParams.get('portal') === 'true';
+      if (!isSwitchMode) {
+        try {
+          var savedHub = localStorage.getItem('astro_preferred_hub');
+          if (savedHub === 'mtg' || savedHub === 'cwg') {
+            window.location.replace('./' + savedHub + '/');
+          }
+        } catch (e) {}
+      }
+    })();
+  </script>
+
   <style>
     :root {
       --bg-void: #05070e;
@@ -440,25 +457,17 @@
       </div>
     </header>
 
-    <!-- ══ Auto-Redirect Banner (Jika ada saved Hub) ══ -->
-    <div id="redirectBanner" class="redirect-banner">
-      <div class="redirect-text">
-        Membuka otomatis <strong id="redirectTargetName">Hub Menteng</strong> dalam <span id="countdownSec">2</span> detik...
-      </div>
-      <button type="button" class="btn-cancel-redirect" onclick="cancelAutoRedirect()">Batalkan</button>
-    </div>
-
     <!-- ══ Section Headline ══ -->
     <div class="section-headline">
       <h2>Pilih Hub Operasional</h2>
-      <p>Pilih fasilitas warehouse tempat Anda bertugas saat ini</p>
+      <p>Pilih fasilitas warehouse tempat Anda bertugas (pilihan Anda otomatis diingat)</p>
     </div>
 
     <!-- ══ Hub Selection Cards ══ -->
     <div class="hub-grid">
 
       <!-- 1. HUB MENTENG (MTG) -->
-      <a href="./mtg/" class="hub-card" onclick="savePreferredHub('mtg')">
+      <a href="./mtg/" class="hub-card" id="cardHubMtg" onclick="selectAndLaunchHub('mtg'); return false;">
         <div>
           <div class="hub-card-header">
             <div class="hub-icon-box">
@@ -467,7 +476,7 @@
                 <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path>
               </svg>
             </div>
-            <span class="hub-badge active">● Live (v1.3.2)</span>
+            <span class="hub-badge active" id="badgeMtg">● Live (v1.3.2)</span>
           </div>
 
           <div class="hub-content" style="margin-top: 14px;">
@@ -479,7 +488,7 @@
               <span class="module-pill">Barcode SLOC</span>
               <span class="module-pill">DCC Master</span>
               <span class="module-pill">ED Sweeper</span>
-              <span class="module-pill">Pinjaman</span>
+              <span class="module-pill">FAQ (Pinjaman)</span>
               <span class="module-pill">Complain</span>
             </div>
           </div>
@@ -492,7 +501,7 @@
       </a>
 
       <!-- 2. HUB CAWANG (CWG) -->
-      <a href="./cwg/" class="hub-card" onclick="savePreferredHub('cwg')">
+      <a href="./cwg/" class="hub-card" id="cardHubCwg" onclick="selectAndLaunchHub('cwg'); return false;">
         <div>
           <div class="hub-card-header">
             <div class="hub-icon-box">
@@ -502,7 +511,7 @@
                 <line x1="12" y1="22.08" x2="12" y2="12"></line>
               </svg>
             </div>
-            <span class="hub-badge ready">● Ready</span>
+            <span class="hub-badge ready" id="badgeCwg">● Ready</span>
           </div>
 
           <div class="hub-content" style="margin-top: 14px;">
@@ -527,12 +536,12 @@
 
     </div>
 
-    <!-- ══ Bottom Preference & APK Section ══ -->
+    <!-- ══ Bottom Info & APK Section ══ -->
     <div class="portal-bottom">
-      <label class="pref-checkbox-wrap">
-        <input type="checkbox" id="prefRememberHub" onchange="toggleRememberHub(this.checked)">
-        <span class="pref-label">Ingat pilihan hub saya di browser ini</span>
-      </label>
+      <div style="font-size: 0.82rem; color: #94a3b8; display: flex; align-items: center; gap: 8px;">
+        <span>💡</span>
+        <span>Sekali pilih, browser & aplikasi HP Anda akan langsung otomatis membuka hub tersebut.</span>
+      </div>
 
       <a href="https://github.com/tw1nss/superapp-release/raw/main/app-debug.apk" class="apk-cta" title="Unduh APK Android Resmi">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -564,65 +573,26 @@
     setInterval(updateClock, 1000);
     updateClock();
 
-    // Auto-redirect logic
-    let redirectTimer = null;
-    let countdownSec = 2;
-
-    function savePreferredHub(hubKey) {
-      const remember = document.getElementById('prefRememberHub').checked;
-      if (remember) {
+    // Select Hub & Instant Launch
+    function selectAndLaunchHub(hubKey) {
+      try {
         localStorage.setItem('astro_preferred_hub', hubKey);
-      }
+      } catch (e) {}
+      window.location.href = './' + hubKey + '/';
     }
 
-    function toggleRememberHub(checked) {
-      if (!checked) {
-        localStorage.removeItem('astro_preferred_hub');
-      }
-    }
-
-    function cancelAutoRedirect() {
-      if (redirectTimer) {
-        clearInterval(redirectTimer);
-        redirectTimer = null;
-      }
-      const banner = document.getElementById('redirectBanner');
-      if (banner) banner.style.display = 'none';
-      localStorage.removeItem('astro_preferred_hub');
-      document.getElementById('prefRememberHub').checked = false;
-    }
-
-    // Init state on load
+    // Highlight current preferred hub if in switch mode
     window.addEventListener('DOMContentLoaded', () => {
-      const savedHub = localStorage.getItem('astro_preferred_hub');
-      const prefCheck = document.getElementById('prefRememberHub');
-
-      if (savedHub && ['mtg', 'cwg'].includes(savedHub)) {
-        if (prefCheck) prefCheck.checked = true;
-
-        const hubNames = {
-          'mtg': 'Hub Menteng (MTG)',
-          'cwg': 'Hub Cawang (CWG)'
-        };
-
-        const banner = document.getElementById('redirectBanner');
-        const targetEl = document.getElementById('redirectTargetName');
-        const countEl = document.getElementById('countdownSec');
-
-        if (banner && targetEl && countEl) {
-          targetEl.textContent = hubNames[savedHub] || savedHub.toUpperCase();
-          banner.style.display = 'flex';
-
-          redirectTimer = setInterval(() => {
-            countdownSec--;
-            countEl.textContent = countdownSec;
-            if (countdownSec <= 0) {
-              clearInterval(redirectTimer);
-              window.location.href = `./${savedHub}/`;
-            }
-          }, 1000);
+      try {
+        const saved = localStorage.getItem('astro_preferred_hub');
+        if (saved === 'mtg') {
+          const badge = document.getElementById('badgeMtg');
+          if (badge) badge.textContent = '★ Hub Pilihan Aktif';
+        } else if (saved === 'cwg') {
+          const badge = document.getElementById('badgeCwg');
+          if (badge) badge.textContent = '★ Hub Pilihan Aktif';
         }
-      }
+      } catch (e) {}
     });
   </script>
 </body>

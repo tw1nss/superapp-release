@@ -8,6 +8,11 @@
 (function () {
   'use strict';
 
+  // 🏢 Auto-set preferred hub to MTG
+  try {
+    localStorage.setItem('astro_preferred_hub', 'mtg');
+  } catch (e) {}
+
   // ── Config ──
   const SHEET_ID = '1fVQwSOoIU9pT5RHWi6-m8qCf_T0rQPZxEf_WuhlaD2g';
   // Selective column query for Master Rack (from 'RACK UPDATE' - real-time latest SLOC from Superset SLOC MASTER)

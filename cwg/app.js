@@ -8,6 +8,11 @@
 (function () {
   'use strict';
 
+  // 🏢 Auto-set preferred hub to CWG
+  try {
+    localStorage.setItem('astro_preferred_hub', 'cwg');
+  } catch (e) {}
+
   // ── Config CWG ──
   const SHEET_ID = '1T6YcctafqzppSyblW17Gm8zXBrwyXJKi81niF66CXCQ';
   // Selective column query for Master Rack (from 'SLOC MASTER' and 'STOCK UPDATE' - real-time latest SLOC from Superset)
