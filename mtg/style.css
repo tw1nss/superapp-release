@@ -564,6 +564,7 @@ body::after {
   border: 1px solid rgba(168, 85, 247, 0.25);
 }
 
+.menu-icon-box.faq,
 .menu-icon-box.pinjaman {
   background: rgba(14, 165, 233, 0.14);
   border: 1px solid rgba(56, 189, 248, 0.3);

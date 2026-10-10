@@ -3144,18 +3144,25 @@
       if (typeof window.initEdcFlatpickr === 'function') window.initEdcFlatpickr();
       if (typeof window.initEdcInputListeners === 'function') window.initEdcInputListeners();
       if (typeof window.fetchEdCorrectionData === 'function') window.fetchEdCorrectionData(true);
-    } else if (menu === 'pinjaman') {
-      hideAllWorkspaces();
-      const pnjWs = document.getElementById('pinjamanWorkspace');
-      if (pnjWs) {
-        pnjWs.classList.remove('hidden');
-        pnjWs.scrollTop = 0;
-      }
-      const bBtn = document.getElementById('backToMenuBtn');
-      if (bBtn) bBtn.classList.add('hidden'); // Pinjaman workspace memiliki top-bar back button tersendiri
-
-      if (typeof window.initPinjamanModule === 'function') {
-        window.initPinjamanModule();
+    } else if (menu === 'pinjaman' || menu === 'faq') {
+      if (typeof window.openFaqLockModal === 'function') {
+        window.openFaqLockModal();
+      } else if (typeof openFaqLockModal === 'function') {
+        openFaqLockModal();
+      } else if (typeof openPinjamanWorkspaceDirect === 'function') {
+        openPinjamanWorkspaceDirect();
+      } else {
+        hideAllWorkspaces();
+        const pnjWs = document.getElementById('pinjamanWorkspace');
+        if (pnjWs) {
+          pnjWs.classList.remove('hidden');
+          pnjWs.scrollTop = 0;
+        }
+        const bBtn = document.getElementById('backToMenuBtn');
+        if (bBtn) bBtn.classList.add('hidden');
+        if (typeof window.initPinjamanModule === 'function') {
+          window.initPinjamanModule();
+        }
       }
     } else if (menu === 'retur') {
       alert('Fitur Retur Task sedang disiapkan.');
@@ -3233,6 +3240,13 @@
     const dccLockModal = document.getElementById('dccLockModal');
     if (dccLockModal && !dccLockModal.classList.contains('hidden')) {
       closeDccLockModal();
+      return true;
+    }
+
+    // 0.05. Close FAQ Lock modal if open
+    const faqLockModal = document.getElementById('faqLockModal');
+    if (faqLockModal && !faqLockModal.classList.contains('hidden')) {
+      closeFaqLockModal();
       return true;
     }
 
@@ -3809,6 +3823,106 @@
 
     applyDccShift(selectedDccShift);
     fetchDccMainList();
+  };
+
+  // ── FAQ (Pinjaman) Security Lock ──
+  const FAQ_PIN_DEFAULT = '071107';
+
+  window.openFaqLockModal = function () {
+    const modal = document.getElementById('faqLockModal');
+    const pinInput = document.getElementById('faqPinInput');
+    const pinError = document.getElementById('faqPinError');
+    if (pinError) pinError.classList.add('hidden');
+    if (pinInput) {
+      pinInput.value = '';
+      if (!pinInput.dataset.enterBound) {
+        pinInput.dataset.enterBound = 'true';
+        pinInput.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            verifyAndEnterFaq();
+          }
+        });
+      }
+      setTimeout(() => pinInput.focus(), 150);
+    }
+    if (modal) modal.classList.remove('hidden');
+  };
+
+  window.closeFaqLockModal = function (e) {
+    if (e && e.target !== e.currentTarget && !e.target.classList.contains('dcc-lock-btn-cancel')) return;
+    const modal = document.getElementById('faqLockModal');
+    if (modal) modal.classList.add('hidden');
+  };
+
+  window.toggleFaqPinVisibility = function () {
+    const pinInput = document.getElementById('faqPinInput');
+    const eyeBtn = document.getElementById('faqPinEyeBtn');
+    if (!pinInput) return;
+    if (pinInput.type === 'password') {
+      pinInput.type = 'text';
+      if (eyeBtn) eyeBtn.textContent = '🔒';
+    } else {
+      pinInput.type = 'password';
+      if (eyeBtn) eyeBtn.textContent = '👁️';
+    }
+  };
+
+  window.verifyAndEnterFaq = function () {
+    const pinInput = document.getElementById('faqPinInput');
+    const pinError = document.getElementById('faqPinError');
+    const enteredPin = (pinInput ? pinInput.value : '').trim();
+
+    if (enteredPin !== FAQ_PIN_DEFAULT) {
+      if (pinError) {
+        pinError.textContent = '❌ PIN salah! Silakan coba lagi.';
+        pinError.classList.remove('hidden');
+      }
+      if (pinInput) {
+        pinInput.focus();
+        pinInput.classList.add('shake');
+        setTimeout(() => pinInput.classList.remove('shake'), 400);
+      }
+      return;
+    }
+
+    if (pinError) pinError.classList.add('hidden');
+    closeFaqLockModal();
+    openPinjamanWorkspaceDirect();
+  };
+
+  window.openPinjamanWorkspaceDirect = function () {
+    const hideAllWorkspaces = () => {
+      const workspaces = [
+        'homeMenuSection',
+        'appWorkspace',
+        'dccWorkspace',
+        'slipGajiWorkspace',
+        'mpScheduleWorkspace',
+        'edSweeperWorkspace',
+        'complainWorkspace',
+        'koliInboundWorkspace',
+        'edCorrectionWorkspace',
+        'pinjamanWorkspace'
+      ];
+      workspaces.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.classList.add('hidden');
+      });
+    };
+
+    hideAllWorkspaces();
+    const pnjWs = document.getElementById('pinjamanWorkspace');
+    if (pnjWs) {
+      pnjWs.classList.remove('hidden');
+      pnjWs.scrollTop = 0;
+    }
+    const bBtn = document.getElementById('backToMenuBtn');
+    if (bBtn) bBtn.classList.add('hidden');
+
+    if (typeof window.initPinjamanModule === 'function') {
+      window.initPinjamanModule();
+    }
   };
 
   window.updateDccPicDisplay = function () {
@@ -7778,13 +7892,14 @@
   const EDS_SPREADSHEET_ID = '1fVQwSOoIU9pT5RHWi6-m8qCf_T0rQPZxEf_WuhlaD2g';
   const EDS_BASE_SHEET_URL = `https://docs.google.com/spreadsheets/d/${EDS_SPREADSHEET_ID}/gviz/tq?tqx=out:csv`;
   const EDS_MAIN_URL = EDS_BASE_SHEET_URL + '&sheet=' + encodeURIComponent('Main List SKU ED Sweeper');
-  const EDS_HASIL_URL = EDS_BASE_SHEET_URL + '&sheet=' + encodeURIComponent('Hasil EDS');
+  const EDS_HASIL_URL = EDS_BASE_SHEET_URL + '&sheet=' + encodeURIComponent('Hasil EDS ED Sweeper');
   const EDS_UPDATE_URL = EDS_BASE_SHEET_URL + '&sheet=' + encodeURIComponent('Data Update ED Sweeper');
   const EDS_REPORT_URL = EDS_BASE_SHEET_URL + '&sheet=Report';
-  const EDS_DEFAULT_WEBAPP_URL = 'https://script.google.com/macros/s/AKfycbzRhVQZEv3TJwTfUhKKV0QtzexKvMS8mfz-iE72LiVRLKulE4_IlU4IW10rII8k7ICpLQ/exec';
+  const EDS_DEFAULT_WEBAPP_URL = 'https://script.google.com/macros/s/AKfycbztOsGIAVVfd2SjvkW_euEa7PyU76A4_PJ0HdJgw80eUOHe4XuRuLKoftL9ZxgrDfFLcw/exec';
 
   const EDS_MAIN_CACHE_KEY = 'EDS_MAIN_CACHE_MTG_V4';
   const EDS_SUBMITTED_CACHE_KEY = 'EDS_SUBMITTED_CACHE_MTG_V4';
+  const EDS_LOCAL_AUDITS_KEY = 'EDS_LOCAL_AUDITS_V4';
   const EDS_PIC_KEY = 'EDS_DEFAULT_PIC_V2';
   const EDS_WEBAPP_KEY = 'EDS_CUSTOM_WEBAPP_URL_V3';
 
@@ -7848,7 +7963,12 @@
 
   function getEdsWebappUrl() {
     try {
-      localStorage.removeItem(EDS_WEBAPP_KEY);
+      const saved = (localStorage.getItem(EDS_WEBAPP_KEY) || '').trim();
+      if (saved && !saved.includes('AKfycbzRhVQZEv3TJwTfUhKKV0QtzexKvMS8mfz-iE72LiVRLKulE4_IlU4IW10rII8k7ICpLQ') && !saved.includes('AKfycbzRrR_j-8bV29djmaLl85Uhe3KOHd8PsW_7GQWAYIIciNvDeDoYrTtPs0377F63stid0Q')) {
+        if (saved.startsWith('https://script.google.com/macros/s/')) return saved;
+      } else if (saved) {
+        localStorage.removeItem(EDS_WEBAPP_KEY);
+      }
     } catch (e) { }
     return EDS_DEFAULT_WEBAPP_URL;
   }
@@ -8254,8 +8374,13 @@
       try {
         const cached = localStorage.getItem(EDS_MAIN_CACHE_KEY);
         const subCached = localStorage.getItem(EDS_SUBMITTED_CACHE_KEY);
+        const auditsCached = localStorage.getItem(EDS_LOCAL_AUDITS_KEY);
         if (subCached) {
           edsSubmittedSkuSet = new Set(safeJsonParse(subCached, []));
+        }
+        if (auditsCached) {
+          const mapData = safeJsonParse(auditsCached, {});
+          Object.keys(mapData).forEach(k => edsAuditResultsMap.set(k.toLowerCase(), mapData[k]));
         }
         if (cached) {
           edsMainListData = safeJsonParse(cached, []);
@@ -8333,48 +8458,58 @@
       }
 
       // 2. Parse Hasil EDS (Dedup: 1 SKU hanya 1 catatan terbaru)
-      edsAuditResultsMap.clear();
-      edsHasilRows = [];
-      edsSubmittedSkuSet.clear();
       if (hasilRes) {
         const hasilLines = parseCSV(hasilRes);
         if (hasilLines && hasilLines.length > 1) {
-          const deduplicatedMap = new Map();
-          for (let i = 1; i < hasilLines.length; i++) {
-            const row = hasilLines[i];
-            if (!row || row.length === 0) continue;
-            const sku = String(row[0] || row[16] || '').trim();
-            if (!sku) continue;
+          const hRow = hasilLines[0].map(h => String(h || '').trim().toLowerCase());
+          // Pastikan bukan sheet katalog produk mentah
+          if (hRow.indexOf('location_id') === -1) {
+            const colSku = hRow.indexOf('sku number') !== -1 ? hRow.indexOf('sku number') : (hRow.indexOf('sku') !== -1 ? hRow.indexOf('sku') : 0);
+            const colName = hRow.indexOf('nama sku') !== -1 ? hRow.indexOf('nama sku') : 1;
+            const colSlocEx = hRow.indexOf('sloc existing') !== -1 ? hRow.indexOf('sloc existing') : 2;
+            const colSlocAc = hRow.indexOf('sloc actual') !== -1 ? hRow.indexOf('sloc actual') : 3;
+            const colExp = hRow.indexOf('expired date') !== -1 ? hRow.indexOf('expired date') : 4;
+            const colFg = hRow.indexOf('fisik good') !== -1 ? hRow.indexOf('fisik good') : 5;
+            const colFb = hRow.indexOf('fisik bad') !== -1 ? hRow.indexOf('fisik bad') : 6;
+            const colSales = hRow.indexOf('sales') !== -1 ? hRow.indexOf('sales') : 7;
+            const colRSloc = hRow.indexOf('reason sloc') !== -1 ? hRow.indexOf('reason sloc') : 8;
+            const colRBad = hRow.indexOf('reason bad') !== -1 ? hRow.indexOf('reason bad') : 9;
+            const colLink1 = hRow.indexOf('evidance link 1') !== -1 ? hRow.indexOf('evidance link 1') : 12;
+            const colLink2 = hRow.indexOf('evidance link 2') !== -1 ? hRow.indexOf('evidance link 2') : 13;
+            const colInputBy = hRow.indexOf('input by') !== -1 ? hRow.indexOf('input by') : 17;
+            const colTime = hRow.indexOf('timestamp') !== -1 ? hRow.indexOf('timestamp') : 18;
 
-            const auditObj = {
-              sku: sku,
-              namaSku: row[1] || '',
-              slocExisting: row[2] || '',
-              slocActual: row[3] || 'Match',
-              expiredDate: excelDateToDateStr(row[4]),
-              fisikGood: row[5] !== '' && row[5] !== undefined ? Number(row[5]) : 0,
-              fisikBad: row[6] !== '' && row[6] !== undefined ? Number(row[6]) : 0,
-              sales: row[7] || '',
-              reasonSloc: row[8] || '',
-              reasonBad: row[9] || '',
-              evidanceLink1: row[12] || '',
-              evidanceLink2: row[13] || '',
-              inputBy: row[17] || '',
-              timestamp: row[18] || '',
-              remaks: row[9] || row[8] || 'Sesuai'
-            };
+            for (let i = 1; i < hasilLines.length; i++) {
+              const row = hasilLines[i];
+              if (!row || row.length === 0) continue;
+              const sku = String(row[colSku] || row[16] || '').trim();
+              if (!sku || sku.toLowerCase() === 'sku' || sku.toLowerCase() === 'sku number') continue;
 
-            // Simpan ke map agar SKU yang sama di-update (menimpa baris lama)
-            deduplicatedMap.set(sku.toLowerCase(), auditObj);
+              const auditObj = {
+                sku: sku,
+                namaSku: row[colName] || '',
+                slocExisting: row[colSlocEx] || '',
+                slocActual: row[colSlocAc] || 'Match',
+                expiredDate: excelDateToDateStr(row[colExp]),
+                fisikGood: row[colFg] !== '' && row[colFg] !== undefined ? Number(row[colFg]) : 0,
+                fisikBad: row[colFb] !== '' && row[colFb] !== undefined ? Number(row[colFb]) : 0,
+                sales: row[colSales] || '',
+                reasonSloc: row[colRSloc] || '',
+                reasonBad: row[colRBad] || '',
+                evidanceLink1: row[colLink1] || '',
+                evidanceLink2: row[colLink2] || '',
+                inputBy: row[colInputBy] || '',
+                timestamp: row[colTime] || '',
+                remaks: row[colRBad] || row[colRSloc] || 'Sesuai'
+              };
+
+              edsAuditResultsMap.set(sku.toLowerCase(), auditObj);
+              edsSubmittedSkuSet.add(sku.toLowerCase());
+            }
           }
-
-          edsHasilRows = Array.from(deduplicatedMap.values()).reverse();
-          deduplicatedMap.forEach((val, key) => {
-            edsAuditResultsMap.set(key, val);
-            edsSubmittedSkuSet.add(key);
-          });
         }
       }
+      edsHasilRows = Array.from(edsAuditResultsMap.values()).reverse();
 
       // 3. Bangun List Tugas EDS (Sinkronisasi Data Tarik Superset / Data Update + Main List SKU)
       const list = [];
@@ -8454,18 +8589,21 @@
 
         const alertText = isCritical ? '🔴 CRITICAL' : '🔴 HARD WARNING';
 
-        // Status Done dari riwayat Hasil EDS
+        // Status Done dari riwayat Hasil EDS, kolom sheet Main List, atau audit lokal
         let isDone = false;
         let doneVal = 'Belum';
         let remaksVal = '-';
         let fisikSystemVal = '-';
 
-        if (edsAuditResultsMap.has(skuKey)) {
+        const isSheetDone = (rawItem.sheetDone && rawItem.sheetDone.toLowerCase() === 'done') || (rawItem.doneVal && rawItem.doneVal.toLowerCase() === 'done');
+        const isLocallyDone = edsSubmittedSkuSet.has(skuKey);
+
+        if (edsAuditResultsMap.has(skuKey) || isSheetDone || isLocallyDone) {
           const audit = edsAuditResultsMap.get(skuKey);
           isDone = true;
           doneVal = 'Done';
-          remaksVal = audit.reasonBad || audit.reasonSloc || audit.remaks || 'Sesuai';
-          fisikSystemVal = `${audit.fisikGood}/${qtySystem}`;
+          remaksVal = audit ? (audit.reasonBad || audit.reasonSloc || audit.remaks || 'Sesuai') : (rawItem.sheetRemaks || rawItem.remaksVal || 'Sesuai');
+          fisikSystemVal = audit ? `${audit.fisikGood}/${qtySystem}` : (rawItem.sheetFisik || rawItem.fisikSystemVal || `${qtySystem}/${qtySystem}`);
           edsSubmittedSkuSet.add(skuKey);
         }
 
@@ -8527,7 +8665,10 @@
               l2Category: (row[13] || '').trim(),
               msltcDateRaw: row[14],
               remainingDays: Number(row[15]),
-              alert: (row[16] || '').trim()
+              alert: (row[16] || '').trim(),
+              sheetDone: (row[17] || '').trim(),
+              sheetRemaks: (row[18] || '').trim(),
+              sheetFisik: (row[19] || '').trim()
             });
           }
         }
@@ -8560,6 +8701,7 @@
         try {
           localStorage.setItem(EDS_MAIN_CACHE_KEY, JSON.stringify(list));
           localStorage.setItem(EDS_SUBMITTED_CACHE_KEY, JSON.stringify(Array.from(edsSubmittedSkuSet)));
+          localStorage.setItem(EDS_LOCAL_AUDITS_KEY, JSON.stringify(Object.fromEntries(edsAuditResultsMap)));
         } catch (e) { }
       }
 
@@ -9251,10 +9393,6 @@
     // ── OPTIMISTIC LOCAL STATE UPDATE ──
     const updateLocalEdsState = () => {
       edsSubmittedSkuSet.add(skuNo.toLowerCase());
-      try {
-        localStorage.setItem(EDS_SUBMITTED_CACHE_KEY, JSON.stringify(Array.from(edsSubmittedSkuSet)));
-      } catch (e) { }
-
       edsAuditResultsMap.set(skuNo.toLowerCase(), {
         sku: skuNo,
         namaSku: namaSku,
@@ -9270,6 +9408,11 @@
         timestamp: timestamp,
         remaks: autoRemaksVal
       });
+
+      try {
+        localStorage.setItem(EDS_SUBMITTED_CACHE_KEY, JSON.stringify(Array.from(edsSubmittedSkuSet)));
+        localStorage.setItem(EDS_LOCAL_AUDITS_KEY, JSON.stringify(Object.fromEntries(edsAuditResultsMap)));
+      } catch (e) { }
 
       // Update item(s) in edsMainListData
       edsMainListData.forEach(it => {

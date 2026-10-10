@@ -564,6 +564,7 @@ body::after {
   border: 1px solid rgba(168, 85, 247, 0.25);
 }
 
+.menu-icon-box.faq,
 .menu-icon-box.pinjaman {
   background: rgba(14, 165, 233, 0.14);
   border: 1px solid rgba(56, 189, 248, 0.3);
@@ -10514,6 +10515,8 @@ select.dcc-field-input option {
   padding-bottom: 70px;
   max-width: 600px;
   margin: 0 auto;
+  overflow-x: hidden;
+  box-sizing: border-box;
 }
 
 /* ── Top Bar ── */
@@ -10521,26 +10524,26 @@ select.dcc-field-input option {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 10px 14px;
+  padding: 8px 12px;
   background: rgba(15, 23, 42, 0.85);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 16px;
-  margin-bottom: 14px;
+  border-radius: 14px;
+  margin-bottom: 12px;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
 }
 
 .pinjaman-top-back-btn,
 .pinjaman-refresh-btn {
-  width: 42px;
-  height: 42px;
+  width: 38px;
+  height: 38px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 12px;
+  border-radius: 10px;
   color: #f8fafc;
   cursor: pointer;
   transition: all 0.2s ease;
@@ -10562,11 +10565,11 @@ select.dcc-field-input option {
 .pinjaman-title-wrap {
   text-align: center;
   flex: 1;
-  padding: 0 10px;
+  padding: 0 8px;
 }
 
 .pinjaman-title {
-  font-size: 1.05rem;
+  font-size: 0.98rem;
   font-weight: 700;
   letter-spacing: -0.01em;
   color: #f8fafc;
@@ -10578,38 +10581,38 @@ select.dcc-field-input option {
 }
 
 .pinjaman-subtitle {
-  font-size: 0.74rem;
+  font-size: 0.7rem;
   color: #94a3b8;
-  margin: 2px 0 0;
+  margin: 1px 0 0;
   font-family: 'JetBrains Mono', monospace;
   letter-spacing: 0.02em;
   white-space: nowrap;
 }
 
-/* ── Segmented Navigation Tabs (5 Flows Responsive Grid) ── */
+/* ── Segmented Navigation Tabs (Balanced 2x2 + 1 Grid) ── */
 .pinjaman-nav {
   display: grid;
-  grid-template-columns: repeat(6, 1fr);
+  grid-template-columns: repeat(2, 1fr);
   gap: 6px;
   background: rgba(10, 15, 29, 0.92);
-  padding: 6px;
-  border-radius: 16px;
+  padding: 5px;
+  border-radius: 14px;
   border: 1px solid rgba(255, 255, 255, 0.08);
-  margin-bottom: 16px;
+  margin-bottom: 12px;
   box-sizing: border-box;
   width: 100%;
 }
 
 .pinjaman-tab-btn {
-  grid-column: span 2; /* Row 1: 3 tabs (2 + 2 + 2 = 6) */
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 6px;
-  padding: 10px 4px;
+  padding: 8px 6px;
+  height: 38px;
   background: rgba(255, 255, 255, 0.03);
   border: 1px solid rgba(255, 255, 255, 0.06);
-  border-radius: 10px;
+  border-radius: 9px;
   color: #94a3b8;
   font-size: 0.78rem;
   font-weight: 600;
@@ -10619,12 +10622,18 @@ select.dcc-field-input option {
   white-space: nowrap;
   user-select: none;
   touch-action: manipulation;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.pinjaman-tab-btn:nth-child(4),
-.pinjaman-tab-btn:nth-child(5) {
-  grid-column: span 3; /* Row 2: 2 tabs (3 + 3 = 6) */
-  padding: 10px 8px;
+/* Riwayat Tab spans full width across bottom */
+.pinjaman-tab-btn.history-tab {
+  grid-column: span 2;
+  height: 36px;
+  padding: 6px 10px;
+  background: rgba(56, 189, 248, 0.05);
+  border-color: rgba(56, 189, 248, 0.12);
+  color: #cbd5e1;
 }
 
 .pinjaman-tab-btn:hover {
@@ -11234,84 +11243,110 @@ select.dcc-field-input option {
 .pinjaman-history-controls {
   display: flex;
   gap: 8px;
-  margin-bottom: 12px;
+  margin-bottom: 10px;
 }
 
 .pinjaman-history-search {
   flex: 1;
+  height: 40px !important;
+  font-size: 0.82rem !important;
+  padding: 0 12px !important;
+  border-radius: 10px !important;
+  background: rgba(10, 15, 29, 0.8) !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
 }
 
 .pinjaman-history-filter-pills {
   display: flex;
+  flex-wrap: wrap;
   gap: 6px;
-  overflow-x: auto;
-  margin-bottom: 14px;
-  padding-bottom: 2px;
+  margin-bottom: 12px;
+  overflow-x: visible;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.pinjaman-history-filter-pills::-webkit-scrollbar {
+  display: none !important;
+  height: 0 !important;
+  width: 0 !important;
 }
 
 .pinjaman-pill-btn {
-  padding: 6px 12px;
-  border-radius: 20px;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 5px 10px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   color: #94a3b8;
-  font-size: 0.78rem;
+  font-size: 0.74rem;
   font-weight: 600;
   cursor: pointer;
   white-space: nowrap;
   transition: all 0.15s ease;
+  user-select: none;
+  touch-action: manipulation;
+}
+
+.pinjaman-pill-btn:hover {
+  color: #f8fafc;
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.15);
 }
 
 .pinjaman-pill-btn.active {
   background: rgba(56, 189, 248, 0.15);
   border-color: #38bdf8;
   color: #38bdf8;
+  box-shadow: 0 2px 8px rgba(56, 189, 248, 0.2);
 }
 
 .pinjaman-history-card {
   background: rgba(15, 23, 42, 0.75);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
   border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 14px;
-  padding: 12px 14px;
-  margin-bottom: 10px;
+  border-radius: 12px;
+  padding: 10px 12px;
+  margin-bottom: 8px;
   transition: all 0.2s ease;
 }
 
 .pinjaman-history-card:hover {
-  border-color: rgba(255, 255, 255, 0.18);
+  border-color: rgba(255, 255, 255, 0.16);
   transform: translateY(-1px);
 }
 
 .pinjaman-history-card.pinjam {
-  border-left: 4px solid #38bdf8;
+  border-left: 3px solid #38bdf8;
 }
 
 .pinjaman-history-card.kembali {
-  border-left: 4px solid #10b981;
+  border-left: 3px solid #10b981;
 }
 
 .pinjaman-history-card.pinjemin {
-  border-left: 4px solid #8b5cf6;
+  border-left: 3px solid #8b5cf6;
 }
 
 .pinjaman-history-card.terima {
-  border-left: 4px solid #f59e0b;
+  border-left: 3px solid #f59e0b;
 }
 
 .pinjaman-hist-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 6px;
+  margin-bottom: 5px;
 }
 
 .pinjaman-hist-badge {
-  font-size: 0.7rem;
+  font-size: 0.68rem;
   font-weight: 700;
-  padding: 2px 8px;
-  border-radius: 6px;
+  padding: 2px 7px;
+  border-radius: 5px;
   text-transform: uppercase;
   font-family: 'JetBrains Mono', monospace;
+  letter-spacing: 0.02em;
 }
 
 .pinjaman-hist-badge.pinjam {
@@ -11339,36 +11374,46 @@ select.dcc-field-input option {
 }
 
 .pinjaman-hist-time {
-  font-size: 0.72rem;
+  font-size: 0.7rem;
   color: #64748b;
   font-family: 'JetBrains Mono', monospace;
 }
 
 .pinjaman-hist-product {
-  font-size: 0.88rem;
+  font-size: 0.84rem;
   font-weight: 600;
   color: #f8fafc;
+  line-height: 1.3;
   margin-bottom: 6px;
 }
 
 .pinjaman-hist-meta {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
-  font-size: 0.75rem;
+  gap: 5px 8px;
+  font-size: 0.72rem;
   color: #94a3b8;
+  background: rgba(10, 15, 29, 0.4);
+  padding: 6px 8px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.04);
 }
 
 .pinjaman-hist-meta span {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 3px;
+}
+
+.pinjaman-hist-meta strong {
+  color: #cbd5e1;
 }
 
 .pinjaman-hist-photo-link {
   color: #38bdf8;
   text-decoration: underline;
   cursor: pointer;
+  font-weight: 600;
 }
 
 

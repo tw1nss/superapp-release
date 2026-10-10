@@ -32,7 +32,7 @@
   <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/id.js"></script>
 
   <!-- Stylesheets -->
-  <link rel="stylesheet" href="style.css?v=109">
+  <link rel="stylesheet" href="style.css?v=114">
 
   <!-- QR Code & Barcode Libraries -->
   <script src="qrcode.min.js"></script>
@@ -229,16 +229,16 @@
           <div class="menu-card-title">ED Correction</div>
         </div>
 
-        <!-- 10. Pinjaman -->
-        <div class="menu-card" onclick="openAppMenu('pinjaman')">
-          <div class="menu-icon-box pinjaman">
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M7 16V4m0 0L3 8m4-4l4 4" stroke="#38bdf8" />
-              <path d="M17 8v12m0 0l4-4m-4 4l-4-4" stroke="#10b981" />
-              <rect x="2" y="11" width="10" height="9" rx="2" stroke="#38bdf8" fill="rgba(56, 189, 248, 0.15)" />
+        <!-- 10. FAQ (Kunci Akses Pinjaman) -->
+        <div class="menu-card" onclick="openAppMenu('faq')">
+          <div class="menu-icon-box faq">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="10" stroke="#38bdf8" fill="rgba(56, 189, 248, 0.12)"></circle>
+              <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" stroke="#38bdf8"></path>
+              <line x1="12" y1="17" x2="12.01" y2="17" stroke="#38bdf8" stroke-width="2.5"></line>
             </svg>
           </div>
-          <div class="menu-card-title">Pinjaman</div>
+          <div class="menu-card-title">FAQ</div>
         </div>
       </div>
     </section>
@@ -2953,6 +2953,44 @@
     </div>
   </div>
 
+  <!-- ═══ FAQ (Pinjaman) Security Lock Modal ═══ -->
+  <div id="faqLockModal" class="dcc-lock-overlay hidden" onclick="closeFaqLockModal(event)">
+    <div class="dcc-lock-card" onclick="event.stopPropagation()">
+      <div class="dcc-lock-header">
+        <div class="dcc-lock-badge-icon">
+          <div class="dcc-lock-icon-circle" style="background: rgba(56, 189, 248, 0.15); border-color: rgba(56, 189, 248, 0.35); color: #38bdf8;">
+            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="10"></circle>
+              <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+              <line x1="12" y1="17" x2="12.01" y2="17"></line>
+            </svg>
+          </div>
+        </div>
+        <h3 class="dcc-lock-title">Kunci Akses FAQ</h3>
+        <p class="dcc-lock-subtitle">Masukkan PIN keamanan untuk membuka akses menu</p>
+      </div>
+
+      <!-- PIN Input Group -->
+      <div class="dcc-lock-group">
+        <label class="dcc-lock-label" for="faqPinInput">PIN Keamanan</label>
+        <div class="dcc-pin-wrapper">
+          <input type="password" id="faqPinInput" class="dcc-pin-input" placeholder="Masukkan PIN Akses"
+            maxlength="12" inputmode="numeric" autocomplete="off">
+          <button type="button" class="dcc-pin-eye-btn" id="faqPinEyeBtn" onclick="toggleFaqPinVisibility()" title="Lihat/Sembunyikan PIN">👁️</button>
+        </div>
+        <div id="faqPinError" class="dcc-pin-error hidden">❌ PIN salah! Silakan coba lagi.</div>
+      </div>
+
+      <!-- Modal Footer Action Buttons -->
+      <div class="dcc-lock-actions">
+        <button type="button" class="dcc-lock-btn-cancel" onclick="closeFaqLockModal()">Batal</button>
+        <button type="button" class="dcc-lock-btn-submit" onclick="verifyAndEnterFaq()">
+          <span>Buka Menu</span> &rarr;
+        </button>
+      </div>
+    </div>
+  </div>
+
   <!-- ═══ In-App Update Modal ═══ -->
   <div id="appUpdateModal" class="app-update-overlay hidden">
     <div class="app-update-card" onclick="event.stopPropagation()">
@@ -3118,7 +3156,7 @@
   </div>
 
   <!-- App Logic -->
-  <script src="app.js?v=109"></script>
+  <script src="app.js?v=114"></script>
 </body>
 
 </html>
