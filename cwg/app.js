@@ -12522,12 +12522,12 @@
   }
 
   // ──────────────────────────────────────────────
-  // NEW KOLI INBOUND MTG - Simplified Table & Detail
+  // NEW KOLI INBOUND CWG - Simplified Table & Detail
   // ──────────────────────────────────────────────
 
-  const KOLI_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1sULhhG0_Oe2hr2B34Lum08ibDuxWJtM9buz9kitAnKg/gviz/tq?tqx=out:csv&gid=0';
-  const KOLI_PROXY_URL = '/api/koli-inbound-csv';
-  const KOLI_CACHE_KEY = 'koli_inbound_cache_data_v3';
+  const KOLI_SHEET_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent('Koli Inbound')}`;
+  const KOLI_PROXY_URL = '/api/koli-inbound-cwg-csv';
+  const KOLI_CACHE_KEY = 'koli_inbound_cwg_cache_data_v1';
 
   let koliAllRows = [];
   let koliFilteredRows = [];
