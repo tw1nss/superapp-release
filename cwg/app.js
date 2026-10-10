@@ -3502,11 +3502,143 @@
   let dccHasil2Rows = [];
 
   // ══════════════════════════════════════════════
+  // ══════════════════════════════════════════════
   //  DCC OFFLINE QUEUE & AUTO-SYNC ENGINE
   // ══════════════════════════════════════════════
-  const OFFLINE_DB_NAME = 'DCC_OFFLINE_DB_MTG_V1';
+  const OFFLINE_DB_NAME = 'DCC_OFFLINE_DB_CWG_V2';
   const OFFLINE_STORE_NAME = 'queue';
+  const DCC_DRAFT_CACHE_KEY = 'DCC_FORM_DRAFT_CWG_V1';
+  const DCC_OFFLINE_QUEUE_LOCAL_KEY = 'DCC_OFFLINE_QUEUE_CWG_LOCAL';
   let isSyncingOfflineQueue = false;
+
+  // ── DCC Form Draft Auto-Save Engine ──
+  let dccDraftSaveTimeout = null;
+  window.saveDccFormDraft = function () {
+    clearTimeout(dccDraftSaveTimeout);
+    dccDraftSaveTimeout = setTimeout(() => {
+      try {
+        const skuInput = document.getElementById('dccSkuInput');
+        if (!skuInput) return;
+        const sku = skuInput.value.trim();
+        const namaSku = (document.getElementById('dccNamaSku') || {}).value || '';
+        const slocExisting = (document.getElementById('dccSlocExisting') || {}).value || '';
+        const expiredDate = (document.getElementById('dccExpiredDate') || {}).value || '';
+        const fisikGood = (document.getElementById('dccFisikGood') || {}).value || '0';
+        const fisikBad = (document.getElementById('dccFisikBad') || {}).value || '0';
+        const sales = (document.getElementById('dccSales') || {}).value || '0';
+        const reasonSloc = (document.getElementById('dccReasonSloc') || {}).value || '';
+        const reasonBadSelect = document.getElementById('dccReasonBad');
+        const reasonBad = reasonBadSelect ? reasonBadSelect.value : '';
+        const evidance = (document.getElementById('dccEvidance') || {}).value || '';
+
+        const slocActualBtn = document.querySelector('#dccSlocActualGroup .dcc-toggle-btn.selected');
+        const slocActual = slocActualBtn ? slocActualBtn.getAttribute('data-value') : '';
+
+        const labelProductBtn = document.querySelector('#dccLabelProductGroup .dcc-toggle-btn.selected');
+        const labelProduct = labelProductBtn ? labelProductBtn.getAttribute('data-value') : 'Ada';
+
+        const labelSlocBtn = document.querySelector('#dccLabelSlocGroup .dcc-toggle-btn.selected');
+        const labelSloc = labelSlocBtn ? labelSlocBtn.getAttribute('data-value') : 'Ada';
+
+        // Only save if there's non-empty meaningful draft content
+        if (sku || expiredDate || (parseInt(fisikGood, 10) > 0) || (parseInt(fisikBad, 10) > 0) || dccPhotoList.length > 0 || reasonSloc || reasonBad || evidance) {
+          const draft = {
+            sku,
+            namaSku,
+            slocExisting,
+            slocActual,
+            expiredDate,
+            fisikGood,
+            fisikBad,
+            sales,
+            reasonSloc,
+            reasonBad,
+            evidance,
+            labelProduct,
+            labelSloc,
+            photos: dccPhotoList || [],
+            savedAt: Date.now()
+          };
+          localStorage.setItem(DCC_DRAFT_CACHE_KEY, JSON.stringify(draft));
+        } else {
+          localStorage.removeItem(DCC_DRAFT_CACHE_KEY);
+        }
+      } catch (e) {}
+    }, 200);
+  };
+
+  window.clearDccFormDraft = function () {
+    clearTimeout(dccDraftSaveTimeout);
+    try {
+      localStorage.removeItem(DCC_DRAFT_CACHE_KEY);
+    } catch (e) {}
+  };
+
+  window.restoreDccFormDraft = function () {
+    try {
+      const raw = localStorage.getItem(DCC_DRAFT_CACHE_KEY);
+      if (!raw) return;
+      const draft = JSON.parse(raw);
+      if (!draft || !draft.sku) return;
+
+      const skuInput = document.getElementById('dccSkuInput');
+      if (skuInput && !skuInput.value) skuInput.value = draft.sku || '';
+
+      const namaInput = document.getElementById('dccNamaSku');
+      if (namaInput) namaInput.value = draft.namaSku || '';
+
+      const slocInput = document.getElementById('dccSlocExisting');
+      if (slocInput) slocInput.value = draft.slocExisting || '';
+
+      if (draft.slocActual) {
+        setDccToggle('dccSlocActualGroup', draft.slocActual);
+      }
+
+      const expInput = document.getElementById('dccExpiredDate');
+      if (expInput && draft.expiredDate) {
+        expInput.value = draft.expiredDate;
+        const parsedExp = parseFlexibleDate(draft.expiredDate);
+        if (parsedExp && dccFlatpickr) {
+          dccFlatpickr.setDate(parsedExp, false);
+        }
+        calculateDccMsltcStatus();
+      }
+
+      if (document.getElementById('dccFisikGood')) document.getElementById('dccFisikGood').value = draft.fisikGood || '0';
+      if (document.getElementById('dccFisikBad')) document.getElementById('dccFisikBad').value = draft.fisikBad || '0';
+      if (document.getElementById('dccSales')) document.getElementById('dccSales').value = draft.sales || '0';
+      if (document.getElementById('dccReasonSloc')) document.getElementById('dccReasonSloc').value = draft.reasonSloc || '';
+      if (document.getElementById('dccEvidance')) document.getElementById('dccEvidance').value = draft.evidance || '';
+
+      if (draft.reasonBad && document.getElementById('dccReasonBad')) {
+        document.getElementById('dccReasonBad').value = draft.reasonBad;
+      }
+
+      if (draft.labelProduct) setDccToggle('dccLabelProductGroup', draft.labelProduct);
+      if (draft.labelSloc) setDccToggle('dccLabelSlocGroup', draft.labelSloc);
+
+      if (Array.isArray(draft.photos) && draft.photos.length > 0) {
+        dccPhotoList = draft.photos.slice(0, 3);
+        renderDccPhotoPreviews();
+      }
+
+      // Restore conditional field visibilities
+      if (draft.slocActual === 'Unmatch') {
+        const reasonSlocGrp = document.getElementById('dccReasonSlocGroup');
+        if (reasonSlocGrp) reasonSlocGrp.classList.remove('hidden');
+      }
+      if (parseInt(draft.fisikBad || '0', 10) > 0) {
+        const reasonBadGrp = document.getElementById('dccReasonBadGroup');
+        const photoGrp = document.getElementById('dccPhotoEvidenceGroup');
+        if (reasonBadGrp) reasonBadGrp.classList.remove('hidden');
+        if (photoGrp) photoGrp.classList.remove('hidden');
+      }
+
+      showDccToast('info', 'Draf Input Dipulihkan', `Melanjutkan input SKU ${draft.sku} yang belum disimpan.`);
+    } catch (e) {
+      console.warn('Failed to restore CWG DCC draft:', e);
+    }
+  };
 
   function openOfflineDb() {
     return new Promise((resolve) => {
@@ -3532,10 +3664,10 @@
       const db = await openOfflineDb();
       const itemToSave = { ...payload, queuedAt: Date.now() };
       if (!db) {
-        const list = safeJsonParse(localStorage.getItem('DCC_OFFLINE_QUEUE_LOCAL'), []);
+        const list = safeJsonParse(localStorage.getItem(DCC_OFFLINE_QUEUE_LOCAL_KEY), []);
         itemToSave.id = Date.now();
         list.push(itemToSave);
-        localStorage.setItem('DCC_OFFLINE_QUEUE_LOCAL', JSON.stringify(list));
+        localStorage.setItem(DCC_OFFLINE_QUEUE_LOCAL_KEY, JSON.stringify(list));
         updateOfflineQueueBadge();
         return;
       }
@@ -3546,7 +3678,7 @@
         updateOfflineQueueBadge();
       };
     } catch (e) {
-      console.warn('Gagal menyimpan ke offline queue:', e);
+      console.warn('Gagal menyimpan ke offline queue CWG:', e);
     }
   }
 
@@ -3554,7 +3686,7 @@
     try {
       const db = await openOfflineDb();
       if (!db) {
-        return safeJsonParse(localStorage.getItem('DCC_OFFLINE_QUEUE_LOCAL'), []);
+        return safeJsonParse(localStorage.getItem(DCC_OFFLINE_QUEUE_LOCAL_KEY), []);
       }
       return new Promise((resolve) => {
         const tx = db.transaction([OFFLINE_STORE_NAME], 'readonly');
@@ -3572,9 +3704,9 @@
     try {
       const db = await openOfflineDb();
       if (!db) {
-        let list = safeJsonParse(localStorage.getItem('DCC_OFFLINE_QUEUE_LOCAL'), []);
+        let list = safeJsonParse(localStorage.getItem(DCC_OFFLINE_QUEUE_LOCAL_KEY), []);
         list = list.filter(i => i.id !== id);
-        localStorage.setItem('DCC_OFFLINE_QUEUE_LOCAL', JSON.stringify(list));
+        localStorage.setItem(DCC_OFFLINE_QUEUE_LOCAL_KEY, JSON.stringify(list));
         updateOfflineQueueBadge();
         return;
       }
@@ -3627,6 +3759,8 @@
 
     let successCount = 0;
     for (const item of items) {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 7000);
       try {
         const payloadToSend = { ...item };
         delete payloadToSend.id;
@@ -3636,13 +3770,16 @@
           method: 'POST',
           mode: 'no-cors',
           headers: { 'Content-Type': 'text/plain' },
-          body: JSON.stringify(payloadToSend)
+          body: JSON.stringify(payloadToSend),
+          signal: controller.signal
         });
+        clearTimeout(timeoutId);
 
         await removeOfflineQueueItem(item.id);
         successCount++;
       } catch (err) {
-        console.warn('Sync item failed:', err);
+        clearTimeout(timeoutId);
+        console.warn('Sync item CWG failed / timeout:', err);
         break; // Pause if network drops mid-sync
       }
     }
@@ -3652,20 +3789,26 @@
 
     if (successCount > 0) {
       playSaveSuccessChime();
-      showDccToast('success', 'Auto-Sync Berhasil!', `${successCount} data screening offline berhasil dicatat ke Sheet MTG.`);
+      showDccToast('success', 'Auto-Sync Berhasil!', `${successCount} data screening offline berhasil dicatat ke Sheet CWG.`);
     }
   };
 
   // Auto-listen to connection restore & periodic check
   window.addEventListener('online', () => {
-    console.log('[DCC] Sinyal internet terhubung kembali. Memulai auto-sync offline queue...');
-    syncDccOfflineQueue();
+    console.log('[DCC CWG] Sinyal internet terhubung kembali. Memulai auto-sync offline queue...');
+    setTimeout(() => {
+      syncDccOfflineQueue();
+    }, 1000);
   });
   setInterval(() => {
-    if (navigator.onLine) {
-      syncDccOfflineQueue();
+    if (navigator.onLine && !isSyncingOfflineQueue) {
+      getOfflineQueueItems().then(items => {
+        if (items.length > 0) {
+          syncDccOfflineQueue();
+        }
+      });
     }
-  }, 25000);
+  }, 15000);
 
   // Initialize queue badge on startup
   setTimeout(updateOfflineQueueBadge, 1500);
@@ -4163,6 +4306,7 @@
       document.getElementById('dccTabScan').classList.add('active');
       document.getElementById('navDccScan').classList.add('active');
       initDccDatePicker();
+      restoreDccFormDraft();
     } else if (tabName === 'report') {
       document.getElementById('dccTabReport').classList.remove('hidden');
       document.getElementById('dccTabReport').classList.add('active');
@@ -5306,6 +5450,7 @@
         reasonGroup.classList.add('hidden');
       }
     }
+    if (typeof saveDccFormDraft === 'function') saveDccFormDraft();
   };
 
   // ── Multi-Photo Evidence Logic (Max 3 Photos) ──
@@ -5354,6 +5499,7 @@
         const photoBase64 = canvas.toDataURL('image/jpeg', 0.70);
         dccPhotoList.push(photoBase64);
         renderDccPhotoPreviews();
+        if (typeof saveDccFormDraft === 'function') saveDccFormDraft();
         playSuccessBeep();
 
         event.target.value = '';
@@ -5374,6 +5520,7 @@
     const galInput = document.getElementById('dccGalleryInput');
     if (camInput) camInput.value = '';
     if (galInput) galInput.value = '';
+    if (typeof saveDccFormDraft === 'function') saveDccFormDraft();
   };
 
   function renderDccPhotoPreviews() {
@@ -5444,6 +5591,7 @@
         removeDccPhoto();
       }
     }
+    if (typeof saveDccFormDraft === 'function') saveDccFormDraft();
   };
 
   // ── DCC Floating Toast Notification ──
@@ -5551,6 +5699,7 @@
     if (photoGroup) photoGroup.classList.add('hidden');
 
     if (dccFlatpickr) dccFlatpickr.clear();
+    clearDccFormDraft();
   };
 
   // ── Flatpickr for Expired Date ──
@@ -5567,6 +5716,7 @@
         allowInput: true,
         onChange: function () {
           calculateDccMsltcStatus();
+          if (typeof saveDccFormDraft === 'function') saveDccFormDraft();
         }
       });
 
@@ -5574,6 +5724,7 @@
         const raw = el.value.trim();
         if (!raw) {
           calculateDccMsltcStatus();
+          if (typeof saveDccFormDraft === 'function') saveDccFormDraft();
           return;
         }
         const parsed = parseFlexibleDate(raw);
@@ -5581,12 +5732,14 @@
           if (dccFlatpickr) dccFlatpickr.setDate(parsed, false);
           calculateDccMsltcStatus();
         }
+        if (typeof saveDccFormDraft === 'function') saveDccFormDraft();
       };
 
       const commitDccManualInput = () => {
         const raw = el.value.trim();
         if (!raw) {
           calculateDccMsltcStatus();
+          if (typeof saveDccFormDraft === 'function') saveDccFormDraft();
           return;
         }
         const parsed = parseFlexibleDate(raw);
@@ -5598,6 +5751,7 @@
           }
           calculateDccMsltcStatus();
         }
+        if (typeof saveDccFormDraft === 'function') saveDccFormDraft();
         el.blur();
       };
 
@@ -5610,11 +5764,26 @@
         }
       });
     } catch (e) {
-      console.warn('DCC Flatpickr init failed:', e);
+      console.warn('DCC CWG Flatpickr init failed:', e);
     }
   }
 
-  // ── Submit to MTG Sheet (With Offline Queue Fallback & Multi-Photo) ──
+  // ── Setup Live Draft Auto-Save Listeners for all DCC fields ──
+  (function initDccFormDraftListeners() {
+    const fields = [
+      'dccSkuInput', 'dccFisikGood', 'dccFisikBad', 'dccSales',
+      'dccReasonSloc', 'dccReasonBad', 'dccEvidance'
+    ];
+    fields.forEach(id => {
+      const el = document.getElementById(id);
+      if (el) {
+        el.addEventListener('input', () => { if (typeof saveDccFormDraft === 'function') saveDccFormDraft(); });
+        el.addEventListener('change', () => { if (typeof saveDccFormDraft === 'function') saveDccFormDraft(); });
+      }
+    });
+  })();
+
+  // ── Submit to CWG Sheet (With Offline Queue Fallback & Multi-Photo) ──
   window.submitDccData = async function () {
     const btn = document.getElementById('dccSubmitBtn');
 
@@ -5809,34 +5978,43 @@
     if (!navigator.onLine) {
       await addToOfflineQueue(payload);
       updateLocalState();
+      clearDccFormDraft();
       playSaveSuccessChime();
-      showDccToast('info', 'Disimpan Offline (Antrean)', `SKU ${skuNo} berhasil disimpan di HP. Otomatis dikirim begitu sinyal kembali.`);
+      showDccToast('info', 'Disimpan Offline (Antrean)', `Sinyal terputus. Data SKU ${skuNo} aman disimpan di HP & otomatis dikirim ke Sheet CWG saat online.`);
       resetDccForm();
       btn.disabled = false;
       btn.textContent = 'Save';
       return;
     }
 
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 6500);
+
     try {
-      // Send as POST payload
+      // Send as POST payload with timeout
       await fetch(DCC_WEBAPP_URL, {
         method: 'POST',
         mode: 'no-cors',
         headers: { 'Content-Type': 'text/plain' },
-        body: JSON.stringify(payload)
+        body: JSON.stringify(payload),
+        signal: controller.signal
       });
+      clearTimeout(timeoutId);
 
       updateLocalState();
+      clearDccFormDraft();
       playSaveSuccessChime();
-      showDccToast('success', 'Data Berhasil Disimpan!', `SKU ${skuNo} (${namaSku}) oleh ${inputByVal} telah dicatat ke sheet MTG.`);
+      showDccToast('success', 'Data Berhasil Disimpan!', `SKU ${skuNo} (${namaSku}) oleh ${inputByVal} telah dicatat ke Sheet CWG.`);
       resetDccForm();
 
     } catch (e) {
-      console.warn('POST failed, storing in offline queue...', e);
+      clearTimeout(timeoutId);
+      console.warn('CWG POST failed / timeout, storing in offline queue...', e);
       await addToOfflineQueue(payload);
       updateLocalState();
+      clearDccFormDraft();
       playSaveSuccessChime();
-      showDccToast('info', 'Tersimpan Offline (Sinyal Lemah)', `Koneksi tidak stabil. Data SKU ${skuNo} diamankan di memori HP dan akan otomatis dikirim ulang.`);
+      showDccToast('info', 'Tersimpan Offline (Sinyal Lemah)', `Koneksi internet tidak stabil / timeout. Data SKU ${skuNo} diamankan di HP & akan otomatis terkirim ke Sheet CWG.`);
       resetDccForm();
     } finally {
       btn.disabled = false;

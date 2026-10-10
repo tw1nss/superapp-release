@@ -11415,5 +11415,65 @@ select.dcc-field-input option {
   font-weight: 600;
 }
 
+/* ══════════════════════════════════════════════════════════════════════
+   🚀 ULTRA-PERFORMANCE ENGINE FOR LOW-END DEVICES (RAM <= 4GB & MOBILE)
+   ══════════════════════════════════════════════════════════════════════ */
 
+/* Stop layout reflow & pause animations on inactive / hidden views */
+.hidden,
+[hidden],
+.dcc-tab-content:not(.active),
+.tab-pane:not(.active) {
+  display: none !important;
+  animation: none !important;
+  transition: none !important;
+}
 
+/* GPU-saving surface styles on mobile screens & touch devices */
+@media (max-width: 768px), (pointer: coarse) {
+  *, *::before, *::after {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* Replace heavy GPU blurs with crisp, battery-friendly solid/opaque surfaces */
+  .modal-dialog,
+  .dcc-modal,
+  .dcc-card,
+  .cpl-card,
+  .pinjaman-card,
+  .koli-table-wrapper,
+  .eds-table-container,
+  .space-loading-overlay,
+  .header-actions,
+  .dcc-header,
+  .dcc-top-bar,
+  .koli-header-bar,
+  .cpl-header-bar,
+  .pinjaman-top-bar,
+  .eds-header-bar,
+  .menu-tile {
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
+  }
+
+  /* Content-visibility optimizations: browser only renders visible rows */
+  .dcc-card,
+  .koli-table tbody tr,
+  .eds-table-row,
+  .cpl-card,
+  .pinjaman-hist-card,
+  .sg-card {
+    content-visibility: auto;
+    contain-intrinsic-size: 1px 75px;
+  }
+}
+
+/* Smooth hardware accelerated scrolling for tables & cards */
+.dcc-card-container,
+.koli-table-wrapper,
+.eds-table-container,
+.cpl-list-container,
+.pinjaman-tab-content {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
