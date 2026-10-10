@@ -4104,21 +4104,62 @@
     window.openAppMenu('dcc');
   };
 
+  // ── Device-Specific User PIC Engine for CWG ("Ingat Saya") ──
+  const DCC_CWG_DEVICE_PIC_KEY = 'CWG_USER_DEVICE_PIC_V1';
+
+  function getDevicePicName() {
+    try {
+      return (localStorage.getItem(DCC_CWG_DEVICE_PIC_KEY) || '').trim();
+    } catch (e) {
+      return '';
+    }
+  }
+
+  function setDevicePicName(name) {
+    try {
+      localStorage.setItem(DCC_CWG_DEVICE_PIC_KEY, (name || '').trim());
+    } catch (e) {}
+    updateDccPetugas2Options();
+    updateDccPicDisplay();
+  }
+
+  function getDccPetugas2Name() {
+    return getDevicePicName();
+  }
+
+  function setDccPetugas2Name(name) {
+    setDevicePicName(name);
+  }
+
+  function updateDccPetugas2Options() {
+    const pic = getDevicePicName();
+    const labelTask2Btn = document.getElementById('labelTask2Btn');
+    if (labelTask2Btn) {
+      labelTask2Btn.textContent = '👤 Task 2 (Siang)';
+    }
+  }
+
   window.updateDccPicDisplay = function () {
     const iconEl = document.getElementById('dccActivePicIcon');
     const nameEl = document.getElementById('dccActivePicName');
     const tagEl = document.getElementById('dccActiveShiftTag');
     const isPagi = (selectedDccShift === 'pagi');
-    const p2 = getDccPetugas2Name();
+    const pic = getDevicePicName();
 
-    if (isPagi) {
-      if (iconEl) iconEl.textContent = '☀️';
-      if (nameEl) nameEl.textContent = 'Bintang';
-      if (tagEl) tagEl.textContent = 'Shift Pagi (Task 1)';
-    } else {
-      if (iconEl) iconEl.textContent = '🌤️';
-      if (nameEl) nameEl.textContent = p2 || 'Belum Diset (Klik Ganti PIC)';
-      if (tagEl) tagEl.textContent = 'Shift Siang (Task 2)';
+    if (iconEl) iconEl.textContent = isPagi ? '☀️' : '🌤️';
+    if (nameEl) {
+      if (pic) {
+        nameEl.textContent = pic;
+        nameEl.style.color = '';
+        nameEl.title = `PIC HP: ${pic}`;
+      } else {
+        nameEl.textContent = 'Belum Diatur (Klik Ganti PIC)';
+        nameEl.style.color = '#fbbf24';
+        nameEl.title = 'Klik Ganti PIC untuk memasukkan nama Anda';
+      }
+    }
+    if (tagEl) {
+      tagEl.textContent = isPagi ? 'Shift Pagi (Task 1)' : 'Shift Siang (Task 2)';
     }
   };
 
@@ -4130,8 +4171,8 @@
       if (isHidden) {
         group.classList.remove('hidden');
         if (input) {
-          const currentP2 = getDccPetugas2Name();
-          input.value = (selectedDccShift === 'pagi') ? 'Bintang' : currentP2;
+          input.value = getDevicePicName();
+          input.placeholder = "Masukkan nama Anda (diingat di HP)...";
           input.focus();
           input.select();
         }
@@ -4145,6 +4186,7 @@
     selectedDccShift = shift;
     const shiftBadge = document.getElementById('dccActiveShiftBadge');
     const reportShiftLabel = document.getElementById('dccReportShiftLabel');
+    const pic = getDevicePicName();
 
     if (shift === 'pagi') {
       if (shiftBadge) {
@@ -4157,10 +4199,10 @@
       filterDccMainList();
       renderShiftSpecificReport();
       if (typeof showDccToast === 'function') {
-        showDccToast('success', '☀️ Shift Pagi Aktif', `Menampilkan ${dccTask1List.length || 0} SKU Task 1`);
+        const picMsg = pic ? `PIC: ${pic}` : 'PIC belum diatur';
+        showDccToast('success', '☀️ Shift Pagi Aktif', `Menampilkan ${dccTask1List.length || 0} SKU Task 1 (${picMsg})`);
       }
     } else {
-      const p2 = getDccPetugas2Name();
       if (shiftBadge) {
         shiftBadge.innerHTML = '🌤️ Shift Siang';
         shiftBadge.className = 'dcc-shift-badge-btn malam';
@@ -4171,7 +4213,7 @@
       filterDccMainList();
       renderShiftSpecificReport();
       if (typeof showDccToast === 'function') {
-        const picMsg = p2 ? `PIC: ${p2}` : 'PIC belum diset';
+        const picMsg = pic ? `PIC: ${pic}` : 'PIC belum diatur';
         showDccToast('success', '🌤️ Shift Siang Aktif', `Menampilkan ${dccTask2List.length || 0} SKU Task 2 (${picMsg})`);
       }
     }
@@ -4186,41 +4228,20 @@
     }
   };
 
-  function getDccPetugas2Name() {
-    try {
-      return (localStorage.getItem(DCC_PETUGAS2_KEY) || '').trim();
-    } catch (e) {
-      return '';
-    }
-  }
-
-  function setDccPetugas2Name(name) {
-    try {
-      localStorage.setItem(DCC_PETUGAS2_KEY, (name || '').trim());
-    } catch (e) {}
-    updateDccPetugas2Options();
-    updateDccPicDisplay();
-  }
-
-  function updateDccPetugas2Options() {
-    const p2 = getDccPetugas2Name();
-    const labelTask2Btn = document.getElementById('labelTask2Btn');
-    if (labelTask2Btn) {
-      labelTask2Btn.textContent = p2 ? `👤 Task 2 (${p2})` : '👤 Task 2 (Siang)';
-    }
-  }
-
   function isItemTask1(item) {
     if (item.task === 'task1') return true;
+    const s = (item.shift || '').toLowerCase().trim();
+    if (s.includes('1') || s.includes('pagi')) return true;
     const a = (item.assign || '').toLowerCase().trim();
-    return a.includes('bintang') || a === 'task 1' || a === 'task1';
+    return a === 'task 1' || a === 'task1' || a.includes('pagi');
   }
 
   function isItemTask2(item) {
     if (item.task === 'task2') return true;
+    const s = (item.shift || '').toLowerCase().trim();
+    if (s.includes('2') || s.includes('siang')) return true;
     const a = (item.assign || '').toLowerCase().trim();
-    if (!a) return false;
-    return !a.includes('bintang') || a === 'task 2' || a === 'task2';
+    return a === 'task 2' || a === 'task2' || a.includes('siang');
   }
 
   window.setDccTaskFilter = function (filterType) {
@@ -4235,15 +4256,14 @@
     const customInput = document.getElementById('dccCustomInputByName');
     const name = customInput ? customInput.value.trim() : '';
     if (!name) {
-      showDccToast('warning', 'Nama Kosong', 'Silakan ketik nama petugas terlebih dahulu.');
+      showDccToast('warning', 'Nama Kosong', 'Silakan ketik nama Anda terlebih dahulu.');
       if (customInput) customInput.focus();
       return;
     }
-    setDccPetugas2Name(name);
-    updateDccPicDisplay();
+    setDevicePicName(name);
     const customGroup = document.getElementById('dccCustomInputByGroup');
     if (customGroup) customGroup.classList.add('hidden');
-    showDccToast('success', 'PIC Disimpan', `Petugas aktif: ${name}`);
+    showDccToast('success', 'Nama Disimpan di HP!', `Nama "${name}" akan otomatis digunakan untuk input Anda.`);
     filterDccMainList();
   };
 
@@ -4430,7 +4450,7 @@
 
     const nowStr = new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
     if (elTanggal) elTanggal.textContent = nowStr;
-    if (elHub) elHub.textContent = 'MTG - Menteng';
+    if (elHub) elHub.textContent = 'CWG - Cakung Barat';
     if (elProgress) elProgress.textContent = progressPct;
     if (elMatch) elMatch.textContent = slocMatchPct;
     if (elUnmatch) elUnmatch.textContent = slocUnmatchPct;
@@ -4452,7 +4472,7 @@
     if (tableBody) {
       const metrics = [
         { label: 'Shift Kerja', val: shiftTitle },
-        { label: 'Nama Hub', val: 'MTG - Menteng' },
+        { label: 'Nama Hub', val: 'CWG - Cakung Barat' },
         { label: 'Tanggal Screening', val: nowStr },
         { label: 'Total Target SKU', val: String(totalSku) },
         { label: 'Total Target QTY', val: String(totalQty) },
@@ -4512,10 +4532,10 @@
 
     // Build CSV with UTF-8 BOM for Microsoft Excel / Google Sheets
     let csvContent = '\uFEFF';
-    csvContent += `LAPORAN DAILY CYCLE COUNT (DCC) - ASTRO HUB MTG\r\n`;
+    csvContent += `LAPORAN DAILY CYCLE COUNT (DCC) - ASTRO HUB CWG\r\n`;
     csvContent += `Tanggal,${todayStr}\r\n`;
     csvContent += `Shift,${isPagi ? 'Shift Pagi (Task 1)' : 'Shift Siang (Task 2)'}\r\n`;
-    csvContent += `Hub,MTG - Menteng\r\n`;
+    csvContent += `Hub,CWG - Cakung Barat\r\n`;
     csvContent += `Progress Counting,${skuCounted}/${totalSku} (${progressPct})\r\n`;
     csvContent += `SLOC Match,${matchPct}\r\n`;
     csvContent += `SLOC Unmatch,${unmatchPct}\r\n`;
@@ -4605,10 +4625,10 @@
     const unmatchPct = totalSub > 0 ? ((slocUnmatchCount / totalSub) * 100).toFixed(1) + '%' : '0%';
     const progressPct = totalSku > 0 ? ((skuCounted / totalSku) * 100).toFixed(1) + '%' : '0%';
 
-    const activePic = isPagi ? 'Bintang' : (getDccPetugas2Name() || 'Petugas Siang');
+    const activePic = getDevicePicName() || 'Petugas CWG';
 
     const message = `📊 *RINGKASAN DAILY CYCLE COUNT (DCC)*\n` +
-      `🏢 *Hub:* MTG - Menteng\n` +
+      `🏢 *Hub:* CWG - Cakung Barat\n` +
       `📅 *Hari/Tanggal:* ${todayStr}\n` +
       `⏱️ *Shift:* ${shiftLabel}\n` +
       `👤 *PIC Penginput:* ${activePic}\n` +
@@ -4620,7 +4640,7 @@
       `❌ *Total Fisik Bad:* ${qtyBad} pcs\n` +
       `🛒 *Total Sales:* ${qtySales} pcs\n` +
       `-----------------------------------------\n` +
-      `_Dilaporkan otomatis via Super App MTG v1.0.6_`;
+      `_Dilaporkan otomatis via Super App CWG_`;
 
     playSuccessBeep();
 
@@ -4768,10 +4788,10 @@
         ? `<span class="dcc-card-status-badge submitted">✅ Sudah Diinput</span>`
         : `<span class="dcc-card-status-badge pending">⏳ Belum Diinput</span>`;
 
-      const isBintang = isItemTask1(item);
-      const activeP2 = getDccPetugas2Name() || 'Petugas Siang';
-      const displayAssign = isBintang ? 'Bintang' : (activeP2 || item.assign || 'Petugas Siang');
-      const assignBadge = `<span class="dcc-card-assign-badge ${isBintang ? 'bintang' : 'petugas2'}" title="Ditugaskan ke: ${escapeAttr(displayAssign)}">
+      const isTask1 = isItemTask1(item);
+      const activePic = getDevicePicName();
+      const displayAssign = item.assign || (activePic || (isTask1 ? 'Shift Pagi' : 'Shift Siang'));
+      const assignBadge = `<span class="dcc-card-assign-badge ${isTask1 ? 'pagi' : 'petugas2'}" title="Ditugaskan ke: ${escapeAttr(displayAssign)}">
             👤 ${escapeHtml(displayAssign)}
            </span>`;
 
@@ -4792,7 +4812,7 @@
             <span class="dcc-card-sloc-pill" title="Lokasi Rack / SLOC">
               📍 ${escapeHtml(slocVal)}
             </span>
-            <button type="button" class="dcc-card-action-btn" onclick="quickFillDccSku('${escapeAttr(item.sku)}', '${isBintang ? 'pagi' : 'siang'}')">
+            <button type="button" class="dcc-card-action-btn" onclick="quickFillDccSku('${escapeAttr(item.sku)}', '${isTask1 ? 'pagi' : 'siang'}')">
               <span>Input SKU</span> &rarr;
             </button>
           </div>
@@ -4833,7 +4853,7 @@
     // Auto-select shift based on assignment / task (NEVER overwrite device's saved PIC name!)
     if (assignOrShift) {
       const str = String(assignOrShift).toLowerCase();
-      if (str.includes('bintang') || str.includes('pagi') || str === 'task 1' || str === 'task1') {
+      if (str.includes('pagi') || str === 'task 1' || str === 'task1' || str.includes('1')) {
         selectedDccShift = 'pagi';
       } else {
         selectedDccShift = 'siang';
@@ -4985,7 +5005,7 @@
             const isPagi = shiftStr.includes('2') || shiftStr.includes('siang')
               ? false
               : (shiftStr.includes('1') || shiftStr.includes('pagi') || (!shiftStr && isItemTask1({ assign: petugasVal })));
-            const assign = petugasVal || (isPagi ? 'Bintang' : p2);
+            const assign = petugasVal || (isPagi ? 'Shift 1 (Pagi)' : 'Shift 2 (Siang)');
 
             const item = {
               sku: cleanSku,
@@ -5047,7 +5067,7 @@
 
           const isExplicitPending = pendingSkuMap.has(sku1) || (sku17 && pendingSkuMap.has(sku17));
 
-          const isTask1Item = inputBy.includes('bintang') || (sku1 && dccTask1List.some(it => it.sku.toLowerCase() === sku1));
+          const isTask1Item = (sku1 && dccTask1List.some(it => it.sku.toLowerCase() === sku1));
           if (isTask1Item) {
             dccHasil1Rows.push(row);
             if (!isExplicitPending) {
@@ -5805,26 +5825,24 @@
     const reasonSloc = document.getElementById('dccReasonSloc').value.trim();
     const evidance = document.getElementById('dccEvidance').value.trim();
 
-    // Guaranteed bulletproof PIC determination
+    // Guaranteed bulletproof PIC determination for CWG (Device remembers user's personal name)
     let inputByVal = '';
-    if (selectedDccShift === 'pagi') {
-      inputByVal = 'Bintang';
+    const customPicEl = document.getElementById('dccCustomInputByName');
+    const customPicTyped = customPicEl ? customPicEl.value.trim() : '';
+    if (customPicTyped) {
+      setDevicePicName(customPicTyped);
+      inputByVal = customPicTyped;
     } else {
-      const customPicEl = document.getElementById('dccCustomInputByName');
-      const customPicTyped = customPicEl ? customPicEl.value.trim() : '';
-      if (customPicTyped) {
-        setDccPetugas2Name(customPicTyped);
-        inputByVal = customPicTyped;
-      } else {
-        inputByVal = getDccPetugas2Name();
-      }
+      inputByVal = getDevicePicName();
     }
 
-    // Strict PIC validation for Shift Siang: require PIC name
+    // Strict PIC validation: require PIC name if not set yet on device
     if (!inputByVal) {
       playWarningBeep();
-      showDccToast('warning', 'PIC Wajib Diisi', 'Silakan masukkan nama PIC penginput untuk Shift Siang.');
+      showDccToast('warning', 'Nama PIC Wajib Diisi', 'Silakan masukkan nama Anda pada kolom PIC penginput (akan diingat di HP ini).');
       toggleDccCustomPicInput();
+      const input = document.getElementById('dccCustomInputByName');
+      if (input) input.focus();
       return;
     }
 

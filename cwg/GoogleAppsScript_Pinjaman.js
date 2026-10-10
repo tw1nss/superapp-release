@@ -648,7 +648,7 @@ function recoverMisplacedDccFromPinjaman() {
         continue;
       }
 
-      if (jenisStr === 'MTG Pinjam ke Hub Lain' && (picStr.toLowerCase().includes('bintang') || picStr === '')) {
+      if ((jenisStr.includes('Pinjam') || jenisStr.includes('CWG') || jenisStr.includes('MTG')) && (picStr || skuStr)) {
         var sLower = skuStr.toLowerCase();
         var itemInfo = mainMap[sLower] || {};
         var pName = itemInfo.productName || String(row[3] || '').trim();
@@ -674,7 +674,7 @@ function recoverMisplacedDccFromPinjaman() {
           String(fisikGood),
           '',
           skuStr,
-          picStr || 'Bintang',
+          picStr || 'Petugas CWG',
           'Ada',
           'Ada'
         ];
@@ -684,7 +684,7 @@ function recoverMisplacedDccFromPinjaman() {
           sku: skuStr,
           fisikGood: fisikGood,
           sloc: sloc,
-          pic: picStr || 'Bintang',
+          pic: picStr || 'Petugas CWG',
           itemInfo: itemInfo
         });
 

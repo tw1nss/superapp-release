@@ -392,11 +392,11 @@
             <span class="dcc-task-badge" id="countAll">0/0</span>
           </button>
           <button type="button" class="dcc-task-filter-btn task-bintang" id="taskFilter1" data-task="task1" onclick="setDccTaskFilter('task1')">
-            <span class="dcc-task-btn-title">👤 Task 1 (Bintang)</span>
+            <span class="dcc-task-btn-title">👤 Task 1 (Pagi)</span>
             <span class="dcc-task-badge" id="countTask1">0/0</span>
           </button>
           <button type="button" class="dcc-task-filter-btn task-petugas2" id="taskFilter2" data-task="task2" onclick="setDccTaskFilter('task2')">
-            <span class="dcc-task-btn-title" id="labelTask2Btn">👤 Task 2 (Petugas Lain)</span>
+            <span class="dcc-task-btn-title" id="labelTask2Btn">👤 Task 2 (Siang)</span>
             <span class="dcc-task-badge" id="countTask2">0/0</span>
           </button>
         </div>
@@ -571,7 +571,7 @@
             <div class="dcc-pic-card-wrap">
               <div class="dcc-pic-active-badge">
                 <span id="dccActivePicIcon" style="font-size:1.2rem;">☀️</span>
-                <span id="dccActivePicName" class="dcc-pic-name">Bintang</span>
+                <span id="dccActivePicName" class="dcc-pic-name">Belum Diatur</span>
                 <span id="dccActiveShiftTag" class="dcc-pic-tag">Shift Pagi (Task 1)</span>
               </div>
               <button type="button" class="btn-dcc-change-pic" id="btnChangePic" onclick="toggleDccCustomPicInput()" title="Ubah Nama Penginput">
@@ -580,7 +580,7 @@
             </div>
             <!-- Custom Input By Name (shown when clicked Ganti PIC) -->
             <div class="dcc-custom-pic-row hidden" id="dccCustomInputByGroup">
-              <input type="text" id="dccCustomInputByName" class="dcc-field-input" placeholder="Ketik nama petugas..." autocomplete="off">
+              <input type="text" id="dccCustomInputByName" class="dcc-field-input" placeholder="Masukkan nama Anda (diingat di HP ini)..." autocomplete="off">
               <button type="button" class="dcc-btn-save" style="width:auto; padding:0 16px; white-space:nowrap; font-size:0.85rem;" onclick="saveDccPetugas2Name()">Simpan</button>
             </div>
           </div>
@@ -1053,7 +1053,7 @@
           <div class="eds-field-group">
             <label class="eds-field-label">Input by (Nama PIC) <span class="eds-required">*</span></label>
             <div class="eds-pic-selector-row">
-              <input type="text" id="edsInputBy" class="eds-field-input" placeholder="Masukkan nama Anda (misal: Bintang)...">
+              <input type="text" id="edsInputBy" class="eds-field-input" placeholder="Masukkan nama Anda...">
               <button type="button" class="eds-pic-save-btn" onclick="saveEdsDefaultPic()" title="Simpan sebagai default">Ingat Saya</button>
             </div>
           </div>
@@ -1448,7 +1448,7 @@
           <div class="eds-field-group">
             <label class="eds-field-label">Input by (Nama Petugas PIC) <span class="eds-required">*</span></label>
             <div class="eds-pic-selector-row">
-              <input type="text" id="edcInputBy" class="eds-field-input" placeholder="Masukkan nama Anda (misal: Bintang)...">
+              <input type="text" id="edcInputBy" class="eds-field-input" placeholder="Masukkan nama Anda...">
               <button type="button" class="eds-pic-save-btn" onclick="saveEdcDefaultPic()" title="Simpan sebagai default">Ingat Saya</button>
             </div>
           </div>

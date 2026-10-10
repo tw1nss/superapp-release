@@ -3246,7 +3246,7 @@ function getAutoFillDialogHtml(pendingCount, samplePic, sampleShift) {
     '  <div class="grid-2">',
     '    <div class="form-group">',
     '      <label class="form-label">Nama Petugas (PIC)</label>',
-    '      <input type="text" id="picName" class="form-input" value="' + samplePic + '" placeholder="Contoh: Bintang / Staff MTG">',
+    '      <input type="text" id="picName" class="form-input" value="' + samplePic + '" placeholder="Contoh: Petugas CWG">',
     '    </div>',
     '    <div class="form-group">',
     '      <label class="form-label">Jumlah Task Selesai</label>',
