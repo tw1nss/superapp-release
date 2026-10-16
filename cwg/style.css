@@ -569,6 +569,19 @@ body::after {
   border: 1px solid rgba(56, 189, 248, 0.3);
 }
 
+.menu-icon-box.leader {
+  background: rgba(163, 230, 53, 0.14);
+  border: 1px solid rgba(163, 230, 53, 0.35);
+  box-shadow: 0 0 16px rgba(163, 230, 53, 0.18);
+}
+
+.home-leader-chip:hover {
+  background: rgba(163, 230, 53, 0.22) !important;
+  border-color: #a3e635 !important;
+  transform: translateY(-1px);
+}
+
+
 .menu-card-title {
   font-size: clamp(0.74rem, 2.5vw, 0.84rem);
   font-weight: 600;

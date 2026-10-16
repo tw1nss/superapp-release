@@ -20,7 +20,7 @@ var SUPERSET_CONFIG = {
   BASE_URL: "https://dash.astronauts.id/",
   TARGET_FILE_ID: "1T6YcctafqzppSyblW17Gm8zXBrwyXJKi81niF66CXCQ",
   DEFAULT_CHART_ID: 27921, // Slice ID ED Sweeper CWG
-  DASHBOARD_PAGE_ID: "nGpwnUvi3oCCkiiggXLQm",
+  DASHBOARD_PAGE_ID: "rnlgWHY6S_B_gEDK6r5Oa", // Dashboard Page ID baru ED Sweeper
   MAX_RETRY: 3,
   RETRY_DELAY: 2000,
   TIMEZONE: "Asia/Jakarta"
@@ -38,14 +38,22 @@ var EDS_SHEETS = {
 
 // Helper: Ambil spreadsheet target (Bisa bound atau standalone ID)
 function getEdsSpreadsheet() {
+  // 1. Selalu utamakan spreadsheet yang sedang aktif dibuka
   try {
-    if (SUPERSET_CONFIG.TARGET_FILE_ID) {
-      return SpreadsheetApp.openById(SUPERSET_CONFIG.TARGET_FILE_ID);
+    var active = SpreadsheetApp.getActiveSpreadsheet();
+    if (active) return active;
+  } catch (eActive) { }
+
+  // 2. Fallback untuk headless / background trigger
+  try {
+    var targetId = PropertiesService.getScriptProperties().getProperty('EDS_SHEET_ID') || SUPERSET_CONFIG.TARGET_FILE_ID;
+    if (targetId && targetId.trim() !== "") {
+      return SpreadsheetApp.openById(targetId.trim());
     }
   } catch (e) {
-    console.warn("Gagal openById EDS, menggunakan Active Spreadsheet:", e);
+    console.warn("Gagal openById EDS:", e);
   }
-  return SpreadsheetApp.getActiveSpreadsheet();
+  return null;
 }
 
 // 🔍 HELPER FLEKSIBEL: Cari sheet EDS dengan toleransi typo / nama lama
@@ -78,25 +86,37 @@ function getEdsSheet(type) {
 }
 
 // ── 1. MENU CUSTOM DI GOOGLE SHEETS ──
-// onOpen dipusatkan di DCC_Master (yang memanggil buildEdSweeperMenu).
-// Fungsi ini sengaja tidak bernama onOpen agar tidak menimpa onOpen DCC_Master.
-function onOpenEdSweeperStandalone() {
+function onOpen(e) {
+  var ui;
   try {
-    ensureDailyBackupTrigger();
-    ensureAutoSupersetTrigger();
-  } catch (e) {
-    console.warn('Gagal set trigger EDS:', e);
+    ui = SpreadsheetApp.getUi();
+  } catch (errUi) {
+    console.warn("Tidak dapat mengakses UI Spreadsheet:", errUi);
+    return;
   }
 
-  var ui = SpreadsheetApp.getUi();
-  // Bangun menu Superset, DCC, dan Pinjaman jika function-nya ada
-  if (typeof buildSupersetMenu === 'function') buildSupersetMenu(ui);
-  if (typeof buildDccMenu === 'function') buildDccMenu(ui);
-  if (typeof buildPinjamanMenu === 'function') buildPinjamanMenu(ui);
   // Bangun menu ED Sweeper
-  buildEdSweeperMenu(ui);
-  // Bangun menu ED Correction jika ada
-  if (typeof buildEdCorrectionMenu === 'function') buildEdCorrectionMenu(ui);
+  try { buildEdSweeperMenu(ui); } catch (eEds) { console.error("Gagal buildEdSweeperMenu:", eEds); }
+
+  // Bangun menu modul lain jika digabung dalam 1 project
+  try { if (typeof buildSupersetMenu === 'function') buildSupersetMenu(ui); } catch (e1) { }
+  try { if (typeof buildDccMenu === 'function') buildDccMenu(ui); } catch (e2) { }
+  try { if (typeof buildPinjamanMenu === 'function') buildPinjamanMenu(ui); } catch (e3) { }
+  try { if (typeof buildEdCorrectionMenu === 'function') buildEdCorrectionMenu(ui); } catch (e4) { }
+}
+
+function onOpenEdSweeperStandalone() {
+  onOpen();
+}
+
+function reloadEdSweeperMenu() {
+  onOpen();
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    if (ss && typeof ss.toast === "function") {
+      ss.toast("Menu ⚡ ED Sweeper Control berhasil dimuat!", "Sukses", 4);
+    }
+  } catch (e) { }
 }
 
 function buildEdSweeperMenu(ui) {
@@ -221,17 +241,42 @@ function updateDataFromSupersetManual() {
 function setSupersetChartIdPrompt() {
   const ui = SpreadsheetApp.getUi();
   const current = PropertiesService.getScriptProperties().getProperty('SUPERSET_CHART_ID_EDS') || SUPERSET_CONFIG.DEFAULT_CHART_ID;
+  const currentPage = PropertiesService.getScriptProperties().getProperty('SUPERSET_PAGE_ID_EDS') || SUPERSET_CONFIG.DASHBOARD_PAGE_ID;
   const resp = ui.prompt(
-    '🎯 Set ID Chart Superset ED Sweeper',
-    'Masukkan ID Chart (Slice ID) untuk data ED Sweeper (Default: ' + current + '):',
+    '🎯 Set ID Chart / Link Superset ED Sweeper',
+    'Paste URL Superset Explore atau masukkan ID Chart (Slice ID):\n\n' +
+    'Saat ini:\n' +
+    '• Chart ID: ' + current + '\n' +
+    '• Dashboard Page ID: ' + currentPage + '\n\n' +
+    'Contoh Link: https://dash.astronauts.id/explore/?dashboard_page_id=rnlgWHY6S_B_gEDK6r5Oa&slice_id=27921',
     ui.ButtonSet.OK_CANCEL
   );
   if (resp.getSelectedButton() === ui.Button.OK) {
-    const id = resp.getResponseText().trim();
-    if (id) {
-      PropertiesService.getScriptProperties().setProperty('SUPERSET_CHART_ID_EDS', id);
-      ui.alert('Sukses', '✅ ID Chart ED Sweeper berhasil diset ke: ' + id, ui.ButtonSet.OK);
+    const rawInput = resp.getResponseText().trim();
+    if (!rawInput) return;
+
+    var chartId = rawInput;
+    var pageId = '';
+
+    var sliceMatch = rawInput.match(/slice_id=(\d+)/);
+    if (sliceMatch && sliceMatch[1]) {
+      chartId = sliceMatch[1];
     }
+    var pageMatch = rawInput.match(/dashboard_page_id=([a-zA-Z0-9_\-]+)/);
+    if (pageMatch && pageMatch[1]) {
+      pageId = pageMatch[1];
+    }
+
+    if (chartId && !isNaN(Number(chartId))) {
+      PropertiesService.getScriptProperties().setProperty('SUPERSET_CHART_ID_EDS', chartId);
+    }
+    if (pageId) {
+      PropertiesService.getScriptProperties().setProperty('SUPERSET_PAGE_ID_EDS', pageId);
+    }
+
+    var msg = '✅ Pengaturan Superset ED Sweeper Diperbarui:\n\n• Chart ID: ' + (chartId || current);
+    if (pageId) msg += '\n• Dashboard Page ID: ' + pageId;
+    ui.alert('Sukses', msg, ui.ButtonSet.OK);
   }
 }
 
@@ -241,6 +286,10 @@ function pullSupersetDataToSheet(sheetName, isSilent) {
   let chartId = props.getProperty('SUPERSET_CHART_ID_EDS') || props.getProperty('SUPERSET_CHART_ID');
   if (!chartId || chartId === '11815' || chartId === '24592') {
     chartId = SUPERSET_CONFIG.DEFAULT_CHART_ID;
+  }
+  let pageId = props.getProperty('SUPERSET_PAGE_ID_EDS') || SUPERSET_CONFIG.DASHBOARD_PAGE_ID;
+  if (!pageId || pageId === 'nGpwnUvi3oCCkiiggXLQm' || pageId === 'U3z99CtEM_b7ZlpM-m6TD') {
+    pageId = SUPERSET_CONFIG.DASHBOARD_PAGE_ID;
   }
 
   if (!cookie) {
@@ -253,13 +302,14 @@ function pullSupersetDataToSheet(sheetName, isSilent) {
   const timestamp = new Date().getTime();
   const formDataPage = JSON.stringify({
     slice_id: Number(chartId),
-    dashboard_page_id: SUPERSET_CONFIG.DASHBOARD_PAGE_ID
+    dashboard_page_id: pageId
   });
   const formDataBasic = JSON.stringify({
     slice_id: Number(chartId)
   });
 
   const urlVariants = [
+    SUPERSET_CONFIG.BASE_URL + "superset/explore_json/?dashboard_page_id=" + encodeURIComponent(pageId) + "&slice_id=" + chartId + "&force=true&_t=" + timestamp,
     SUPERSET_CONFIG.BASE_URL + "superset/explore_json/?form_data=" + encodeURIComponent(formDataPage) + "&force=true&_t=" + timestamp,
     SUPERSET_CONFIG.BASE_URL + "api/v1/chart/" + chartId + "/data?force=true&_t=" + timestamp,
     SUPERSET_CONFIG.BASE_URL + "superset/explore_json/?form_data=" + encodeURIComponent(formDataBasic) + "&force=true&_t=" + timestamp

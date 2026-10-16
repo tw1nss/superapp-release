@@ -1,0 +1,629 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
+  <meta name="theme-color" content="#05070e">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <title>Dashboard Leader CWG: Monitoring Produk (LDP, LBH & BADSTOCK)</title>
+  <link rel="icon" type="image/svg+xml" href="icon-192.svg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="leader.css?v=20261015_monochrome">
+</head>
+<body>
+
+  <!-- ══════════════════════════════════════════════════════════════════════════
+       PIN SECURITY LOCK OVERLAY
+       ══════════════════════════════════════════════════════════════════════════ -->
+  <div id="pinLockOverlay" class="pin-lock-overlay">
+    <div class="pin-lock-card">
+      <div class="pin-lock-badge">
+        <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+          <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+        </svg>
+      </div>
+      <h2 class="pin-lock-title">KUNCI LEADER CWG</h2>
+      <p class="pin-lock-sub">Masukkan PIN Keamanan 6-Digit Khusus Leader Hub Cawang</p>
+
+      <!-- Pin Dots Display Indicator -->
+      <div class="pin-dots-display">
+        <span class="pin-dot"></span>
+        <span class="pin-dot"></span>
+        <span class="pin-dot"></span>
+        <span class="pin-dot"></span>
+        <span class="pin-dot"></span>
+        <span class="pin-dot"></span>
+      </div>
+
+      <!-- Password / Pin Input Field -->
+      <div class="pin-input-field-wrap">
+        <input type="password" id="pinInputField" class="pin-input-field" placeholder="••••••" maxlength="6" inputmode="numeric" autocomplete="off">
+        <button type="button" id="pinEyeToggleBtn" class="pin-toggle-eye" title="Lihat/Sembunyikan PIN">👁️</button>
+      </div>
+
+      <div id="pinErrorMsg" class="pin-error-msg"></div>
+
+      <!-- Numeric Keypad Grid -->
+      <div class="pin-keypad">
+        <button type="button" class="keypad-btn" data-key="1">1</button>
+        <button type="button" class="keypad-btn" data-key="2">2</button>
+        <button type="button" class="keypad-btn" data-key="3">3</button>
+        <button type="button" class="keypad-btn" data-key="4">4</button>
+        <button type="button" class="keypad-btn" data-key="5">5</button>
+        <button type="button" class="keypad-btn" data-key="6">6</button>
+        <button type="button" class="keypad-btn" data-key="7">7</button>
+        <button type="button" class="keypad-btn" data-key="8">8</button>
+        <button type="button" class="keypad-btn" data-key="9">9</button>
+        <button type="button" class="keypad-btn action-btn" data-key="clear">CLEAR</button>
+        <button type="button" class="keypad-btn" data-key="0">0</button>
+        <button type="button" class="keypad-btn action-btn" data-key="backspace">⌫</button>
+      </div>
+
+      <!-- Actions -->
+      <div class="pin-actions-row">
+        <a href="index.html" class="pin-btn-back">Batal</a>
+        <button type="button" id="pinSubmitBtn" class="pin-btn-submit">
+          <span>Buka Dashboard</span> &rarr;
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════════════════
+       MAIN 3-COLUMN COCKPIT APP LAYOUT
+       Column 1: Left Sidebar (ALL, LDP, LBH, BADSTOCK)
+       Column 2: Center Telemetry Dashboard (Header, KPI, Charts, Table)
+       Column 3: Right Slicer Panel (Filter by Slicers)
+       ══════════════════════════════════════════════════════════════════════════ -->
+  <div class="leader-app-layout">
+
+    <!-- ── 1. LEFT SIDEBAR NAVIGATION ── -->
+    <aside class="leader-sidebar">
+      <div>
+        <div class="sidebar-header">
+          <div class="sidebar-brand">
+            <img src="astro-logo.png" alt="CWG Leader" class="sidebar-logo" onerror="this.src='app-logo.jpg'">
+            <div class="sidebar-brand-text">
+              <span class="sidebar-hub-tag">HUB CAWANG • CWG</span>
+              <span class="sidebar-title">Leader Console</span>
+            </div>
+          </div>
+        </div>
+
+        <nav class="sidebar-nav">
+          <span class="nav-section-label">NAVIGASI PRODUK</span>
+
+          <!-- 1. ALL -->
+          <button type="button" class="sidebar-nav-btn active" data-menu="ALL">
+            <span class="nav-btn-left">
+              <span class="nav-btn-icon">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="3" y="3" width="7" height="7"></rect>
+                  <rect x="14" y="3" width="7" height="7"></rect>
+                  <rect x="14" y="14" width="7" height="7"></rect>
+                  <rect x="3" y="14" width="7" height="7"></rect>
+                </svg>
+              </span>
+              <span>ALL (Semua)</span>
+            </span>
+            <span class="nav-btn-badge" id="badgeCountAll">0</span>
+          </button>
+
+          <!-- 2. LDP -->
+          <button type="button" class="sidebar-nav-btn" data-menu="LDP">
+            <span class="nav-btn-left">
+              <span class="nav-btn-icon">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+                  <line x1="12" y1="9" x2="12" y2="13"></line>
+                  <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                </svg>
+              </span>
+              <span>LDP (Lost & Damage)</span>
+            </span>
+            <span class="nav-btn-badge" id="badgeCountLdp">0</span>
+          </button>
+
+          <!-- 3. LBH -->
+          <button type="button" class="sidebar-nav-btn" data-menu="LBH">
+            <span class="nav-btn-left">
+              <span class="nav-btn-icon">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                  <line x1="12" y1="5" x2="12" y2="19"></line>
+                  <line x1="5" y1="12" x2="19" y2="12"></line>
+                </svg>
+              </span>
+              <span>LBH (Barang Lebih)</span>
+            </span>
+            <span class="nav-btn-badge" id="badgeCountLbh">0</span>
+          </button>
+
+          <!-- 4. BADSTOCK -->
+          <button type="button" class="sidebar-nav-btn" data-menu="BADSTOCK">
+            <span class="nav-btn-left">
+              <span class="nav-btn-icon">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                  <polyline points="3 6 5 6 21 6"></polyline>
+                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                  <line x1="10" y1="11" x2="10" y2="17"></line>
+                  <line x1="14" y1="11" x2="14" y2="17"></line>
+                </svg>
+              </span>
+              <span>BADSTOCK</span>
+            </span>
+            <span class="nav-btn-badge" id="badgeCountBad">0</span>
+          </button>
+        </nav>
+      </div>
+
+      <!-- Sidebar Footer -->
+      <div class="sidebar-footer">
+        <div class="sidebar-stat-mini">
+          <div class="stat-mini-label">ESTIMASI LOSS (CWG)</div>
+          <div class="stat-mini-val" id="miniLossValue">Rp 0</div>
+        </div>
+        <button type="button" class="sidebar-lock-btn" id="sidebarLockBtn">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+          <span>Kunci Dashboard (PIN)</span>
+        </button>
+      </div>
+    </aside>
+
+    <!-- ── 2. MAIN DASHBOARD VIEWPORT ── -->
+    <main class="leader-main-content">
+      <!-- Cockpit Header Top Bar -->
+      <header class="leader-top-bar">
+        <div class="top-bar-title-group">
+          <h1 id="headerTitle">👑 CWG Leader Command Center</h1>
+          <p id="headerSubtitle">Hub Cawang • Monitoring Produk LDP (Lost & Damage), LBH (Lebih) & BADSTOCK</p>
+        </div>
+
+        <div class="top-bar-actions">
+          <button type="button" class="btn-header primary" id="btnInputAnomali">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+            <span>Input Temuan</span>
+          </button>
+          <button type="button" class="btn-header secondary" id="btnSyncCloud" title="Tarik data terbaru dari Google Sheets CWG">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+            <span>Sync Cloud</span>
+          </button>
+          <button type="button" class="btn-header secondary icon-only" id="btnExportCsv" title="Ekspor data produk ke CSV">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+          </button>
+          <button type="button" class="btn-header secondary icon-only" id="btnPrintReport" title="Cetak Rekap Laporan">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
+          </button>
+          <a href="index.html" class="btn-header secondary" title="Kembali ke Superapp CWG">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+            <span>SuperApp CWG</span>
+          </a>
+        </div>
+      </header>
+
+      <!-- Dashboard Viewport Content -->
+      <div class="dashboard-viewport">
+
+        <!-- ── 6 KPI STATISTIC CARDS ── -->
+        <section class="kpi-cards-grid">
+          <!-- Total Produk -->
+          <div class="kpi-stat-card accent-all">
+            <div class="kpi-card-header">
+              <span class="kpi-card-label">TOTAL TEMUAN</span>
+              <span class="kpi-card-icon">📦</span>
+            </div>
+            <div class="kpi-card-value" id="kpiTotalCount">0</div>
+            <div class="kpi-card-sub" id="kpiTotalQty">0 pcs</div>
+          </div>
+
+          <!-- LDP -->
+          <div class="kpi-stat-card accent-ldp">
+            <div class="kpi-card-header">
+              <span class="kpi-card-label">LDP (LOST/DAMAGE)</span>
+              <span class="kpi-card-icon">🚨</span>
+            </div>
+            <div class="kpi-card-value" id="kpiLdpCount">0</div>
+            <div class="kpi-card-sub" id="kpiLdpQty">0 pcs</div>
+          </div>
+
+          <!-- LBH -->
+          <div class="kpi-stat-card accent-lbh">
+            <div class="kpi-card-header">
+              <span class="kpi-card-label">LBH (LEBIH/SURPLUS)</span>
+              <span class="kpi-card-icon">⚡</span>
+            </div>
+            <div class="kpi-card-value" id="kpiLbhCount">0</div>
+            <div class="kpi-card-sub" id="kpiLbhQty">0 pcs</div>
+          </div>
+
+          <!-- BADSTOCK -->
+          <div class="kpi-stat-card accent-bad">
+            <div class="kpi-card-header">
+              <span class="kpi-card-label">BADSTOCK & EXPIRED</span>
+              <span class="kpi-card-icon">🗑️</span>
+            </div>
+            <div class="kpi-card-value" id="kpiBadCount">0</div>
+            <div class="kpi-card-sub" id="kpiBadQty">0 pcs</div>
+          </div>
+
+          <!-- ESTIMASI LOSS -->
+          <div class="kpi-stat-card accent-loss">
+            <div class="kpi-card-header">
+              <span class="kpi-card-label" id="kpiLossLabel">TOTAL LOSS (RP)</span>
+              <span class="kpi-card-icon">💰</span>
+            </div>
+            <div class="kpi-card-value" id="kpiLossValue" style="font-size: 1.35rem;">Rp 0</div>
+            <div class="kpi-card-sub" id="kpiLossSub">Kerugian LDP & Badstock</div>
+          </div>
+
+          <!-- RESOLVED RATE -->
+          <div class="kpi-stat-card accent-res">
+            <div class="kpi-card-header">
+              <span class="kpi-card-label">TINGKAT SELESAI</span>
+              <span class="kpi-card-icon">✅</span>
+            </div>
+            <div class="kpi-card-value" id="kpiResolvedRate">0%</div>
+            <div class="kpi-card-sub">Status terselesaikan</div>
+          </div>
+        </section>
+
+        <!-- ── CHARTS ROW 1 (Donut | Horiz Bar by Zone | Status Vertical Col) ── -->
+        <section class="charts-grid-row-1">
+          <!-- Chart 1: Donut Distribution -->
+          <div class="chart-card">
+            <div class="chart-card-header">
+              <span class="chart-card-title">Proporsi Kategori Produk</span>
+              <span class="chart-card-badge">KATEGORI</span>
+            </div>
+            <div class="chart-container-box" id="chartDonutContainer">
+              <!-- SVG Donut Chart rendered via leader.js -->
+            </div>
+          </div>
+
+          <!-- Chart 2: Products by Zone (Horizontal Bar) -->
+          <div class="chart-card">
+            <div class="chart-card-header">
+              <span class="chart-card-title">Sebaran Produk per Zona Suhu</span>
+              <span class="chart-card-badge">ZONA</span>
+            </div>
+            <div class="chart-container-box" id="chartRackBarContainer">
+              <!-- SVG Horizontal Bar Chart rendered via leader.js -->
+            </div>
+          </div>
+
+          <!-- Chart 3: Status & Action (Vertical Column) -->
+          <div class="chart-card">
+            <div class="chart-card-header">
+              <span class="chart-card-title">Status Penanganan Produk</span>
+              <span class="chart-card-badge">STATUS</span>
+            </div>
+            <div class="chart-container-box" id="chartStatusContainer">
+              <!-- SVG Status Column Chart rendered via leader.js -->
+            </div>
+          </div>
+        </section>
+
+        <!-- ── CHARTS ROW 2 (Top 5 Problematic SKU | Bottom 5 / Lowest Discrepancy) ── -->
+        <section class="charts-grid-row-2">
+          <!-- Chart 4: Top 5 Problematic SKU -->
+          <div class="chart-card">
+            <div class="chart-card-header">
+              <span class="chart-card-title">Top 5 SKU Bermasalah (Kuantitas Terbanyak)</span>
+              <span class="chart-card-badge">TOP 5</span>
+            </div>
+            <div class="chart-container-box" id="chartTop5Container">
+              <!-- SVG Top 5 Columns rendered via leader.js -->
+            </div>
+          </div>
+
+          <!-- Chart 5: Bottom 5 / Discrepancy Terendah -->
+          <div class="chart-card">
+            <div class="chart-card-header">
+              <span class="chart-card-title">Bottom 5 / Discrepancy Terendah</span>
+              <span class="chart-card-badge">BOTTOM 5</span>
+            </div>
+            <div class="chart-container-box" id="chartBottom5Container">
+              <!-- SVG Bottom 5 Columns rendered via leader.js -->
+            </div>
+          </div>
+        </section>
+
+        <!-- ── DATA TELEMETRY TABLE ── -->
+        <section class="data-table-section">
+          <div class="table-toolbar">
+            <div class="table-title-wrap">
+              <h2 class="table-title" id="tableTitle">Daftar Produk (LDP, LBH & BADSTOCK)</h2>
+              <span class="table-count-pill" id="tableCountPill">0 items</span>
+            </div>
+
+            <!-- Fuzzy Live Search Box -->
+            <div class="table-search-box">
+              <svg class="table-search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+              <input type="text" id="tableSearchInput" class="table-search-input" placeholder="Cari SKU, nama produk, PIC..." autocomplete="off">
+              <button type="button" id="tableClearSearchBtn" class="table-clear-btn">&times;</button>
+            </div>
+          </div>
+
+          <!-- Responsive Table Wrapper -->
+          <div class="table-responsive-wrapper">
+            <table class="telemetry-table">
+              <thead>
+                <tr>
+                  <th style="width: 44px;">No</th>
+                  <th>SKU</th>
+                  <th>Nama Produk & Catatan</th>
+                  <th>Kategori</th>
+                  <th style="text-align: center;">Qty</th>
+                  <th>Status</th>
+                  <th>Petugas / PIC</th>
+                  <th>Tanggal & Jam</th>
+                  <th style="text-align: right;">Aksi</th>
+                </tr>
+              </thead>
+              <tbody id="tableBody">
+                <!-- Rows injected via leader.js -->
+              </tbody>
+            </table>
+
+            <div id="tableEmptyState" class="table-empty-state" style="display: none;">
+              <div class="table-empty-icon">🔍</div>
+              <div style="font-size: 0.95rem; font-weight: 700; color: #fff;">Tidak Ada Data Ditemukan</div>
+              <div style="font-size: 0.8rem; margin-top: 4px;">Coba sesuaikan kata kunci pencarian atau setel ulang filter slicer Anda.</div>
+            </div>
+          </div>
+        </section>
+
+      </div>
+
+      <!-- ── BOTTOM SHEET / TABS BAR (Matches reference screenshot) ── -->
+      <footer class="leader-bottom-tabs">
+        <button type="button" class="bottom-tab-item active" data-tab="overview">Overview</button>
+        <button type="button" class="bottom-tab-item" data-tab="ldp">LDP Details</button>
+        <button type="button" class="bottom-tab-item" data-tab="lbh">LBH Details</button>
+        <button type="button" class="bottom-tab-item" data-tab="badstock">BADSTOCK Log</button>
+        <button type="button" class="bottom-tab-item" data-tab="input_manual">➕ Input Temuan</button>
+      </footer>
+    </main>
+
+    <!-- ── 3. RIGHT SLICER PANEL (Matches user reference screenshot) ── -->
+    <aside class="leader-slicer-panel">
+      <div class="slicer-panel-header">
+        <span class="slicer-panel-title">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+          Slicers & Filters
+        </span>
+        <button type="button" id="btnResetSlicers" class="btn-reset-slicers">Reset</button>
+      </div>
+
+      <!-- Slicer 1: Kategori Produk -->
+      <div class="slicer-box">
+        <div class="slicer-box-header">
+          <span class="slicer-box-title">Kategori Produk</span>
+          <span class="slicer-box-icons">🎛️</span>
+        </div>
+        <div class="slicer-chips-grid">
+          <button type="button" class="slicer-chip-btn active full-width" data-slicer-group="category" data-slicer-val="ALL">ALL (Semua)</button>
+          <button type="button" class="slicer-chip-btn" data-slicer-group="category" data-slicer-val="LDP">LDP</button>
+          <button type="button" class="slicer-chip-btn" data-slicer-group="category" data-slicer-val="LBH">LBH</button>
+          <button type="button" class="slicer-chip-btn full-width" data-slicer-group="category" data-slicer-val="BADSTOCK">BADSTOCK</button>
+        </div>
+      </div>
+
+      <!-- Slicer 2: Status Penanganan -->
+      <div class="slicer-box">
+        <div class="slicer-box-header">
+          <span class="slicer-box-title">Status Penanganan</span>
+          <span class="slicer-box-icons">🏷️</span>
+        </div>
+        <div class="slicer-chips-grid">
+          <button type="button" class="slicer-chip-btn active" data-slicer-group="status" data-slicer-val="ALL">Semua</button>
+          <button type="button" class="slicer-chip-btn" data-slicer-group="status" data-slicer-val="Pending">Pending</button>
+          <button type="button" class="slicer-chip-btn" data-slicer-group="status" data-slicer-val="Investigasi">Investigasi</button>
+          <button type="button" class="slicer-chip-btn" data-slicer-group="status" data-slicer-val="Selesai">Selesai</button>
+        </div>
+      </div>
+
+      <!-- Slicer 3: Zona & Suhu -->
+      <div class="slicer-box">
+        <div class="slicer-box-header">
+          <span class="slicer-box-title">Zona / Suhu Produk</span>
+          <span class="slicer-box-icons">🏢</span>
+        </div>
+        <div class="slicer-chips-grid">
+          <button type="button" class="slicer-chip-btn active full-width" data-slicer-group="zone" data-slicer-val="ALL">Semua Zona</button>
+          <button type="button" class="slicer-chip-btn" data-slicer-group="zone" data-slicer-val="Chiller">Chiller</button>
+          <button type="button" class="slicer-chip-btn" data-slicer-group="zone" data-slicer-val="Frozen">Frozen</button>
+          <button type="button" class="slicer-chip-btn" data-slicer-group="zone" data-slicer-val="Ambient">Ambient</button>
+          <button type="button" class="slicer-chip-btn" data-slicer-group="zone" data-slicer-val="Tata Rumah">Tata Rumah</button>
+        </div>
+      </div>
+
+      <!-- Slicer 4: Shift Kerja -->
+      <div class="slicer-box">
+        <div class="slicer-box-header">
+          <span class="slicer-box-title">Shift Kerja</span>
+          <span class="slicer-box-icons">☀️</span>
+        </div>
+        <div class="slicer-chips-grid">
+          <button type="button" class="slicer-chip-btn active full-width" data-slicer-group="shift" data-slicer-val="ALL">Semua Shift</button>
+          <button type="button" class="slicer-chip-btn" data-slicer-group="shift" data-slicer-val="Shift Pagi">Shift Pagi</button>
+          <button type="button" class="slicer-chip-btn" data-slicer-group="shift" data-slicer-val="Shift Siang">Shift Siang</button>
+        </div>
+      </div>
+
+      <!-- Slicer 5: Petugas / PIC Input -->
+      <div class="slicer-box">
+        <div class="slicer-box-header">
+          <span class="slicer-box-title">Petugas / PIC Input</span>
+          <span class="slicer-box-icons">👤</span>
+        </div>
+        <div class="slicer-chips-grid">
+          <button type="button" class="slicer-chip-btn active full-width" data-slicer-group="pic" data-slicer-val="ALL" id="slicerPicAllBtn">Semua PIC</button>
+          <button type="button" class="slicer-chip-btn full-width" data-slicer-group="pic" data-slicer-val="EXCLUDE_WIMS" id="slicerPicExcludeWimsBtn" title="Sembunyikan produk yang di-LDP oleh Admin WIMS" style="color: #f87171;">🚫 Tanpa Admin WIMS</button>
+          <button type="button" class="slicer-chip-btn full-width" data-slicer-group="pic" data-slicer-val="ONLY_WIMS" id="slicerPicOnlyWimsBtn" title="Hanya tampilkan produk dari Admin WIMS">Hanya Admin WIMS</button>
+        </div>
+
+        <div class="slicer-pic-select-wrap">
+          <label for="slicerPicSelect" class="slicer-input-label">Pilih Petugas Spesifik:</label>
+          <select id="slicerPicSelect" class="slicer-select">
+            <option value="ALL">-- Semua Petugas --</option>
+          </select>
+        </div>
+
+        <label class="slicer-checkbox-wrap" id="slicerPicExcludeWrap">
+          <input type="checkbox" id="slicerPicExcludeCheck">
+          <span>Kecualikan PIC Terpilih</span>
+        </label>
+      </div>
+
+    </aside>
+
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════════════════
+       MODAL: INPUT TEMUAN PRODUK BARU
+       ══════════════════════════════════════════════════════════════════════════ -->
+  <div id="modalNewAnomaly" class="modal-overlay hidden">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <h3 class="modal-title">➕ Input Temuan Produk Baru</h3>
+        <button type="button" class="modal-close-btn">&times;</button>
+      </div>
+      <form id="newAnomalyForm">
+        <div class="modal-body">
+          <div class="form-grid-2">
+            <div class="form-group">
+              <label class="form-label">SKU Produk *</label>
+              <input type="text" id="inputSku" class="form-input" placeholder="Contoh: 147060" required autocomplete="off">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Kategori *</label>
+              <select id="inputCategory" class="form-select" required>
+                <option value="LDP">LDP (Lost & Damage)</option>
+                <option value="LBH">LBH (Barang Lebih)</option>
+                <option value="BADSTOCK">BADSTOCK (Rusak/Expired)</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Nama Produk *</label>
+            <input type="text" id="inputProductName" class="form-input" placeholder="Nama lengkap produk barang..." required autocomplete="off">
+          </div>
+
+          <div class="form-grid-2">
+            <div class="form-group">
+              <label class="form-label">Kuantitas Qty (Pcs) *</label>
+              <input type="number" id="inputQty" class="form-input" min="1" value="1" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Zona / Suhu</label>
+              <select id="inputZone" class="form-select">
+                <option value="Ambient">Ambient</option>
+                <option value="Chiller">Chiller</option>
+                <option value="Frozen">Frozen</option>
+                <option value="Fresh">Fresh</option>
+                <option value="Tata Rumah">Tata Rumah</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-grid-2">
+            <div class="form-group">
+              <label class="form-label">Lokasi / Rak (Opsional)</label>
+              <input type="text" id="inputRack" class="form-input" placeholder="Contoh: L1-AMD-A3-T3-2">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Shift Kerja</label>
+              <select id="inputShift" class="form-select">
+                <option value="Shift Pagi">Shift Pagi</option>
+                <option value="Shift Siang">Shift Siang</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Penyebab / Alasan Temuan *</label>
+            <input type="text" id="inputReason" class="form-input" placeholder="Contoh: Expired date, Kemasan sobek, Hilang saat picking" required>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Petugas / PIC Pelapor</label>
+            <input type="text" id="inputPic" class="form-input" placeholder="Nama petugas / Leader pelapor" value="Leader CWG">
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Catatan Leader / Rencana Tindakan</label>
+            <textarea id="inputNotes" class="form-textarea" rows="2" placeholder="Tindakan verifikasi CCTV, lapor vendor, write-off..."></textarea>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn-header secondary modal-close-btn">Batal</button>
+          <button type="submit" class="btn-header primary">Simpan Data &rarr;</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════════════════
+       MODAL: DETAIL & UPDATE STATUS
+       ══════════════════════════════════════════════════════════════════════════ -->
+  <div id="modalDetailAnomaly" class="modal-overlay hidden">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <h3 class="modal-title">📋 Detail Temuan Produk & Tindakan Leader</h3>
+        <button type="button" class="modal-close-btn">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div style="background: rgba(255,255,255,0.04); border-radius: 8px; padding: 14px; border: 1px solid rgba(255,255,255,0.06); display: flex; flex-direction: column; gap: 8px;">
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <span style="font-family:JetBrains Mono; color:#38bdf8; font-weight:700; font-size:1.1rem;" id="detailSku">000000</span>
+            <span style="font-weight:700; color:#fbbf24; font-size:0.85rem;" id="detailCategory">LDP</span>
+          </div>
+          <div style="font-weight:700; font-size:1rem; color:#fff;" id="detailName">Nama Produk</div>
+          <div style="display:flex; gap:16px; font-size:0.82rem; color:#94a3b8; flex-wrap:wrap;">
+            <span>Qty: <b style="color:#fff;" id="detailQty">0 pcs</b></span>
+            <span>Zona: <b style="color:#fff;" id="detailZone">-</b></span>
+            <span>Shift: <b style="color:#fff;" id="detailShift">-</b></span>
+          </div>
+        </div>
+
+        <div class="form-group" style="margin-top: 10px;">
+          <label class="form-label">Pelapor PIC:</label>
+          <div style="color:#fff; font-size:0.9rem;" id="detailPic">-</div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Alasan Temuan:</label>
+          <div style="color:#f87171; font-size:0.9rem; font-weight:600;" id="detailReason">-</div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Catatan Leader Sebelumnya:</label>
+          <div style="color:#cbd5e1; font-size:0.85rem;" id="detailNotes">-</div>
+        </div>
+
+        <div class="form-group" style="border-top:1px solid rgba(255,255,255,0.08); padding-top:14px;">
+          <label class="form-label">Perbarui Status Penanganan:</label>
+          <select id="detailStatus" class="form-select">
+            <option value="Pending">🔴 Pending (Menunggu Tindakan)</option>
+            <option value="Investigasi">🟡 Investigasi (Cek CCTV / Inbound / Fisik)</option>
+            <option value="Selesai">🟢 Selesai (Tindakan Selesai / Write-Off / Adjust)</option>
+          </select>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn-header secondary modal-close-btn">Tutup</button>
+        <button type="button" id="btnSaveDetailStatus" class="btn-header primary">Simpan Perubahan &rarr;</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="leader.js?v=20261014_1"></script>
+</body>
+</html>

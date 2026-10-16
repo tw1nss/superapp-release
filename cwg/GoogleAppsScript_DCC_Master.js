@@ -93,7 +93,8 @@ function onOpen() {
     function() { if (typeof buildJadwalMenu === 'function') buildJadwalMenu(ui); },
     function() { if (typeof ensureDailyBackupTrigger === 'function') ensureDailyBackupTrigger(); },
     function() { if (typeof ensureAutoSupersetTrigger === 'function') ensureAutoSupersetTrigger(); },
-    function() { if (typeof ensureDailyBackupTriggerEdCorrection === 'function') ensureDailyBackupTriggerEdCorrection(); }
+    function() { if (typeof ensureDailyBackupTriggerEdCorrection === 'function') ensureDailyBackupTriggerEdCorrection(); },
+    function() { if (typeof ensureAutoPullDccTrigger === 'function') ensureAutoPullDccTrigger(); }
   ];
   menus.forEach(function(step) {
     try { step(); } catch (e) { console.warn('onOpen step dilewati:', e); }
@@ -115,15 +116,20 @@ function buildSupersetMenu(ui) {
     .addItem('3. SLOC MASTER (CWG 27916)', 'menu_sloc_master')
     .addItem('4. SEQUENCING (CWG 27954)', 'menu_sequencing')
     .addItem('5. ED CORRECTION (CWG 27922)', 'menu_ed_correction')
-    .addItem('6. BAD & LOST', 'menu_bad_lost')
+    .addItem('6. BAD, LDP & LBH (CWG 27941/27901/27904)', 'menu_bad_lost')
     .addItem('7. MSLTC', 'menu_msltc')
     .addItem('8. KOLI INBOUND (CWG 27918)', 'menu_koli_inbound')
     .addSeparator()
     .addItem('🔑 Set / Ganti Cookie Superset', 'setSupersetCookiePrompt')
-    .addItem('🔗 Set Link / Slice ID BAD & LDP', 'setBadLostChartPrompt')
+    .addItem('🔗 Set Link / Slice ID BAD, LDP & LBH', 'setBadLostChartPrompt')
+    .addSeparator()
+    .addItem('⏱️ Pasang Auto-Pull DCC (Setiap 10 Menit)', 'setupAutoPullDccTrigger10Minutes')
+    .addItem('🛑 Matikan Auto-Pull DCC (10 Menit)', 'removeAutoPullDccTriggerPrompt')
     .addSeparator()
     .addItem('⏰ Aktifkan Pemicu Auto-Sync (Setiap Jam)', 'setupSupersetHourlyTrigger')
-    .addItem('🛑 Matikan Pemicu Auto-Sync', 'removeSupersetAutoSyncTriggerPrompt')
+    .addItem('🛑 Matikan Semua Pemicu Auto-Sync', 'removeSupersetAutoSyncTriggerPrompt')
+    .addSeparator()
+    .addItem('ℹ️ Cek Status Timer Auto-Pull', 'checkAutoPullDccStatusPrompt')
     .addToUi();
 }
 
@@ -139,6 +145,10 @@ function buildDccMenu(ui) {
     .addItem('📦 Backup DCC ke Historical', 'copyDccToHistorical')
     .addItem('🗑️ Clear Kolom Sheet "Hasil DCC"', 'hapus')
     .addItem('🔄 Kosongkan / Reset "Mainlist SKU"', 'resetMainlistSkuPrompt')
+    .addSeparator()
+    .addItem('⏱️ Pasang Auto-Pull DCC (10 Menit)', 'setupAutoPullDccTrigger10Minutes')
+    .addItem('🛑 Matikan Auto-Pull DCC (10 Menit)', 'removeAutoPullDccTriggerPrompt')
+    .addItem('ℹ️ Cek Status Timer Auto-Pull', 'checkAutoPullDccStatusPrompt')
     .addSeparator()
     .addItem('📋 Siapkan 4 Sheet Pinjaman & Pengembalian', 'setupPinjamanSheets')
     .addSeparator()
@@ -182,21 +192,27 @@ function menu_ed_correction() {
 }
 
 function menu_bad_lost() {
-  console.log("🚀 [BAD & LOST] Memulai penggabungan data DETAIL BAD dan LDP DETAILS CWG...");
+  console.log("🚀 [BAD & LOST] Memulai penggabungan data DETAIL BAD, LDP, dan LBH CWG...");
   var props = PropertiesService.getScriptProperties();
 
-  // 1. DETAIL BAD (CWG)
-  var badFormDataKey = props.getProperty('BAD_FORM_DATA_KEY') || "t6x9bADlyyKPWqOaGJs3kEUex4ypzB-2NWGcltkRMUSfwcPGreBFEKbtlhW71uHcs";
-  var badPageId = props.getProperty('BAD_PAGE_ID') || "ObknBDbUzUg";
-  var badSliceId = props.getProperty('BAD_SLICE_ID') || null;
+  // 1. DETAIL BAD (CWG) - 27941
+  var badFormDataKey = props.getProperty('BAD_FORM_DATA_KEY') || "YFFz0dsVcjlXbJMRnA8A_sBFUNbTa5LlUIIsq5wUAG_4k8xUHrXGC9IkDseddSLy";
+  var badPageId = props.getProperty('BAD_PAGE_ID') || "hhwqUYiJiLP_Jl3TzYkR1";
+  var badSliceId = props.getProperty('BAD_SLICE_ID') || 27941;
 
-  // 2. LDP DETAILS CWG
-  var ldpFormDataKey = props.getProperty('LDP_FORM_DATA_KEY') || "1URv13iH9YvjxBZeVHFk3Yg5nAIX6GJsOyBAPYdwObxCEBO_Kml6m7FjwWNCT3dB";
-  var ldpPageId = props.getProperty('LDP_PAGE_ID') || "2fRGZnGpTZsZnXlZ";
-  var ldpSliceId = props.getProperty('LDP_SLICE_ID') || null;
+  // 2. LDP DETAILS CWG - 27901
+  var ldpFormDataKey = props.getProperty('LDP_FORM_DATA_KEY') || "hgaR5JFRTDxyma-KTv4wjp8pkTz8S-nd0IgpfqUP4h8Ty-Ab4NpjWAChgjPY9pTc";
+  var ldpPageId = props.getProperty('LDP_PAGE_ID') || "MLs5g1er3i_kCu5IcDroT";
+  var ldpSliceId = props.getProperty('LDP_SLICE_ID') || 27901;
+
+  // 3. LBH DETAILS CWG - 27904
+  var lbhFormDataKey = props.getProperty('LBH_FORM_DATA_KEY') || "7ub49RrKd0lwUbLDDoMHO_W5JWRUt7qujfikaRXlUKp2ehhyP_RnA2AfYoUUt6h3";
+  var lbhPageId = props.getProperty('LBH_PAGE_ID') || "hY6QfDdXUa54wA_SXUR2B";
+  var lbhSliceId = props.getProperty('LBH_SLICE_ID') || 27904;
 
   var badData = [];
   var ldpData = [];
+  var lbhData = [];
   var errors = [];
 
   try {
@@ -221,25 +237,37 @@ function menu_bad_lost() {
     if (errLdp.message === "MY_COOKIE_EMPTY") {
       return alertUser("❌ MY_COOKIE belum di-set!\n\nGunakan menu '📈 Superset Control' ➔ '🔑 Set / Ganti Cookie Superset' untuk memasukkan cookie.");
     }
-    console.warn("⚠️ Gagal tarik LDP DETAILS CWG:", errLdp.message);
+    console.warn("⚠️ Gagal tarik LDP CWG:", errLdp.message);
     errors.push("LDP CWG: " + errLdp.message);
   }
 
-  if (badData.length === 0 && ldpData.length === 0) {
+  try {
+    lbhData = fetchSupersetData(lbhSliceId, lbhFormDataKey, lbhPageId) || [];
+  } catch (errLbh) {
+    if (errLbh.message === "COOKIE_EXPIRED") {
+      return alertUser("❌ COOKIE EXPIRED!\n\nSilakan perbarui cookie Superset Anda di menu '📈 Superset Control' ➔ '🔑 Set / Ganti Cookie Superset'.");
+    }
+    if (errLbh.message === "MY_COOKIE_EMPTY") {
+      return alertUser("❌ MY_COOKIE belum di-set!\n\nGunakan menu '📈 Superset Control' ➔ '🔑 Set / Ganti Cookie Superset' untuk memasukkan cookie.");
+    }
+    console.warn("⚠️ Gagal tarik LBH CWG:", errLbh.message);
+    errors.push("LBH CWG: " + errLbh.message);
+  }
+
+  if (badData.length === 0 && ldpData.length === 0 && lbhData.length === 0) {
     var is404 = errors.some(function(e) { return e.indexOf("404") !== -1; });
     if (is404) {
       return alertUser("❌ GAGAL TARIK DATA (HTTP 404 - Link/Key Expired)!\n\n" +
         "Key Superset sementara yang sebelumnya sudah kedaluwarsa di server.\n\n" +
         "👉 SOLUSI CEPAT:\n" +
-        "1. Buka chart 'DETAIL BAD' dan 'LDP DETAILS CWG' di tab browser dash.astronauts.id Anda.\n" +
-        "2. Klik tombol 'Save' di kanan atas untuk menyimpan permanen (atau klik 'UPDATE CHART').\n" +
-        "3. Copy URL baru / Slice ID-nya.\n" +
-        "4. Masukkan ke menu Google Sheets: '📈 Superset Control' ➔ '🔗 Set Link / Slice ID BAD & LDP'.");
+        "1. Buka chart 'DETAIL BAD', 'LDP CWG', dan 'LBH CWG' di tab browser dash.astronauts.id Anda.\n" +
+        "2. Pastikan chart sudah tersimpan permanen.\n" +
+        "3. Masukkan ke menu Google Sheets: '📈 Superset Control' ➔ '🔗 Set Link / Slice ID BAD, LDP & LBH'.");
     }
-    return alertUser("❌ Gagal menarik kedua data (DETAIL BAD & LDP CWG):\n" + errors.join("\n"));
+    return alertUser("❌ Gagal menarik ketiga data (DETAIL BAD, LDP & LBH):\n" + errors.join("\n"));
   }
 
-  // Gabungkan kedua data dengan kolom penanda KATEGORI: "BAD" atau "LDP" di posisi pertama
+  // Gabungkan ketiga data dengan kolom penanda KATEGORI: "BAD", "LDP", "LBH" di posisi pertama
   var combinedData = [];
 
   badData.forEach(function(row) {
@@ -252,12 +280,18 @@ function menu_bad_lost() {
     combinedData.push(item);
   });
 
+  lbhData.forEach(function(row) {
+    var item = Object.assign({ KATEGORI: "LBH" }, row);
+    combinedData.push(item);
+  });
+
   // Tulis ke sheet tujuan
   processToSheet(combinedData, "BAD & LOST");
 
-  var msg = "✅ Berhasil menggabungkan data BAD & LDP ke sheet 'BAD & LOST'!\n\n" +
-            "• DETAIL BAD: " + badData.length + " baris\n" +
-            "• LDP CWG: " + ldpData.length + " baris\n" +
+  var msg = "✅ Berhasil menggabungkan data BAD, LDP & LBH ke sheet 'BAD & LOST'!\n\n" +
+            "• DETAIL BAD (27941): " + badData.length + " baris\n" +
+            "• LDP CWG (27901): " + ldpData.length + " baris\n" +
+            "• LBH CWG (27904): " + lbhData.length + " baris\n" +
             "• Total Digabung: " + combinedData.length + " baris";
   if (errors.length > 0) {
     msg += "\n\n⚠️ Catatan: " + errors.join("; ");
@@ -293,7 +327,163 @@ function update_single(chartId, sheetName) {
 }
 
 // ============================================================
-// ⏰ TRIGGER MANAGEMENT (AUTO-SYNC PEMICU WAKTU)
+// ⏱️ CORE ENGINE: AUTO-PULL DATA DCC MASTER (10 MENIT SEKALI)
+// ============================================================
+
+/**
+ * Task otomatis penarikan seluruh chart data Superset DCC Master.
+ * Dijalankan otomatis oleh Google Apps Script time-based trigger setiap 10 menit sekali.
+ */
+function autoPullDataDccMaster() {
+  try {
+    console.log("🚀 [AUTO-PULL DCC 10M] Memulai penarikan data Superset DCC Master di latar belakang...");
+    var ss = getSpreadsheet();
+    if (ss && typeof ss.toast === "function") {
+      ss.toast("Sedang auto-pull data Superset DCC di latar belakang...", "⏱️ Auto-Pull DCC (10 Menit)", 4);
+    }
+
+    var successList = [];
+    var errorList = [];
+
+    CHARTS.forEach(function(c) {
+      try {
+        if (c.sheet === "BAD & LOST" || c.sheet === "Bad & Lost" || c.isCombinedBadLdp) {
+          menu_bad_lost();
+        } else {
+          update_single(c.id, c.sheet);
+        }
+        successList.push(c.sheet);
+      } catch (errChart) {
+        console.warn("⚠️ [AUTO-PULL DCC] Gagal menarik sheet " + c.sheet + ":", errChart);
+        errorList.push(c.sheet + " (" + (errChart.message || errChart) + ")");
+      }
+    });
+
+    // Refresh formula otomatis Mainlist SKU agar data terbaru langsung tersinkron
+    try {
+      if (typeof installDccMainlistFormulas === 'function') {
+        installDccMainlistFormulas(true);
+      }
+    } catch (eFormula) {}
+
+    var logSummary = "✅ [AUTO-PULL DCC 10M] Selesai. " + successList.length + " sheet berhasil diperbarui.";
+    if (errorList.length > 0) {
+      logSummary += " Catatan error: " + errorList.join("; ");
+    }
+    console.log(logSummary);
+
+    if (ss && typeof ss.toast === "function") {
+      ss.toast(successList.length + " sheet Superset berhasil diperbarui!", "✅ Auto-Pull Selesai", 5);
+    }
+  } catch (err) {
+    console.error("❌ [AUTO-PULL DCC] Terjadi kesalahan fatal saat auto-pull:", err);
+  }
+}
+
+// Handler alias untuk fleksibilitas pemanggilan (termasuk huruf kecil / standar)
+function autoPullData() {
+  autoPullDataDccMaster();
+}
+
+function autopulldata() {
+  autoPullDataDccMaster();
+}
+
+function autoPullDccMasterTask() {
+  autoPullDataDccMaster();
+}
+
+// ============================================================
+// ⏰ TRIGGER MANAGEMENT (AUTO-PULL DCC MASTER 10 MENIT SEKALI)
+// ============================================================
+
+/**
+ * ⏱️ Pasang / Aktifkan Trigger Auto-Pull 10 Menit Sekali
+ */
+function setupAutoPullDccTrigger10Minutes() {
+  removeAutoPullDccTrigger();
+  ScriptApp.newTrigger('autoPullDataDccMaster')
+    .timeBased()
+    .everyMinutes(10)
+    .create();
+  alertUser("✅ Timer Otomatis Auto-Pull DCC Master (10 Menit) Berhasil Diaktifkan!\n\nData Superset DCC Master kini akan otomatis ditarik setiap 10 menit sekali.");
+}
+
+/**
+ * 🛑 Hapus / Nonaktifkan Trigger Auto-Pull 10 Menit
+ */
+function removeAutoPullDccTrigger() {
+  var triggers = ScriptApp.getProjectTriggers();
+  var count = 0;
+  for (var i = 0; i < triggers.length; i++) {
+    var fn = triggers[i].getHandlerFunction();
+    if (fn === 'autoPullDataDccMaster' || fn === 'autoPullData' || fn === 'autopulldata' || fn === 'autoPullDccMasterTask') {
+      ScriptApp.deleteTrigger(triggers[i]);
+      count++;
+    }
+  }
+  return count;
+}
+
+function removeAutoPullDccTriggerPrompt() {
+  var deleted = removeAutoPullDccTrigger();
+  if (deleted > 0) {
+    alertUser("🛑 Timer Auto-Pull DCC Master (10 Menit) telah dinonaktifkan (" + deleted + " trigger dihapus).");
+  } else {
+    alertUser("ℹ️ Tidak ada timer auto-pull 10 menit DCC Master yang sedang aktif.");
+  }
+}
+
+/**
+ * ℹ️ Cek Status Pemicu Waktu (Trigger) DCC Master
+ */
+function checkAutoPullDccStatusPrompt() {
+  var triggers = ScriptApp.getProjectTriggers();
+  var active10Min = false;
+  var activeHourly = false;
+  for (var i = 0; i < triggers.length; i++) {
+    var fn = triggers[i].getHandlerFunction();
+    if (fn === 'autoPullDataDccMaster' || fn === 'autoPullData' || fn === 'autopulldata' || fn === 'autoPullDccMasterTask') {
+      active10Min = true;
+    }
+    if (fn === 'update_all') {
+      activeHourly = true;
+    }
+  }
+
+  var msg = "ℹ️ STATUS PEMICU WAKTU (TRIGGER) DCC MASTER:\n\n" +
+            "• Auto-Pull 10 Menit: " + (active10Min ? "🟢 AKTIF (Setiap 10 Menit Sekali)" : "🔴 NON-AKTIF") + "\n" +
+            "• Auto-Sync 1 Jam: " + (activeHourly ? "🟢 AKTIF (Setiap 1 Jam Sekali)" : "⚪ Tidak Aktif") + "\n\n" +
+            (active10Min 
+              ? "Sistem berjalan normal dan menarik data Superset otomatis setiap 10 menit." 
+              : "Untuk mengaktifkan, klik menu '📈 Superset Control' ➔ '⏱️ Pasang Auto-Pull DCC (Setiap 10 Menit)'.");
+  alertUser(msg);
+}
+
+/**
+ * ⚡ Memastikan trigger 10 menit terpasang otomatis saat spreadsheet dibuka
+ */
+function ensureAutoPullDccTrigger() {
+  var triggers = ScriptApp.getProjectTriggers();
+  var hasTrigger = false;
+  for (var i = 0; i < triggers.length; i++) {
+    var fn = triggers[i].getHandlerFunction();
+    if (fn === 'autoPullDataDccMaster' || fn === 'autoPullData' || fn === 'autopulldata' || fn === 'autoPullDccMasterTask') {
+      hasTrigger = true;
+      break;
+    }
+  }
+  if (!hasTrigger) {
+    ScriptApp.newTrigger('autoPullDataDccMaster')
+      .timeBased()
+      .everyMinutes(10)
+      .create();
+    console.log("⏱️ Background Auto-Pull DCC Master (Setiap 10 Menit) otomatis dibuat via onOpen.");
+  }
+}
+
+// ============================================================
+// ⏰ TRIGGER MANAGEMENT (AUTO-SYNC PEMICU WAKTU 1 JAM)
 // ============================================================
 function setupSupersetHourlyTrigger() {
   removeSupersetAutoSyncTrigger();
@@ -308,7 +498,8 @@ function removeSupersetAutoSyncTrigger() {
   var triggers = ScriptApp.getProjectTriggers();
   var count = 0;
   for (var i = 0; i < triggers.length; i++) {
-    if (triggers[i].getHandlerFunction() === 'update_all') {
+    var fn = triggers[i].getHandlerFunction();
+    if (fn === 'update_all' || fn === 'autoPullDataDccMaster' || fn === 'autoPullData' || fn === 'autopulldata' || fn === 'autoPullDccMasterTask') {
       ScriptApp.deleteTrigger(triggers[i]);
       count++;
     }
@@ -319,7 +510,7 @@ function removeSupersetAutoSyncTrigger() {
 function removeSupersetAutoSyncTriggerPrompt() {
   var deleted = removeSupersetAutoSyncTrigger();
   if (deleted > 0) {
-    alertUser("🛑 Auto-sync Superset telah dinonaktifkan (" + deleted + " pemicu dihapus).");
+    alertUser("🛑 Semua pemicu auto-sync & auto-pull Superset telah dinonaktifkan (" + deleted + " pemicu dihapus).");
   } else {
     alertUser("ℹ️ Tidak ada pemicu auto-sync Superset yang aktif.");
   }
@@ -337,6 +528,15 @@ function doGet(e) {
     return ContentService.createTextOutput(JSON.stringify({
       status: "success",
       message: "4 Sheet Pinjaman & Pengembalian MTG berhasil dibuat & diformat!"
+    })).setMimeType(ContentService.MimeType.JSON);
+  }
+
+  // Trigger auto-pull data DCC via URL / webhook (?action=autoPullData)
+  if (param.action === 'autoPullData' || param.action === 'autopulldata' || param.action === 'autoPullDcc') {
+    autoPullDataDccMaster();
+    return ContentService.createTextOutput(JSON.stringify({
+      status: "success",
+      message: "Auto-pull data DCC Master berhasil diproses!"
     })).setMimeType(ContentService.MimeType.JSON);
   }
 
@@ -503,6 +703,17 @@ function doPost(e) {
     if (payload.action === 'recoverMisplacedDcc' || payload.action === 'fixMisplacedDcc') {
       var recRes = recoverMisplacedDccFromPinjaman();
       return ContentService.createTextOutput(JSON.stringify(recRes)).setMimeType(ContentService.MimeType.JSON);
+    }
+
+    // ==========================================================
+    // ⏱️ ROUTER AUTO-PULL DATA DCC MASTER JIKA DIPANGGIL VIA POST
+    // ==========================================================
+    if (payload.action === 'autoPullData' || payload.action === 'autopulldata' || payload.action === 'autoPullDcc') {
+      autoPullDataDccMaster();
+      return ContentService.createTextOutput(JSON.stringify({
+        status: "success",
+        message: "Auto-pull data DCC Master berhasil diproses!"
+      })).setMimeType(ContentService.MimeType.JSON);
     }
 
     // ==========================================================
@@ -1346,15 +1557,16 @@ function installDccMainlistFormulas(isSilent) {
 
   // 2. Hasil Audit dari 'Hasil DCC' (Kolom H - P)
   // XLOOKUP search_mode = -1 mengambil audit paling terbaru untuk SKU tersebut
-  sheet.getRange('H2').setFormula("=MAP(C2:C, LAMBDA(sku, IF(sku=\"\", \"\", IFERROR(XLOOKUP(TRIM(sku), 'Hasil DCC'!B:B, 'Hasil DCC'!G:G, \"\", 0, -1), IFERROR(XLOOKUP(VALUE(TRIM(sku)), 'Hasil DCC'!B:B, 'Hasil DCC'!G:G, \"\", 0, -1), \"\")))))");
-  sheet.getRange('I2').setFormula("=MAP(C2:C, LAMBDA(sku, IF(sku=\"\", \"\", IFERROR(XLOOKUP(TRIM(sku), 'Hasil DCC'!B:B, 'Hasil DCC'!H:H, \"\", 0, -1), IFERROR(XLOOKUP(VALUE(TRIM(sku)), 'Hasil DCC'!B:B, 'Hasil DCC'!H:H, \"\", 0, -1), \"\")))))");
+  // Menggunakan 'Hasil DCC'!B:B & "" untuk menjamin pencocokan akurat baik format Teks maupun Angka
+  sheet.getRange('H2').setFormula("=MAP(C2:C, LAMBDA(sku, IF(sku=\"\", \"\", IFERROR(XLOOKUP(TRIM(sku)&\"\", 'Hasil DCC'!B:B&\"\", 'Hasil DCC'!G:G, IFERROR(XLOOKUP(VALUE(TRIM(sku)), 'Hasil DCC'!B:B, 'Hasil DCC'!G:G, \"\"), \"\"), 0, -1), \"\"))))");
+  sheet.getRange('I2').setFormula("=MAP(C2:C, LAMBDA(sku, IF(sku=\"\", \"\", IFERROR(XLOOKUP(TRIM(sku)&\"\", 'Hasil DCC'!B:B&\"\", 'Hasil DCC'!H:H, IFERROR(XLOOKUP(VALUE(TRIM(sku)), 'Hasil DCC'!B:B, 'Hasil DCC'!H:H, \"\"), \"\"), 0, -1), \"\"))))");
   sheet.getRange('J2').setFormula("=ARRAYFORMULA(IF(C2:C=\"\", \"\", IF((H2:H=\"\")*(I2:I=\"\"), \"\", N(H2:H) + N(I2:I))))");
   sheet.getRange('K2').setFormula("=ARRAYFORMULA(IF(C2:C=\"\", \"\", IF(J2:J=\"\", \"\", N(J2:J) - N(F2:F))))");
-  sheet.getRange('L2').setFormula("=MAP(C2:C, LAMBDA(sku, IF(sku=\"\", \"\", IFERROR(XLOOKUP(TRIM(sku), 'Hasil DCC'!B:B, 'Hasil DCC'!E:E, \"\", 0, -1), IFERROR(XLOOKUP(VALUE(TRIM(sku)), 'Hasil DCC'!B:B, 'Hasil DCC'!E:E, \"\", 0, -1), \"\")))))");
+  sheet.getRange('L2').setFormula("=MAP(C2:C, LAMBDA(sku, IF(sku=\"\", \"\", IFERROR(XLOOKUP(TRIM(sku)&\"\", 'Hasil DCC'!B:B&\"\", 'Hasil DCC'!E:E, IFERROR(XLOOKUP(VALUE(TRIM(sku)), 'Hasil DCC'!B:B, 'Hasil DCC'!E:E, \"\"), \"\"), 0, -1), \"\"))))");
   sheet.getRange('M2').setFormula("=ARRAYFORMULA(IF(C2:C=\"\", \"\", IF(L2:L=\"\", \"\", IF(EXACT(UPPER(TRIM(E2:E)), UPPER(TRIM(L2:L))), \"MATCH\", \"UNMATCH\"))))");
-  sheet.getRange('N2').setFormula("=MAP(C2:C, LAMBDA(sku, IF(sku=\"\", \"\", IFERROR(XLOOKUP(TRIM(sku), 'Hasil DCC'!B:B, 'Hasil DCC'!S:S, \"\", 0, -1), IFERROR(XLOOKUP(VALUE(TRIM(sku)), 'Hasil DCC'!B:B, 'Hasil DCC'!S:S, \"\", 0, -1), \"\")))))");
+  sheet.getRange('N2').setFormula("=MAP(C2:C, LAMBDA(sku, IF(sku=\"\", \"\", IFERROR(XLOOKUP(TRIM(sku)&\"\", 'Hasil DCC'!B:B&\"\", 'Hasil DCC'!S:S, IFERROR(XLOOKUP(VALUE(TRIM(sku)), 'Hasil DCC'!B:B, 'Hasil DCC'!S:S, \"\"), \"\"), 0, -1), \"\"))))");
   sheet.getRange('O2').setFormula("=ARRAYFORMULA(IF(C2:C=\"\", \"\", IF(L2:L<>\"\", \"DONE\", \"PENDING\")))");
-  sheet.getRange('P2').setFormula("=MAP(C2:C, LAMBDA(sku, IF(sku=\"\", \"\", IFERROR(XLOOKUP(TRIM(sku), 'Hasil DCC'!B:B, 'Hasil DCC'!K:K, \"\", 0, -1), IFERROR(XLOOKUP(VALUE(TRIM(sku)), 'Hasil DCC'!B:B, 'Hasil DCC'!K:K, \"\", 0, -1), \"\")))))");
+  sheet.getRange('P2').setFormula("=MAP(C2:C, LAMBDA(sku, IF(sku=\"\", \"\", IFERROR(XLOOKUP(TRIM(sku)&\"\", 'Hasil DCC'!B:B&\"\", 'Hasil DCC'!K:K, IFERROR(XLOOKUP(VALUE(TRIM(sku)), 'Hasil DCC'!B:B, 'Hasil DCC'!K:K, \"\"), \"\"), 0, -1), \"\"))))");
 
   if (!isSilent) {
     alertUser('✅ Berhasil memasang rumus otomatis di "Mainlist SKU"!\n\nSemua data dari "STOCK UPDATE", "SLOC MASTER", "DATA MASTER" dan "Hasil DCC" kini tersinkronisasi secara real-time.');
@@ -1809,7 +2021,34 @@ function setBadLostChartPrompt() {
     }
   }
 
-  ui.alert('✅ Konfigurasi Link BAD & LDP berhasil disimpan!\n\nSilakan jalankan menu: "📈 Superset Control" ➔ "6. BAD & LOST".');
+  // 3. LBH CWG
+  var curLbhKey = props.getProperty('LBH_FORM_DATA_KEY') || '';
+  var curLbhId = props.getProperty('LBH_SLICE_ID') || '';
+  var resLbh = ui.prompt(
+    '🔗 Set Link / Slice ID: LBH CWG (3/3)',
+    'Paste URL Explore dari dash.astronauts.id atau form_data_key atau nomor Slice ID untuk LBH CWG:\n\n' +
+    'Saat Ini:\n• Slice ID: ' + (curLbhId || '-') + '\n• Key: ' + (curLbhKey ? (curLbhKey.substring(0, 25) + '...') : '(Default CWG Key)'),
+    ui.ButtonSet.OK_CANCEL
+  );
+
+  if (resLbh.getSelectedButton() === ui.Button.OK) {
+    var valLbh = resLbh.getResponseText().trim();
+    if (valLbh) {
+      if (/^\d+$/.test(valLbh)) {
+        props.setProperty('LBH_SLICE_ID', valLbh);
+      } else {
+        var kM3 = valLbh.match(/form_data_key=([a-zA-Z0-9_\-]+)/);
+        var sM3 = valLbh.match(/slice_id=(\d+)/);
+        var pM3 = valLbh.match(/dashboard_page_id=([a-zA-Z0-9_\-]+)/);
+        if (kM3) props.setProperty('LBH_FORM_DATA_KEY', kM3[1]);
+        if (sM3) props.setProperty('LBH_SLICE_ID', sM3[1]);
+        if (pM3) props.setProperty('LBH_PAGE_ID', pM3[1]);
+        if (!kM3 && !sM3) props.setProperty('LBH_FORM_DATA_KEY', valLbh);
+      }
+    }
+  }
+
+  ui.alert('✅ Konfigurasi Link BAD, LDP & LBH berhasil disimpan!\n\nSilakan jalankan menu: "📈 Superset Control" ➔ "6. BAD, LDP & LBH (ALL ANOMALI)".');
 }
 
 // ==============================================================================

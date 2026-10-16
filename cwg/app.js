@@ -3140,6 +3140,12 @@
       clockInterval = null;
     }
 
+    // 👑 Dashboard Leader CWG
+    if (menu === 'leader_cwg' || menu === 'leader') {
+      window.location.href = 'leader.html';
+      return;
+    }
+
     // 🛡️ Guard: Fitur dinonaktifkan sementara khusus Hub CWG
     if (menu === 'complain' || menu === 'slip_gaji' || menu === 'hk' || menu === 'pinjaman') {
       if (typeof showDccToast === 'function') {

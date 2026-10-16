@@ -86,6 +86,9 @@
       </div>
 
       <div class="home-version-wrap">
+        <a href="leader.html" class="home-version-chip home-leader-chip" style="text-decoration: none; border-color: rgba(163, 230, 53, 0.4); background: rgba(163, 230, 53, 0.12); color: #d9f99d;" title="Buka Dashboard Leader Khusus CWG">
+          <span style="color: #a3e635;">👑</span> Leader CWG
+        </a>
         <a href="../?switch=true" class="home-version-chip" style="text-decoration: none;" title="Ganti Hub Operasional / Kembali ke Portal">
           <span style="color: #38bdf8;">🏢</span> Hub CWG ▾
         </a>
@@ -125,22 +128,17 @@
           <div class="menu-card-title">Barcode</div>
         </div>
 
-        <!-- 2. Complain (Dinonaktifkan sementara khusus Hub CWG) -->
-        <!--
-        <div class="menu-card" onclick="openAppMenu('complain')">
-          <div class="menu-icon-box complain" style="position: relative;">
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-              <rect x="1" y="3" width="15" height="13" rx="2" stroke="#f59e0b" fill="rgba(245, 158, 11, 0.15)" />
-              <polygon points="16 8 20 8 23 11 23 16 16 16 8" stroke="#f59e0b" fill="rgba(245, 158, 11, 0.2)" />
-              <circle cx="5.5" cy="18.5" r="2.5" stroke="#94a3b8" fill="#1e293b" />
-              <circle cx="18.5" cy="18.5" r="2.5" stroke="#94a3b8" fill="#1e293b" />
-              <line x1="5" y1="9" x2="9" y2="9" stroke="#f59e0b" stroke-width="2" />
+        <!-- 2. Leader CWG (Khusus Hub CWG: ALL, LDP, LBH, BADSTOCK) -->
+        <div class="menu-card menu-card-leader" onclick="openAppMenu('leader_cwg')" style="border-color: rgba(163, 230, 53, 0.35);">
+          <div class="menu-icon-box leader" style="border-color: rgba(163, 230, 53, 0.4); background: rgba(163, 230, 53, 0.15); position: relative;">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#a3e635" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M2 4l3 12h14l3-12-6 7-4-7-4 7-6-7z" fill="rgba(163, 230, 53, 0.25)"></path>
+              <circle cx="12" cy="19" r="2" fill="#a3e635"></circle>
             </svg>
-            <span id="homeComplainBadge" class="menu-badge hidden">0</span>
+            <span class="menu-badge" style="background:#a3e635; color:#050b02; font-weight:800;">PIN</span>
           </div>
-          <div class="menu-card-title">Complain</div>
+          <div class="menu-card-title" style="color: #d9f99d;">Leader CWG</div>
         </div>
-        -->
 
         <!-- 3. Retur Task -->
         <div class="menu-card" onclick="openAppMenu('retur')">
