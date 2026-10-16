@@ -17,6 +17,48 @@
   const SPREADSHEET_SHEET_NAME = 'BAD & LOST';
   const DCC_WEBAPP_URL = 'https://script.google.com/macros/s/AKfycbygTPu8soPeO8j0l88UMUcBQrSi7WFCjSe-G2PJV5vg_JLsEim1q2mHuaV9nT6GSQj3sw/exec';
 
+  // ─── REKAP DATA PERBANDINGAN 3 BULAN SEBELUMNYA & BEFORE-AFTER AUDIT (Hub CWG Cawang) ───
+  const CWG_COMPARISON_DATA = {
+    headerToday: {
+      badGantung: 849570,
+      badGantungBefore: 5624012,
+      ldp: 10492374,
+      ldpBefore: 23614809,
+      lbh: 6700075,
+      lbhBefore: 6466914
+    },
+    badGantung: {
+      before: [
+        { productType: 'Fresh', value: 5025913 },
+        { productType: 'Frozen', value: 598099 }
+      ],
+      after: [
+        { productType: 'Fresh', value: 809020 },
+        { productType: 'Frozen', value: 40550 }
+      ]
+    },
+    ldpMonthly: [
+      { monthCode: '02', monthName: 'February', before: 12666, after: 12666, isLast3Months: false, isCurrentMonth: false },
+      { monthCode: '03', monthName: 'March', before: 18000, after: 0, isLast3Months: false, isCurrentMonth: false },
+      { monthCode: '04', monthName: 'April', before: 39010, after: 39010, isLast3Months: false, isCurrentMonth: false },
+      { monthCode: '05', monthName: 'May', before: 129650, after: 129650, isLast3Months: false, isCurrentMonth: false },
+      { monthCode: '06', monthName: 'June', before: 1010973, after: 426559, isLast3Months: false, isCurrentMonth: false },
+      { monthCode: '07', monthName: 'July', before: 1454203, after: 993865, isLast3Months: false, isCurrentMonth: false },
+      { monthCode: '08', monthName: 'August', before: 1110123, after: 572454, isLast3Months: true, isCurrentMonth: false },
+      { monthCode: '09', monthName: 'September', before: 10443417, after: 1376094, isLast3Months: true, isCurrentMonth: false },
+      { monthCode: '10', monthName: 'October', before: 9396768, after: 6942076, isLast3Months: true, isCurrentMonth: true }
+    ],
+    lbhMonthly: [
+      { monthCode: '04', monthName: 'April', before: 86127, after: 86769, isLast3Months: false, isCurrentMonth: false },
+      { monthCode: '05', monthName: 'May', before: 25279, after: 25385, isLast3Months: false, isCurrentMonth: false },
+      { monthCode: '06', monthName: 'June', before: 1384820, after: 1394814, isLast3Months: false, isCurrentMonth: false },
+      { monthCode: '07', monthName: 'July', before: 89498, after: 90805, isLast3Months: false, isCurrentMonth: false },
+      { monthCode: '08', monthName: 'August', before: 42657, after: 41338, isLast3Months: true, isCurrentMonth: false },
+      { monthCode: '09', monthName: 'September', before: 2307523, after: 2301148, isLast3Months: true, isCurrentMonth: false },
+      { monthCode: '10', monthName: 'October', before: 2531009, after: 2759815, isLast3Months: true, isCurrentMonth: true }
+    ]
+  };
+
   // ─── INITIAL SEED DATA (Hub CWG Cawang) ───
   const INITIAL_CWG_DATA = [
     // ── LDP (Lost Damage Problem) ──
@@ -399,9 +441,39 @@
   let currentSearchQuery = '';
   let activeBottomTab = 'overview';
   let pinEnteredDigits = '';
+  let comparisonMonthFilter = 'LAST_3_MONTHS'; // 'LAST_3_MONTHS', 'ALL', '10', '09', '08'
+  let comparisonCategoryFilter = 'ALL'; // 'ALL', 'BAD_GANTUNG', 'LDP', 'LBH'
 
   // ─── DOM ELEMENTS REFERENCE ───
   const dom = {
+    // Views
+    telemetryAnomalyView: document.getElementById('telemetryAnomalyView'),
+    comparisonAuditView: document.getElementById('comparisonAuditView'),
+    anomalySlicersBox: document.getElementById('anomalySlicersBox'),
+    comparisonSlicersBox: document.getElementById('comparisonSlicersBox'),
+
+    // Comparison View DOM
+    compValBadToday: document.getElementById('compValBadToday'),
+    compValLdpToday: document.getElementById('compValLdpToday'),
+    compValLbhToday: document.getElementById('compValLbhToday'),
+    btnCompFocusLast3Months: document.getElementById('btnCompFocusLast3Months'),
+    btnCompShowAllMonths: document.getElementById('btnCompShowAllMonths'),
+    btnExportComparisonCsv: document.getElementById('btnExportComparisonCsv'),
+    tableLdpBefore: document.getElementById('tableLdpBefore'),
+    tbodyLdpBefore: document.getElementById('tbodyLdpBefore'),
+    tbodyLdpAfter: document.getElementById('tbodyLdpAfter'),
+    grandLdpBefore: document.getElementById('grandLdpBefore'),
+    grandLdpAfter: document.getElementById('grandLdpAfter'),
+    grandLdpDelta: document.getElementById('grandLdpDelta'),
+    tbodyLbhBefore: document.getElementById('tbodyLbhBefore'),
+    tbodyLbhAfter: document.getElementById('tbodyLbhAfter'),
+    grandLbhBefore: document.getElementById('grandLbhBefore'),
+    grandLbhAfter: document.getElementById('grandLbhAfter'),
+    grandLbhDelta: document.getElementById('grandLbhDelta'),
+    compLdpChartContainer: document.getElementById('compLdpChartContainer'),
+    compMonthBtns: document.querySelectorAll('[data-comp-month]'),
+    compCatBtns: document.querySelectorAll('[data-comp-cat]'),
+
     // PIN Lock
     pinLockOverlay: document.getElementById('pinLockOverlay'),
     pinInputField: document.getElementById('pinInputField'),
@@ -1085,13 +1157,24 @@
   // 7. EVENT LISTENERS (SIDEBAR, SLICERS, TABS, SEARCH)
   // ══════════════════════════════════════════════════════════════════════════
   function initEventListeners() {
-    // ── Sidebar Menu Navigation (ALL, LDP, LBH, BADSTOCK) ──
+    // ── Sidebar Menu Navigation (ALL, LDP, LBH, BADSTOCK, COMPARISON) ──
     dom.sidebarNavBtns.forEach(btn => {
       btn.addEventListener('click', () => {
-        const targetMenu = btn.dataset.menu; // ALL, LDP, LBH, BADSTOCK
+        const targetMenu = btn.dataset.menu; // ALL, LDP, LBH, BADSTOCK, COMPARISON
         activeSidebarMenu = targetMenu;
 
         dom.sidebarNavBtns.forEach(b => b.classList.toggle('active', b === btn));
+
+        // Sync bottom tabs
+        dom.bottomTabs.forEach(t => {
+          if (targetMenu === 'COMPARISON') {
+            t.classList.toggle('active', t.dataset.tab === 'comparison');
+          } else if (targetMenu === 'ALL') {
+            t.classList.toggle('active', t.dataset.tab === 'overview');
+          } else {
+            t.classList.toggle('active', t.dataset.tab === targetMenu.toLowerCase());
+          }
+        });
 
         // Sync right slicer category button
         currentSlicers.category = targetMenu;
@@ -1220,22 +1303,71 @@
         const tabTarget = tab.dataset.tab;
         activeBottomTab = tabTarget;
 
-        if (tabTarget === 'ldp' || tabTarget === 'lbh' || tabTarget === 'badstock') {
+        if (tabTarget === 'comparison') {
+          activeSidebarMenu = 'COMPARISON';
+          dom.sidebarNavBtns.forEach(b => b.classList.toggle('active', b.dataset.menu === 'COMPARISON'));
+          renderAll();
+        } else if (tabTarget === 'ldp' || tabTarget === 'lbh' || tabTarget === 'badstock') {
           const menuKey = tabTarget.toUpperCase();
           activeSidebarMenu = menuKey;
           dom.sidebarNavBtns.forEach(b => b.classList.toggle('active', b.dataset.menu === menuKey));
-          applyFilters();
-          renderAllCharts();
-          renderTable();
+          renderAll();
         } else if (tabTarget === 'all' || tabTarget === 'overview') {
           activeSidebarMenu = 'ALL';
           dom.sidebarNavBtns.forEach(b => b.classList.toggle('active', b.dataset.menu === 'ALL'));
-          applyFilters();
-          renderAllCharts();
-          renderTable();
+          renderAll();
         } else if (tabTarget === 'input_manual') {
           openNewAnomalyModal();
         }
+      });
+    });
+
+    // ── Comparison View Actions ──
+    if (dom.btnCompFocusLast3Months) {
+      dom.btnCompFocusLast3Months.addEventListener('click', () => {
+        comparisonMonthFilter = 'LAST_3_MONTHS';
+        dom.btnCompFocusLast3Months.classList.add('active');
+        if (dom.btnCompShowAllMonths) dom.btnCompShowAllMonths.classList.remove('active');
+        syncCompMonthSlicers();
+        renderComparisonTables();
+      });
+    }
+
+    if (dom.btnCompShowAllMonths) {
+      dom.btnCompShowAllMonths.addEventListener('click', () => {
+        comparisonMonthFilter = 'ALL';
+        dom.btnCompShowAllMonths.classList.add('active');
+        if (dom.btnCompFocusLast3Months) dom.btnCompFocusLast3Months.classList.remove('active');
+        syncCompMonthSlicers();
+        renderComparisonTables();
+      });
+    }
+
+    if (dom.btnExportComparisonCsv) {
+      dom.btnExportComparisonCsv.addEventListener('click', exportComparisonCsv);
+    }
+
+    // Comparison Slicers: Month Filter
+    dom.compMonthBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        dom.compMonthBtns.forEach(b => b.classList.toggle('active', b === btn));
+        comparisonMonthFilter = btn.dataset.compMonth;
+        if (dom.btnCompFocusLast3Months) {
+          dom.btnCompFocusLast3Months.classList.toggle('active', comparisonMonthFilter === 'LAST_3_MONTHS');
+        }
+        if (dom.btnCompShowAllMonths) {
+          dom.btnCompShowAllMonths.classList.toggle('active', comparisonMonthFilter === 'ALL');
+        }
+        renderComparisonTables();
+      });
+    });
+
+    // Comparison Slicers: Category Filter
+    dom.compCatBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        dom.compCatBtns.forEach(b => b.classList.toggle('active', b === btn));
+        comparisonCategoryFilter = btn.dataset.compCat;
+        renderComparisonTables();
       });
     });
 
@@ -1245,7 +1377,13 @@
     }
 
     if (dom.btnExportCsv) {
-      dom.btnExportCsv.addEventListener('click', exportCsvReport);
+      dom.btnExportCsv.addEventListener('click', () => {
+        if (activeSidebarMenu === 'COMPARISON') {
+          exportComparisonCsv();
+        } else {
+          exportCsvReport();
+        }
+      });
     }
 
     if (dom.btnPrintReport) {
@@ -1273,7 +1411,8 @@
       'ALL': 'CWG Leader Command Center',
       'LDP': 'Leader Console: Lost Damage Problem (LDP)',
       'LBH': 'Leader Console: Barang Lebih / Surplus (LBH)',
-      'BADSTOCK': 'Leader Console: BADSTOCK & Defect'
+      'BADSTOCK': 'Leader Console: BADSTOCK & Defect',
+      'COMPARISON': 'Report Hub Cawang Today (Perbandingan 3 Bulan & Before-After)'
     };
     dom.headerTitle.innerHTML = `👑 ${map[activeSidebarMenu] || 'CWG Leader Command Center'}`;
   }
@@ -1585,6 +1724,271 @@
   }
 
   // ══════════════════════════════════════════════════════════════════════════
+  // 9B. REKAP & PERBANDINGAN 3 BULAN (BEFORE VS AFTER AUDIT)
+  // ══════════════════════════════════════════════════════════════════════════
+  function syncCompMonthSlicers() {
+    dom.compMonthBtns.forEach(b => {
+      b.classList.toggle('active', b.dataset.compMonth === comparisonMonthFilter);
+    });
+  }
+
+  function renderComparisonView() {
+    if (dom.headerSubtitle) {
+      dom.headerSubtitle.textContent = 'Hub CWG Cawang • Rekapitulasi Audit Before vs After (Fokus 3 Bulan Terakhir: Agu, Sep, Okt)';
+    }
+
+    renderComparisonSummaryCards();
+    renderComparisonTables();
+    renderComparisonChart();
+  }
+
+  function renderComparisonSummaryCards() {
+    const today = CWG_COMPARISON_DATA.headerToday;
+    if (dom.compValBadToday) dom.compValBadToday.textContent = `Rp${today.badGantung.toLocaleString('id-ID')}`;
+    if (dom.compValLdpToday) dom.compValLdpToday.textContent = `Rp${today.ldp.toLocaleString('id-ID')}`;
+    if (dom.compValLbhToday) dom.compValLbhToday.textContent = `Rp${today.lbh.toLocaleString('id-ID')}`;
+  }
+
+  function renderComparisonTables() {
+    // 1. Bad Gantung Section Visibility
+    const secBad = document.querySelector('.comp-block-section:nth-of-type(1)');
+    const secLdp = document.querySelector('.comp-block-section:nth-of-type(2)');
+    const secLbh = document.querySelector('.comp-block-section:nth-of-type(3)');
+
+    if (secBad) secBad.style.display = (comparisonCategoryFilter === 'ALL' || comparisonCategoryFilter === 'BAD_GANTUNG') ? 'flex' : 'none';
+    if (secLdp) secLdp.style.display = (comparisonCategoryFilter === 'ALL' || comparisonCategoryFilter === 'LDP') ? 'flex' : 'none';
+    if (secLbh) secLbh.style.display = (comparisonCategoryFilter === 'ALL' || comparisonCategoryFilter === 'LBH') ? 'flex' : 'none';
+
+    // 2. Render LDP Monthly Tables
+    let ldpRows = CWG_COMPARISON_DATA.ldpMonthly;
+    if (comparisonMonthFilter === '08' || comparisonMonthFilter === '09' || comparisonMonthFilter === '10') {
+      ldpRows = ldpRows.filter(r => r.monthCode === comparisonMonthFilter);
+    }
+
+    let beforeLdpHtml = '';
+    let afterLdpHtml = '';
+    let totalLdpBefore = 0;
+    let totalLdpAfter = 0;
+
+    ldpRows.forEach(item => {
+      totalLdpBefore += item.before;
+      totalLdpAfter += item.after;
+
+      const isHighlight3M = item.isLast3Months && (comparisonMonthFilter === 'LAST_3_MONTHS');
+      const isCurrent = item.isCurrentMonth;
+      const rowClass = isHighlight3M ? 'highlight-3month' : (isCurrent ? 'highlight-current' : '');
+
+      let monthLabel = `${item.monthCode} - ${item.monthName}`;
+      if (item.isLast3Months && comparisonMonthFilter === 'LAST_3_MONTHS') {
+        monthLabel += ` <span class="badge-month-pill">3 Bulan</span>`;
+      }
+
+      // BEFORE row
+      beforeLdpHtml += `
+        <tr class="${rowClass}">
+          <td>${monthLabel}</td>
+          <td class="cell-val">Rp${item.before.toLocaleString('id-ID')}</td>
+        </tr>
+      `;
+
+      // AFTER row with Delta calculation
+      let deltaStr = '';
+      let deltaClass = '';
+      if (item.before === 0 && item.after === 0) {
+        deltaStr = '0%';
+      } else if (item.before === 0 && item.after > 0) {
+        deltaStr = `+Rp${item.after.toLocaleString('id-ID')}`;
+      } else if (item.after === 0 && item.before > 0) {
+        deltaStr = `▼ -100% (Nihil)`;
+        deltaClass = 'good';
+      } else {
+        const diff = item.after - item.before;
+        const pct = Math.round((diff / item.before) * 1000) / 10;
+        if (diff < 0) {
+          deltaStr = `▼ ${pct}% (-Rp${Math.abs(diff).toLocaleString('id-ID')})`;
+          deltaClass = 'good';
+        } else if (diff > 0) {
+          deltaStr = `▲ +${pct}% (+Rp${diff.toLocaleString('id-ID')})`;
+          deltaClass = 'neutral';
+        } else {
+          deltaStr = 'Tetap (0%)';
+        }
+      }
+
+      afterLdpHtml += `
+        <tr class="${rowClass}">
+          <td>${monthLabel}</td>
+          <td class="cell-val">${item.after > 0 ? 'Rp' + item.after.toLocaleString('id-ID') : '-'}</td>
+          <td class="cell-delta ${deltaClass}">${deltaStr}</td>
+        </tr>
+      `;
+    });
+
+    if (dom.tbodyLdpBefore) dom.tbodyLdpBefore.innerHTML = beforeLdpHtml;
+    if (dom.tbodyLdpAfter) dom.tbodyLdpAfter.innerHTML = afterLdpHtml;
+    if (dom.grandLdpBefore) dom.grandLdpBefore.textContent = `Rp${totalLdpBefore.toLocaleString('id-ID')}`;
+    if (dom.grandLdpAfter) dom.grandLdpAfter.textContent = `Rp${totalLdpAfter.toLocaleString('id-ID')}`;
+    if (dom.grandLdpDelta) {
+      const diffLdp = totalLdpAfter - totalLdpBefore;
+      const pctLdp = Math.round((diffLdp / totalLdpBefore) * 1000) / 10;
+      dom.grandLdpDelta.textContent = `▼ ${pctLdp}% (-Rp${Math.abs(diffLdp).toLocaleString('id-ID')})`;
+    }
+
+    // 3. Render LBH Monthly Tables
+    let lbhRows = CWG_COMPARISON_DATA.lbhMonthly;
+    if (comparisonMonthFilter === '08' || comparisonMonthFilter === '09' || comparisonMonthFilter === '10') {
+      lbhRows = lbhRows.filter(r => r.monthCode === comparisonMonthFilter);
+    }
+
+    let beforeLbhHtml = '';
+    let afterLbhHtml = '';
+    let totalLbhBefore = 0;
+    let totalLbhAfter = 0;
+
+    lbhRows.forEach(item => {
+      totalLbhBefore += item.before;
+      totalLbhAfter += item.after;
+
+      const isHighlight3M = item.isLast3Months && (comparisonMonthFilter === 'LAST_3_MONTHS');
+      const isCurrent = item.isCurrentMonth;
+      const rowClass = isHighlight3M ? 'highlight-3month' : (isCurrent ? 'highlight-current' : '');
+
+      let monthLabel = `${item.monthCode} - ${item.monthName}`;
+      if (item.isLast3Months && comparisonMonthFilter === 'LAST_3_MONTHS') {
+        monthLabel += ` <span class="badge-month-pill">3 Bulan</span>`;
+      }
+
+      beforeLbhHtml += `
+        <tr class="${rowClass}">
+          <td>${monthLabel}</td>
+          <td class="cell-val">Rp${item.before.toLocaleString('id-ID')}</td>
+        </tr>
+      `;
+
+      const diff = item.after - item.before;
+      let deltaStr = '';
+      let deltaClass = '';
+      if (diff > 0) {
+        deltaStr = `▲ +Rp${diff.toLocaleString('id-ID')}`;
+        deltaClass = 'neutral';
+      } else if (diff < 0) {
+        deltaStr = `▼ -Rp${Math.abs(diff).toLocaleString('id-ID')}`;
+        deltaClass = 'good';
+      } else {
+        deltaStr = 'Tetap';
+      }
+
+      afterLbhHtml += `
+        <tr class="${rowClass}">
+          <td>${monthLabel}</td>
+          <td class="cell-val">Rp${item.after.toLocaleString('id-ID')}</td>
+          <td class="cell-delta ${deltaClass}">${deltaStr}</td>
+        </tr>
+      `;
+    });
+
+    if (dom.tbodyLbhBefore) dom.tbodyLbhBefore.innerHTML = beforeLbhHtml;
+    if (dom.tbodyLbhAfter) dom.tbodyLbhAfter.innerHTML = afterLbhHtml;
+    if (dom.grandLbhBefore) dom.grandLbhBefore.textContent = `Rp${totalLbhBefore.toLocaleString('id-ID')}`;
+    if (dom.grandLbhAfter) dom.grandLbhAfter.textContent = `Rp${totalLbhAfter.toLocaleString('id-ID')}`;
+    if (dom.grandLbhDelta) {
+      const diffLbh = totalLbhAfter - totalLbhBefore;
+      const pctLbh = Math.round((diffLbh / totalLbhBefore) * 1000) / 10;
+      dom.grandLbhDelta.textContent = `▲ +${pctLbh}% (+Rp${diffLbh.toLocaleString('id-ID')})`;
+    }
+  }
+
+  function renderComparisonChart() {
+    if (!dom.compLdpChartContainer) return;
+    const items = CWG_COMPARISON_DATA.ldpMonthly;
+    const maxVal = Math.max(...items.map(i => Math.max(i.before, i.after)));
+
+    const width = 800;
+    const height = 180;
+    const padding = { top: 20, right: 20, bottom: 35, left: 50 };
+    const chartWidth = width - padding.left - padding.right;
+    const chartHeight = height - padding.top - padding.bottom;
+
+    const groupWidth = chartWidth / items.length;
+    const barWidth = Math.min(16, (groupWidth - 10) / 2);
+
+    let barsHtml = '';
+    items.forEach((item, idx) => {
+      const groupX = padding.left + (idx * groupWidth);
+      const bH = (item.before / maxVal) * chartHeight;
+      const aH = (item.after / maxVal) * chartHeight;
+      const bY = padding.top + chartHeight - bH;
+      const aY = padding.top + chartHeight - aH;
+
+      const is3M = item.isLast3Months;
+      const labelColor = is3M ? '#fde047' : '#94a3b8';
+      const labelWeight = is3M ? '700' : '500';
+
+      barsHtml += `
+        <!-- Group ${item.monthName} -->
+        <g>
+          <!-- Before Bar -->
+          <rect x="${groupX + 4}" y="${bY}" width="${barWidth}" height="${bH}" rx="3" fill="#f59e0b" opacity="0.85">
+            <title>BEFORE: ${item.monthName} = Rp${item.before.toLocaleString('id-ID')}</title>
+          </rect>
+          <!-- After Bar -->
+          <rect x="${groupX + 4 + barWidth + 2}" y="${aY}" width="${barWidth}" height="${aH}" rx="3" fill="#38bdf8" opacity="0.95">
+            <title>AFTER: ${item.monthName} = Rp${item.after.toLocaleString('id-ID')}</title>
+          </rect>
+          <!-- Month Text Label -->
+          <text x="${groupX + 4 + barWidth}" y="${height - 10}" fill="${labelColor}" font-size="10" font-weight="${labelWeight}" text-anchor="middle" font-family="Inter, sans-serif">
+            ${item.monthName.slice(0, 3)}
+          </text>
+        </g>
+      `;
+    });
+
+    const svg = `
+      <svg viewBox="0 0 ${width} ${height}" style="width:100%; height:100%; display:block;" preserveAspectRatio="xMidYMid meet">
+        <!-- Grid lines -->
+        <line x1="${padding.left}" y1="${padding.top}" x2="${width - padding.right}" y2="${padding.top}" stroke="#1e293b" stroke-dasharray="3 3"/>
+        <line x1="${padding.left}" y1="${padding.top + chartHeight/2}" x2="${width - padding.right}" y2="${padding.top + chartHeight/2}" stroke="#1e293b" stroke-dasharray="3 3"/>
+        <line x1="${padding.left}" y1="${padding.top + chartHeight}" x2="${width - padding.right}" y2="${padding.top + chartHeight}" stroke="#334155"/>
+        <!-- Bars -->
+        ${barsHtml}
+      </svg>
+    `;
+
+    dom.compLdpChartContainer.innerHTML = svg;
+  }
+
+  function exportComparisonCsv() {
+    const ldp = CWG_COMPARISON_DATA.ldpMonthly;
+    const lbh = CWG_COMPARISON_DATA.lbhMonthly;
+
+    let csv = 'Laporan Rekap Perbandingan Hub Cawang Today (Before vs After)\r\n';
+    csv += `Tanggal Rekap: ${new Date().toISOString().slice(0, 10)}\r\n\r\n`;
+
+    csv += 'Kategori,Bulan,Before (Rp),After (Rp),Delta (Rp),Progres\r\n';
+    ldp.forEach(r => {
+      const diff = r.after - r.before;
+      csv += `LDP,${r.monthCode} - ${r.monthName},${r.before},${r.after},${diff},"${diff < 0 ? 'Penurunan' : 'Tetap'}"\r\n`;
+    });
+    csv += `LDP,Grand Total,23614809,10492374,-13122435,"Penurunan -55.6%"\r\n\r\n`;
+
+    lbh.forEach(r => {
+      const diff = r.after - r.before;
+      csv += `LBH,${r.monthCode} - ${r.monthName},${r.before},${r.after},${diff},"${diff > 0 ? 'Surplus' : 'Penyesuaian'}"\r\n`;
+    });
+    csv += `LBH,Grand Total,6466914,6700075,+233161,"Penyesuaian +3.6%"\r\n`;
+
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `REKAP_PERBANDINGAN_CWG_3BULAN_${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
   // 10. MASTER RENDER PIPELINE
   // ══════════════════════════════════════════════════════════════════════════
   function renderAllCharts() {
@@ -1596,6 +2000,22 @@
   }
 
   function renderAll() {
+    updateHeaderTitles();
+
+    if (activeSidebarMenu === 'COMPARISON') {
+      if (dom.telemetryAnomalyView) dom.telemetryAnomalyView.style.display = 'none';
+      if (dom.comparisonAuditView) dom.comparisonAuditView.style.display = 'flex';
+      if (dom.anomalySlicersBox) dom.anomalySlicersBox.style.display = 'none';
+      if (dom.comparisonSlicersBox) dom.comparisonSlicersBox.style.display = 'block';
+      renderComparisonView();
+      return;
+    }
+
+    if (dom.telemetryAnomalyView) dom.telemetryAnomalyView.style.display = 'block';
+    if (dom.comparisonAuditView) dom.comparisonAuditView.style.display = 'none';
+    if (dom.anomalySlicersBox) dom.anomalySlicersBox.style.display = 'block';
+    if (dom.comparisonSlicersBox) dom.comparisonSlicersBox.style.display = 'none';
+
     applyFilters();
     renderKpiMetrics();
     renderAllCharts();

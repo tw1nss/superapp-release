@@ -158,6 +158,22 @@
             </span>
             <span class="nav-btn-badge" id="badgeCountBad">0</span>
           </button>
+
+          <!-- 5. REKAP & PERBANDINGAN 3 BULAN -->
+          <span class="nav-section-label" style="margin-top: 12px;">REKAP & AUDIT</span>
+          <button type="button" class="sidebar-nav-btn" data-menu="COMPARISON" id="sidebarNavBtnComparison" title="Buka data perbandingan 3 bulan sebelumnya & Before vs After">
+            <span class="nav-btn-left">
+              <span class="nav-btn-icon" style="color: #facc15;">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                  <line x1="18" y1="20" x2="18" y2="10"></line>
+                  <line x1="12" y1="20" x2="12" y2="4"></line>
+                  <line x1="6" y1="20" x2="6" y2="14"></line>
+                </svg>
+              </span>
+              <span>Perbandingan (3 Bulan)</span>
+            </span>
+            <span class="nav-btn-badge" style="background: rgba(250, 204, 21, 0.15); border: 1px solid rgba(250, 204, 21, 0.4); color: #facc15; font-weight: 800;">REPORT</span>
+          </button>
         </nav>
       </div>
 
@@ -208,6 +224,8 @@
       <!-- Dashboard Viewport Content -->
       <div class="dashboard-viewport">
 
+        <!-- ── WRAPPER 1: TELEMETRY ANOMALY VIEW (ALL, LDP, LBH, BADSTOCK) ── -->
+        <div id="telemetryAnomalyView">
         <!-- ── 6 KPI STATISTIC CARDS ── -->
         <section class="kpi-cards-grid">
           <!-- Total Produk -->
@@ -376,6 +394,298 @@
             </div>
           </div>
         </section>
+        </div> <!-- /#telemetryAnomalyView -->
+
+        <!-- ── WRAPPER 2: REKAP PERBANDINGAN 3 BULAN SEBELUMNYA & BEFORE-AFTER VIEW ── -->
+        <div id="comparisonAuditView" class="comparison-audit-view" style="display: none;">
+          <!-- Top Hub Cawang Today Banner -->
+          <div class="comparison-header-banner">
+            <div class="comparison-banner-top">
+              <div class="comparison-banner-title-group">
+                <span class="comparison-kicker-tag">REKAPITULASI PROSES AUDIT</span>
+                <h2 class="comparison-banner-title">Report Hub Cawang Today</h2>
+                <p class="comparison-banner-desc">Perbandingan Nilai Kerugian &amp; Surplus Fisik Sebelum vs Sesudah Investigasi Leader (Fokus 3 Bulan Terakhir)</p>
+              </div>
+              <div class="comparison-banner-actions">
+                <button type="button" class="btn-comp-action active" id="btnCompFocusLast3Months">
+                  <span>⭐ Fokus 3 Bulan (Agu, Sep, Okt)</span>
+                </button>
+                <button type="button" class="btn-comp-action" id="btnCompShowAllMonths">
+                  <span>📅 Semua Bulan (Feb - Okt)</span>
+                </button>
+                <button type="button" class="btn-comp-action outline" id="btnExportComparisonCsv" title="Download data perbandingan format CSV">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                  <span>Ekspor CSV</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- 3 Summary KPI Cards Today (Matching Screenshot Header) -->
+            <div class="comparison-kpi-summary-grid">
+              <!-- Bad Gantung -->
+              <div class="comp-summary-card card-bad">
+                <div class="comp-card-badge">BAD GANTUNG TODAY</div>
+                <div class="comp-card-val" id="compValBadToday">Rp849,570</div>
+                <div class="comp-card-delta-row">
+                  <span class="comp-delta-tag good">▼ -84.9% (Cleared)</span>
+                  <span class="comp-card-sub">Sebelumnya: <b>Rp5,624,012</b></span>
+                </div>
+              </div>
+
+              <!-- LDP -->
+              <div class="comp-summary-card card-ldp">
+                <div class="comp-card-badge">LDP (LOST/DAMAGE) TODAY</div>
+                <div class="comp-card-val" id="compValLdpToday">Rp10,492,374</div>
+                <div class="comp-card-delta-row">
+                  <span class="comp-delta-tag good">▼ -55.6% (-Rp13.12M)</span>
+                  <span class="comp-card-sub">Sebelumnya: <b>Rp23,614,809</b></span>
+                </div>
+              </div>
+
+              <!-- LBH -->
+              <div class="comp-summary-card card-lbh">
+                <div class="comp-card-badge">LBH (LEBIH/SURPLUS) TODAY</div>
+                <div class="comp-card-val" id="compValLbhToday">Rp6,700,075</div>
+                <div class="comp-card-delta-row">
+                  <span class="comp-delta-tag neutral">▲ +3.6% (+Rp233k)</span>
+                  <span class="comp-card-sub">Sebelumnya: <b>Rp6,466,914</b></span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- SECTION 1: BAD GANTUNG CATEGORY BREAKDOWN (BEFORE VS AFTER) -->
+          <div class="comp-block-section">
+            <div class="comp-block-header">
+              <div class="comp-block-title-wrap">
+                <span class="comp-block-number">01</span>
+                <div>
+                  <h3 class="comp-block-title">Category Breakdown Bad Gantung</h3>
+                  <p class="comp-block-sub">Perbandingan nilai stok barang gantung kategori Fresh &amp; Frozen (Sebelum vs Sesudah Tindakan)</p>
+                </div>
+              </div>
+              <span class="comp-recovery-pill good">🔥 Berhasil Dipulihkan: Rp 4,774,442 (-84.9%)</span>
+            </div>
+
+            <div class="comp-dual-grid">
+              <!-- BEFORE -->
+              <div class="comp-table-card card-before">
+                <div class="comp-table-badge-bar before">
+                  <span class="badge-tag">BEFORE</span>
+                  <span class="badge-title">Category Breakdown Bad Gantung</span>
+                </div>
+                <table class="comp-table">
+                  <thead>
+                    <tr>
+                      <th>Product Type</th>
+                      <th style="text-align: right;">Stock_value</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td>Fresh</td>
+                      <td class="cell-val">Rp5,025,913</td>
+                    </tr>
+                    <tr>
+                      <td>Frozen</td>
+                      <td class="cell-val">Rp598,099</td>
+                    </tr>
+                  </tbody>
+                  <tfoot>
+                    <tr class="grand-total-row">
+                      <td>Grand Total</td>
+                      <td class="cell-val bold">Rp5,624,012</td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+
+              <!-- AFTER -->
+              <div class="comp-table-card card-after">
+                <div class="comp-table-badge-bar after">
+                  <span class="badge-tag">AFTER</span>
+                  <span class="badge-title">Category Breakdown Bad Gantung</span>
+                </div>
+                <table class="comp-table">
+                  <thead>
+                    <tr>
+                      <th>Product Type</th>
+                      <th style="text-align: right;">Stock_value</th>
+                      <th style="text-align: right;">Penurunan / Delta</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td>Fresh</td>
+                      <td class="cell-val">Rp809,020</td>
+                      <td class="cell-delta good">▼ -83.9% (-Rp4.21M)</td>
+                    </tr>
+                    <tr>
+                      <td>Frozen</td>
+                      <td class="cell-val">Rp40,550</td>
+                      <td class="cell-delta good">▼ -93.2% (-Rp557k)</td>
+                    </tr>
+                  </tbody>
+                  <tfoot>
+                    <tr class="grand-total-row">
+                      <td>Grand Total</td>
+                      <td class="cell-val bold">Rp849,570</td>
+                      <td class="cell-delta good bold">▼ -84.9% (-Rp4.77M)</td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- SECTION 2: DETAIL BREAKDOWN LDP /MONTH (BEFORE VS AFTER) -->
+          <div class="comp-block-section">
+            <div class="comp-block-header">
+              <div class="comp-block-title-wrap">
+                <span class="comp-block-number">02</span>
+                <div>
+                  <h3 class="comp-block-title">Detail Breakdown LDP /Month</h3>
+                  <p class="comp-block-sub">Perbandingan tren kerugian LDP per bulan (Fokus sorot 3 bulan sebelumnya: Agustus, September &amp; Oktober)</p>
+                </div>
+              </div>
+              <span class="comp-recovery-pill good">📉 Penurunan Kerugian LDP: -Rp 13,122,435 (-55.6%)</span>
+            </div>
+
+            <!-- Monthly Comparison Visual Chart Bar for LDP -->
+            <div class="comp-chart-card">
+              <div class="comp-chart-header">
+                <span class="comp-chart-title">Visualisasi Tren LDP: Sebelum vs Sesudah (Perbandingan Bulanan)</span>
+                <span class="comp-chart-legend">
+                  <span class="legend-dot before"></span> Before
+                  <span class="legend-dot after"></span> After
+                </span>
+              </div>
+              <div id="compLdpChartContainer" class="comp-chart-svg-wrap"></div>
+            </div>
+
+            <div class="comp-dual-grid">
+              <!-- BEFORE -->
+              <div class="comp-table-card card-before">
+                <div class="comp-table-badge-bar before">
+                  <span class="badge-tag">BEFORE</span>
+                  <span class="badge-title">Detail Breakdown LDP /Month</span>
+                </div>
+                <table class="comp-table" id="tableLdpBefore">
+                  <thead>
+                    <tr>
+                      <th>Month</th>
+                      <th style="text-align: right;">Stock_value</th>
+                    </tr>
+                  </thead>
+                  <tbody id="tbodyLdpBefore">
+                    <!-- Dynamic rendering -->
+                  </tbody>
+                  <tfoot>
+                    <tr class="grand-total-row">
+                      <td>Grand Total</td>
+                      <td class="cell-val bold" id="grandLdpBefore">Rp23,614,809</td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+
+              <!-- AFTER -->
+              <div class="comp-table-card card-after">
+                <div class="comp-table-badge-bar after">
+                  <span class="badge-tag">AFTER</span>
+                  <span class="badge-title">Detail Breakdown LDP /Month</span>
+                </div>
+                <table class="comp-table" id="tableLdpAfter">
+                  <thead>
+                    <tr>
+                      <th>Month</th>
+                      <th style="text-align: right;">Stock_value</th>
+                      <th style="text-align: right;">Delta Pemulihan</th>
+                    </tr>
+                  </thead>
+                  <tbody id="tbodyLdpAfter">
+                    <!-- Dynamic rendering -->
+                  </tbody>
+                  <tfoot>
+                    <tr class="grand-total-row">
+                      <td>Grand Total</td>
+                      <td class="cell-val bold" id="grandLdpAfter">Rp10,492,374</td>
+                      <td class="cell-delta good bold" id="grandLdpDelta">▼ -55.6%</td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- SECTION 3: DETAIL BREAKDOWN LBH /MONTH (BEFORE VS AFTER) -->
+          <div class="comp-block-section">
+            <div class="comp-block-header">
+              <div class="comp-block-title-wrap">
+                <span class="comp-block-number">03</span>
+                <div>
+                  <h3 class="comp-block-title">Detail Breakdown LBH /Month</h3>
+                  <p class="comp-block-sub">Perbandingan rekonsiliasi barang surplus fisik LBH (Sebelum vs Sesudah Penyesuaian Sistem)</p>
+                </div>
+              </div>
+              <span class="comp-recovery-pill neutral">📦 Penyesuaian Fisik LBH: +Rp 233,161 (+3.6%)</span>
+            </div>
+
+            <div class="comp-dual-grid">
+              <!-- BEFORE -->
+              <div class="comp-table-card card-before">
+                <div class="comp-table-badge-bar before">
+                  <span class="badge-tag">BEFORE</span>
+                  <span class="badge-title">Detail Breakdown LBH /Month</span>
+                </div>
+                <table class="comp-table" id="tableLbhBefore">
+                  <thead>
+                    <tr>
+                      <th>Month</th>
+                      <th style="text-align: right;">Stock Value</th>
+                    </tr>
+                  </thead>
+                  <tbody id="tbodyLbhBefore">
+                    <!-- Dynamic rendering -->
+                  </tbody>
+                  <tfoot>
+                    <tr class="grand-total-row">
+                      <td>Grand Total</td>
+                      <td class="cell-val bold" id="grandLbhBefore">Rp6,466,914</td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+
+              <!-- AFTER -->
+              <div class="comp-table-card card-after">
+                <div class="comp-table-badge-bar after">
+                  <span class="badge-tag">AFTER</span>
+                  <span class="badge-title">Detail Breakdown LBH /Month</span>
+                </div>
+                <table class="comp-table" id="tableLbhAfter">
+                  <thead>
+                    <tr>
+                      <th>Month</th>
+                      <th style="text-align: right;">Stock Value</th>
+                      <th style="text-align: right;">Penyesuaian</th>
+                    </tr>
+                  </thead>
+                  <tbody id="tbodyLbhAfter">
+                    <!-- Dynamic rendering -->
+                  </tbody>
+                  <tfoot>
+                    <tr class="grand-total-row">
+                      <td>Grand Total</td>
+                      <td class="cell-val bold" id="grandLbhAfter">Rp6,700,075</td>
+                      <td class="cell-delta neutral bold" id="grandLbhDelta">▲ +3.6%</td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
 
       </div>
 
@@ -385,6 +695,7 @@
         <button type="button" class="bottom-tab-item" data-tab="ldp">LDP Details</button>
         <button type="button" class="bottom-tab-item" data-tab="lbh">LBH Details</button>
         <button type="button" class="bottom-tab-item" data-tab="badstock">BADSTOCK Log</button>
+        <button type="button" class="bottom-tab-item" data-tab="comparison">📊 Perbandingan 3 Bulan</button>
         <button type="button" class="bottom-tab-item" data-tab="input_manual">➕ Input Temuan</button>
       </footer>
     </main>
@@ -399,6 +710,8 @@
         <button type="button" id="btnResetSlicers" class="btn-reset-slicers">Reset</button>
       </div>
 
+      <!-- ── SLICERS CONTAINER FOR TELEMETRY ANOMALIES ── -->
+      <div id="anomalySlicersBox">
       <!-- Slicer 1: Kategori Produk -->
       <div class="slicer-box">
         <div class="slicer-box-header">
@@ -478,6 +791,53 @@
           <input type="checkbox" id="slicerPicExcludeCheck">
           <span>Kecualikan PIC Terpilih</span>
         </label>
+      </div>
+      </div> <!-- /#anomalySlicersBox -->
+
+      <!-- ── SLICERS CONTAINER FOR REKAP & PERBANDINGAN 3 BULAN ── -->
+      <div id="comparisonSlicersBox" style="display: none;">
+        <!-- Slicer A: Filter Rentang Bulan -->
+        <div class="slicer-box">
+          <div class="slicer-box-header">
+            <span class="slicer-box-title">Rentang Bulan Rekap</span>
+            <span class="slicer-box-icons">📅</span>
+          </div>
+          <div class="slicer-chips-grid">
+            <button type="button" class="slicer-chip-btn active full-width" data-comp-month="LAST_3_MONTHS" id="slicerCompLast3Btn">⭐ 3 Bulan Terakhir (Agu, Sep, Okt)</button>
+            <button type="button" class="slicer-chip-btn full-width" data-comp-month="ALL" id="slicerCompAllMonthsBtn">📅 Semua Riwayat (Feb - Okt)</button>
+            <button type="button" class="slicer-chip-btn" data-comp-month="10">10 - Oktober</button>
+            <button type="button" class="slicer-chip-btn" data-comp-month="09">09 - September</button>
+            <button type="button" class="slicer-chip-btn full-width" data-comp-month="08">08 - Agustus</button>
+          </div>
+        </div>
+
+        <!-- Slicer B: Fokus Kategori -->
+        <div class="slicer-box">
+          <div class="slicer-box-header">
+            <span class="slicer-box-title">Fokus Kategori Tabel</span>
+            <span class="slicer-box-icons">🎛️</span>
+          </div>
+          <div class="slicer-chips-grid">
+            <button type="button" class="slicer-chip-btn active full-width" data-comp-cat="ALL">Tampilkan Semua (3 Tabel)</button>
+            <button type="button" class="slicer-chip-btn full-width" data-comp-cat="BAD_GANTUNG">Bad Gantung Saja</button>
+            <button type="button" class="slicer-chip-btn" data-comp-cat="LDP">LDP Saja</button>
+            <button type="button" class="slicer-chip-btn" data-comp-cat="LBH">LBH Saja</button>
+          </div>
+        </div>
+
+        <!-- Telemetry Summary Widget -->
+        <div class="slicer-box" style="background: rgba(16, 185, 129, 0.08); border-color: rgba(16, 185, 129, 0.25);">
+          <div class="slicer-box-header">
+            <span class="slicer-box-title" style="color: #6ee7b7;">Total Loss Teratasi</span>
+            <span class="slicer-box-icons">✅</span>
+          </div>
+          <div style="font-family: var(--font-mono); font-size: 1.15rem; font-weight: 800; color: #10b981; margin: 4px 0;">
+            -Rp 17,896,877
+          </div>
+          <div style="font-size: 0.76rem; color: #94a3b8; line-height: 1.4;">
+            Penurunan drastis nilai selisih kerugian (LDP &amp; Bad Gantung) setelah audit leader.
+          </div>
+        </div>
       </div>
 
     </aside>
