@@ -597,9 +597,9 @@ function setupPinjamanSheetsManual() {
 function recoverMisplacedDccFromPinjaman() {
   try {
     var ss = getPinjamanSpreadsheet();
-    var pinjamSheet = ss.getSheetByName('Pinjaman Barang CWG');
+    var pinjamSheet = ss.getSheetByName('Pinjaman Barang MTG') || ss.getSheetByName('Pinjaman Barang CWG');
     if (!pinjamSheet || pinjamSheet.getLastRow() < 2) {
-      return { status: 'info', message: 'Sheet Pinjaman Barang CWG kosong atau tidak ditemukan.' };
+      return { status: 'info', message: 'Sheet Pinjaman Barang MTG / CWG kosong atau tidak ditemukan.' };
     }
 
     var hasilDccSheet = ss.getSheetByName('Hasil DCC') || ss.insertSheet('Hasil DCC');

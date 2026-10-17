@@ -54,9 +54,17 @@ var EDC_SHEETS = {
 };
 
 // ==============================================================================
+// ==============================================================================
 // 🔍 HELPER SPREADSHEET (BISA STANDALONE ATAU BOUND SPREADSHEET)
 // ==============================================================================
 function getEdCorrectionSpreadsheet() {
+  // 1. Selalu utamakan spreadsheet yang sedang aktif dibuka oleh user
+  try {
+    var active = SpreadsheetApp.getActiveSpreadsheet();
+    if (active) return active;
+  } catch (eActive) { }
+
+  // 2. Fallback untuk eksekusi headless (WebApp / Trigger Background)
   try {
     var customId = PropertiesService.getScriptProperties().getProperty('ED_CORRECTION_SHEET_ID');
     var targetId = customId || EDC_CONFIG.DEFAULT_TARGET_ID;
@@ -65,9 +73,9 @@ function getEdCorrectionSpreadsheet() {
       return SpreadsheetApp.openById(targetId.trim());
     }
   } catch (e) {
-    console.warn("Gagal openById ED Correction, menggunakan Active Spreadsheet:", e);
+    console.warn("Gagal openById ED Correction:", e);
   }
-  return SpreadsheetApp.getActiveSpreadsheet();
+  return null;
 }
 
 function getEdCorrectionSheet(type) {
@@ -106,21 +114,50 @@ function getEdCorrectionSheet(type) {
 // ==============================================================================
 // 🔘 TRIGGER ON OPEN & PEMBUATAN MENU
 // ==============================================================================
-function onOpen() {
-  var ui = SpreadsheetApp.getUi();
-  // Panggil menu Superset, DCC, EDS, dan Pinjaman jika terintegrasi dalam 1 project
-  if (typeof buildSupersetMenu === 'function') buildSupersetMenu(ui);
-  if (typeof buildDccMenu === 'function') buildDccMenu(ui);
-  if (typeof buildPinjamanMenu === 'function') buildPinjamanMenu(ui);
-  if (typeof buildEdSweeperMenu === 'function') buildEdSweeperMenu(ui);
-
-  // Pasang trigger auto-backup harian ED Correction (23:30 WIB)
+/**
+ * Trigger standar Google Sheets saat spreadsheet dibuka.
+ * Wajib bernama 'onOpen' agar Google Sheets mengeksekusi otomatis.
+ */
+function onOpen(e) {
+  var ui;
   try {
-    ensureDailyBackupTriggerEdCorrection();
-  } catch (eTrig) { }
+    ui = SpreadsheetApp.getUi();
+  } catch (errUi) {
+    console.warn("Tidak dapat mengakses UI Spreadsheet (mungkin standalone / headless):", errUi);
+    return;
+  }
 
-  // Bangun Menu Utama ED Correction
-  buildEdCorrectionMenu(ui);
+  // 1. Bangun Menu Utama ED Correction (Prioritas Utama)
+  try {
+    buildEdCorrectionMenu(ui);
+  } catch (eEdc) {
+    console.error("Gagal membangun menu ED Correction:", eEdc);
+  }
+
+  // 2. Panggil menu lain jika file digabung dalam 1 project Google Apps Script
+  try { if (typeof buildSupersetMenu === 'function') buildSupersetMenu(ui); } catch (e1) { }
+  try { if (typeof buildDccMenu === 'function') buildDccMenu(ui); } catch (e2) { }
+  try { if (typeof buildPinjamanMenu === 'function') buildPinjamanMenu(ui); } catch (e3) { }
+  try { if (typeof buildEdSweeperMenu === 'function') buildEdSweeperMenu(ui); } catch (e4) { }
+  try { if (typeof buildKoliInboundMenu === 'function') buildKoliInboundMenu(ui); } catch (e5) { }
+  try { if (typeof buildJadwalMenu === 'function') buildJadwalMenu(ui); } catch (e6) { }
+}
+
+/**
+ * Alias manual untuk memuat ulang menu dari editor Apps Script atau file lain
+ */
+function onOpenEdCorrectionStandalone() {
+  onOpen();
+}
+
+function reloadEdCorrectionMenu() {
+  onOpen();
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    if (ss && typeof ss.toast === "function") {
+      ss.toast("Menu ✏️ ED Correction Control berhasil dimuat!", "Sukses", 4);
+    }
+  } catch (e) { }
 }
 
 function buildEdCorrectionMenu(ui) {

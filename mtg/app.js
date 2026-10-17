@@ -4246,13 +4246,10 @@
   window.refreshDccData = function () {
     try {
       localStorage.removeItem(DCC_MAIN_CACHE_KEY);
-      localStorage.removeItem(DCC_SUBMITTED_CACHE_KEY);
+      // NOTE: DO NOT delete DCC_SUBMITTED_CACHE_KEY so locally submitted SKUs are preserved across refresh!
     } catch (e) {}
     dccTask1List = [];
     dccTask2List = [];
-    dccSubmittedTask1Set = new Set();
-    dccSubmittedTask2Set = new Set();
-    dccSubmittedSkuSet = new Set();
     if (currentDccTab === 'report') {
       fetchDccReport(true);
     } else {
@@ -4743,7 +4740,11 @@
       const stockVal = item.stock !== undefined && item.stock !== '' ? item.stock : '0';
       const slocVal = item.slocExisting || 'Belum ada SLOC';
       const skuClean = (item.sku || '').trim().toLowerCase();
-      const isSubmitted = activeSubmittedSet.has(skuClean) || dccSubmittedSkuSet.has(skuClean);
+      const skuNorm = skuClean.replace(/^0+/, '');
+      const isSubmitted = item.status === 'DONE' ||
+        activeSubmittedSet.has(skuClean) ||
+        dccSubmittedSkuSet.has(skuClean) ||
+        (skuNorm && (activeSubmittedSet.has(skuNorm) || dccSubmittedSkuSet.has(skuNorm)));
 
       const statusBadge = isSubmitted
         ? `<span class="dcc-card-status-badge submitted">✅ Sudah Diinput</span>`
@@ -4847,6 +4848,35 @@
             dccSubmittedTask2Set = new Set(parsed.submitted2 || []);
             dccHasil1Rows = parsed.hasil1 || [];
             dccHasil2Rows = parsed.hasil2 || [];
+
+            // Restore dccSubmittedSkuSet from dedicated cache
+            try {
+              const submittedCache = localStorage.getItem(DCC_SUBMITTED_CACHE_KEY);
+              if (submittedCache) {
+                const submittedArr = JSON.parse(submittedCache);
+                if (Array.isArray(submittedArr)) {
+                  submittedArr.forEach(s => {
+                    if (s) dccSubmittedSkuSet.add(String(s).trim().toLowerCase());
+                  });
+                }
+              }
+            } catch (eS) {}
+            // Also union from task-specific sets
+            dccSubmittedTask1Set.forEach(s => dccSubmittedSkuSet.add(String(s).trim().toLowerCase()));
+            dccSubmittedTask2Set.forEach(s => dccSubmittedSkuSet.add(String(s).trim().toLowerCase()));
+
+            // Update item statuses to DONE
+            [...dccTask1List, ...dccTask2List].forEach(it => {
+              const sc = (it.sku || '').trim().toLowerCase();
+              const sn = sc.replace(/^0+/, '');
+              if (it.status === 'DONE' || dccSubmittedSkuSet.has(sc) || (sn && dccSubmittedSkuSet.has(sn))) {
+                it.status = 'DONE';
+                if (it.task === 'task1') dccSubmittedTask1Set.add(sc);
+                else dccSubmittedTask2Set.add(sc);
+                dccSubmittedSkuSet.add(sc);
+              }
+            });
+
             dccMainListData = [...dccTask1List, ...dccTask2List];
             enrichAllDccListsWithSupersheet();
             filterDccMainList();
@@ -4866,10 +4896,11 @@
     try {
       const p2 = getDccPetugas2Name() || 'Petugas Siang';
 
-      // Fetch Mainlist SKU and Hasil DCC in parallel
-      const [resMain, resHasilDcc] = await Promise.all([
+      // Fetch Mainlist SKU, Hasil DCC, and Pinjaman Sheet in parallel
+      const [resMain, resHasilDcc, resPinjaman] = await Promise.all([
         fetch(DCC_MAIN_SHEET_URL + '&_t=' + Date.now()).catch(() => null),
-        fetch(DCC_HASIL_SHEET_URL + '&_t=' + Date.now()).catch(() => null)
+        fetch(DCC_HASIL_SHEET_URL + '&_t=' + Date.now()).catch(() => null),
+        fetch(DCC_BASE_SHEET_URL + '&sheet=' + encodeURIComponent('Pinjaman Barang MTG') + '&_t=' + Date.now()).catch(() => null)
       ]);
 
       let parsedFromMainlist = false;
@@ -5001,48 +5032,125 @@
         dccHasil1Rows = [];
         dccHasil2Rows = [];
 
-        // Fast lookup for items explicitly marked as PENDING in Mainlist SKU
-        const pendingSkuMap = new Set();
-        if (parsedFromMainlist) {
-          [...dccTask1List, ...dccTask2List].forEach(it => {
-            if (it.status === 'PENDING') {
-              if (it.sku) pendingSkuMap.add(it.sku.toLowerCase());
-            }
-          });
-        }
-
         for (const row of parsedHasilDcc.rows) {
           const sku1 = (row[1] || '').trim().toLowerCase();
           const sku17 = (row[17] || '').trim().toLowerCase();
           const inputBy = (row[18] || '').trim().toLowerCase();
+          const targetSku = (sku1 || sku17).replace(/\|.*$/, '').trim();
+          if (!targetSku) continue;
 
-          const isExplicitPending = pendingSkuMap.has(sku1) || (sku17 && pendingSkuMap.has(sku17));
-
-          const isTask1Item = inputBy.includes('bintang') || (sku1 && dccTask1List.some(it => it.sku.toLowerCase() === sku1));
+          const isTask1Item = inputBy.includes('bintang') || (targetSku && dccTask1List.some(it => it.sku.toLowerCase() === targetSku));
           if (isTask1Item) {
             dccHasil1Rows.push(row);
-            if (!isExplicitPending) {
-              if (sku1) dccSubmittedTask1Set.add(sku1);
-              if (sku17) dccSubmittedTask1Set.add(sku17);
-            }
+            dccSubmittedTask1Set.add(targetSku);
           } else {
             dccHasil2Rows.push(row);
-            if (!isExplicitPending) {
-              if (sku1) dccSubmittedTask2Set.add(sku1);
-              if (sku17) dccSubmittedTask2Set.add(sku17);
-            }
+            dccSubmittedTask2Set.add(targetSku);
           }
-          if (!isExplicitPending) {
-            if (sku1) dccSubmittedSkuSet.add(sku1);
-            if (sku17) dccSubmittedSkuSet.add(sku17);
+          dccSubmittedSkuSet.add(targetSku);
+
+          const targetNorm = targetSku.replace(/^0+/, '');
+          const found = [...dccTask1List, ...dccTask2List].find(it => {
+            const itSku = (it.sku || '').trim().toLowerCase();
+            return itSku === targetSku || (targetNorm && itSku.replace(/^0+/, '') === targetNorm);
+          });
+          if (found) {
+            found.status = 'DONE';
+            const normFoundSku = (found.sku || '').trim().toLowerCase();
+            if (found.task === 'task1') {
+              dccSubmittedTask1Set.add(normFoundSku);
+            } else {
+              dccSubmittedTask2Set.add(normFoundSku);
+            }
+            dccSubmittedSkuSet.add(normFoundSku);
           }
         }
       }
 
+      // 3. Fallback: Parse Pinjaman Barang MTG (Recover any DCC submissions routed to Pinjaman)
+      if (resPinjaman && resPinjaman.ok) {
+        try {
+          const textPinjaman = await resPinjaman.text();
+          const pinjamanRows = parseCSV(textPinjaman);
+          if (pinjamanRows && pinjamanRows.length > 1) {
+            for (let p = 1; p < pinjamanRows.length; p++) {
+              const pRow = pinjamanRows[p];
+              if (!pRow || pRow.length < 3) continue;
+              const pSku = (pRow[2] || '').trim().toLowerCase();
+              if (!pSku) continue;
+              const pClean = pSku.includes('|') ? pSku.split('|')[0].trim() : pSku;
+
+              // Check if this SKU belongs to our DCC tasks
+              const matchT1 = dccTask1List.find(it => it.sku.toLowerCase() === pClean);
+              const matchT2 = dccTask2List.find(it => it.sku.toLowerCase() === pClean);
+              if (matchT1 || matchT2) {
+                dccSubmittedSkuSet.add(pClean);
+                if (matchT1) {
+                  dccSubmittedTask1Set.add(pClean);
+                  matchT1.status = 'DONE';
+                }
+                if (matchT2) {
+                  dccSubmittedTask2Set.add(pClean);
+                  matchT2.status = 'DONE';
+                }
+              }
+            }
+          }
+        } catch (ePinjamParse) {}
+      }
+
+      // 4. Merge locally cached submitted SKUs (Guarantees zero-loss on refresh / offline lag)
+      try {
+        const localSubmittedRaw = localStorage.getItem(DCC_SUBMITTED_CACHE_KEY);
+        if (localSubmittedRaw) {
+          const localArr = JSON.parse(localSubmittedRaw);
+          if (Array.isArray(localArr)) {
+            localArr.forEach(sku => {
+              if (!sku) return;
+              const sClean = String(sku).trim().toLowerCase();
+              dccSubmittedSkuSet.add(sClean);
+              const matchT1 = dccTask1List.find(it => it.sku.toLowerCase() === sClean);
+              const matchT2 = dccTask2List.find(it => it.sku.toLowerCase() === sClean);
+              if (matchT1) {
+                dccSubmittedTask1Set.add(sClean);
+                matchT1.status = 'DONE';
+              } else if (matchT2) {
+                dccSubmittedTask2Set.add(sClean);
+                matchT2.status = 'DONE';
+              }
+            });
+          }
+        }
+      } catch (eM) {}
+
+      // 5. Merge items from offline queue
+      try {
+        if (typeof getOfflineQueueItems === 'function') {
+          const qItems = await getOfflineQueueItems();
+          if (Array.isArray(qItems)) {
+            qItems.forEach(q => {
+              const qSku = (q.sku || q.skuNo || q.skuNumber || '').trim().toLowerCase();
+              if (qSku) {
+                dccSubmittedSkuSet.add(qSku);
+                const matchT1 = dccTask1List.find(it => it.sku.toLowerCase() === qSku);
+                const matchT2 = dccTask2List.find(it => it.sku.toLowerCase() === qSku);
+                if (matchT1) {
+                  dccSubmittedTask1Set.add(qSku);
+                  matchT1.status = 'DONE';
+                } else if (matchT2) {
+                  dccSubmittedTask2Set.add(qSku);
+                  matchT2.status = 'DONE';
+                }
+              }
+            });
+          }
+        }
+      } catch (eQ) {}
+
       dccMainListData = [...dccTask1List, ...dccTask2List];
       enrichAllDccListsWithSupersheet();
 
-      // Save cache
+      // Persist merged submitted set back to storage
       try {
         localStorage.setItem(DCC_MAIN_CACHE_KEY, JSON.stringify({
           task1: dccTask1List,
@@ -5052,6 +5160,7 @@
           hasil1: dccHasil1Rows,
           hasil2: dccHasil2Rows
         }));
+        localStorage.setItem(DCC_SUBMITTED_CACHE_KEY, JSON.stringify(Array.from(dccSubmittedSkuSet)));
       } catch (e) {}
 
       filterDccMainList();
@@ -5087,7 +5196,12 @@
     let countSubmitted = 0;
     baseList.forEach(item => {
       const skuClean = (item.sku || '').trim().toLowerCase();
-      if (activeSubmittedSet.has(skuClean) || dccSubmittedSkuSet.has(skuClean)) {
+      const skuNorm = skuClean.replace(/^0+/, '');
+      const isDone = item.status === 'DONE' ||
+        activeSubmittedSet.has(skuClean) ||
+        dccSubmittedSkuSet.has(skuClean) ||
+        (skuNorm && (activeSubmittedSet.has(skuNorm) || dccSubmittedSkuSet.has(skuNorm)));
+      if (isDone) {
         countSubmitted++;
       }
     });
@@ -5114,12 +5228,20 @@
     if (currentDccStatusFilter === 'submitted') {
       filtered = filtered.filter(item => {
         const skuClean = (item.sku || '').trim().toLowerCase();
-        return activeSubmittedSet.has(skuClean) || dccSubmittedSkuSet.has(skuClean);
+        const skuNorm = skuClean.replace(/^0+/, '');
+        return item.status === 'DONE' ||
+          activeSubmittedSet.has(skuClean) ||
+          dccSubmittedSkuSet.has(skuClean) ||
+          (skuNorm && (activeSubmittedSet.has(skuNorm) || dccSubmittedSkuSet.has(skuNorm)));
       });
     } else if (currentDccStatusFilter === 'pending') {
       filtered = filtered.filter(item => {
         const skuClean = (item.sku || '').trim().toLowerCase();
-        const isDone = activeSubmittedSet.has(skuClean) || dccSubmittedSkuSet.has(skuClean);
+        const skuNorm = skuClean.replace(/^0+/, '');
+        const isDone = item.status === 'DONE' ||
+          activeSubmittedSet.has(skuClean) ||
+          dccSubmittedSkuSet.has(skuClean) ||
+          (skuNorm && (activeSubmittedSet.has(skuNorm) || dccSubmittedSkuSet.has(skuNorm)));
         return !isDone;
       });
     }
@@ -5875,6 +5997,8 @@
     });
 
     const payload = {
+      action: 'saveDccScreening',
+      module: 'dcc',
       timestamp: timestamp,
       skuNumber: skuNo,
       sku: skuNo,

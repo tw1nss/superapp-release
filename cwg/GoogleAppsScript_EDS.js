@@ -1419,6 +1419,8 @@ function handleDccSubmit(payload) {
         const cleanBase64_1 = payload.imageBase64.replace(/^data:image\/(png|jpeg|jpg);base64,/, "");
         const decoded1 = Utilities.base64Decode(cleanBase64_1);
         const blob1 = Utilities.newBlob(decoded1, 'image/jpeg', evidance1Name);
+        const file1 = folder.createFile(blob1);
+        file1.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
         const fileId1 = file1.getId();
         evidanceLink1 = file1.getUrl();
         // Gunakan formula IMAGE agar foto fisik langsung tampil sebagai gambar thumbnail di dalam sel Google Sheets
