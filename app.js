@@ -3400,9 +3400,9 @@
   const DCC_REPORT_URL = DCC_BASE_SHEET_URL + '&sheet=Report';
   const DCC_WEBAPP_URL = 'https://script.google.com/macros/s/AKfycbzRhVQZEv3TJwTfUhKKV0QtzexKvMS8mfz-iE72LiVRLKulE4_IlU4IW10rII8k7ICpLQ/exec';
 
-  const DCC_MAIN_CACHE_KEY = 'DCC_MAIN_CACHE_MTG_V11';
-  const DCC_REPORT_CACHE_KEY = 'DCC_REPORT_CACHE_MTG_V9';
-  const DCC_SUBMITTED_CACHE_KEY = 'DCC_SUBMITTED_CACHE_MTG_V9';
+  const DCC_MAIN_CACHE_KEY = 'DCC_MAIN_CACHE_MTG_V12';
+  const DCC_REPORT_CACHE_KEY = 'DCC_REPORT_CACHE_MTG_V10';
+  const DCC_SUBMITTED_CACHE_KEY = 'DCC_SUBMITTED_CACHE_MTG_V12';
   const DCC_PETUGAS2_KEY = 'DCC_PETUGAS2_NAME_V1';
   const DCC_PIN_KEY = 'DCC_AUTH_PIN_KEY_V1';
   const DCC_PIN_DEFAULT = '071107';
@@ -4246,10 +4246,15 @@
   window.refreshDccData = function () {
     try {
       localStorage.removeItem(DCC_MAIN_CACHE_KEY);
-      // NOTE: DO NOT delete DCC_SUBMITTED_CACHE_KEY so locally submitted SKUs are preserved across refresh!
+      localStorage.removeItem(DCC_SUBMITTED_CACHE_KEY);
     } catch (e) {}
     dccTask1List = [];
     dccTask2List = [];
+    dccSubmittedSkuSet = new Set();
+    dccSubmittedTask1Set = new Set();
+    dccSubmittedTask2Set = new Set();
+    dccHasil1Rows = [];
+    dccHasil2Rows = [];
     if (currentDccTab === 'report') {
       fetchDccReport(true);
     } else {
@@ -4896,11 +4901,10 @@
     try {
       const p2 = getDccPetugas2Name() || 'Petugas Siang';
 
-      // Fetch Mainlist SKU, Hasil DCC, and Pinjaman Sheet in parallel
-      const [resMain, resHasilDcc, resPinjaman] = await Promise.all([
+      // Fetch Mainlist SKU and Hasil DCC in parallel (DCC is strictly isolated from Pinjaman)
+      const [resMain, resHasilDcc] = await Promise.all([
         fetch(DCC_MAIN_SHEET_URL + '&_t=' + Date.now()).catch(() => null),
-        fetch(DCC_HASIL_SHEET_URL + '&_t=' + Date.now()).catch(() => null),
-        fetch(DCC_BASE_SHEET_URL + '&sheet=' + encodeURIComponent('Pinjaman Barang MTG') + '&_t=' + Date.now()).catch(() => null)
+        fetch(DCC_HASIL_SHEET_URL + '&_t=' + Date.now()).catch(() => null)
       ]);
 
       let parsedFromMainlist = false;
@@ -5067,61 +5071,31 @@
         }
       }
 
-      // 3. Fallback: Parse Pinjaman Barang MTG (Recover any DCC submissions routed to Pinjaman)
-      if (resPinjaman && resPinjaman.ok) {
+      // 3. Merge locally cached submitted SKUs if not hard-refreshing
+      if (!forceRefresh) {
         try {
-          const textPinjaman = await resPinjaman.text();
-          const pinjamanRows = parseCSV(textPinjaman);
-          if (pinjamanRows && pinjamanRows.length > 1) {
-            for (let p = 1; p < pinjamanRows.length; p++) {
-              const pRow = pinjamanRows[p];
-              if (!pRow || pRow.length < 3) continue;
-              const pSku = (pRow[2] || '').trim().toLowerCase();
-              if (!pSku) continue;
-              const pClean = pSku.includes('|') ? pSku.split('|')[0].trim() : pSku;
-
-              // Check if this SKU belongs to our DCC tasks
-              const matchT1 = dccTask1List.find(it => it.sku.toLowerCase() === pClean);
-              const matchT2 = dccTask2List.find(it => it.sku.toLowerCase() === pClean);
-              if (matchT1 || matchT2) {
-                dccSubmittedSkuSet.add(pClean);
+          const localSubmittedRaw = localStorage.getItem(DCC_SUBMITTED_CACHE_KEY);
+          if (localSubmittedRaw) {
+            const localArr = JSON.parse(localSubmittedRaw);
+            if (Array.isArray(localArr)) {
+              localArr.forEach(sku => {
+                if (!sku) return;
+                const sClean = String(sku).trim().toLowerCase();
+                dccSubmittedSkuSet.add(sClean);
+                const matchT1 = dccTask1List.find(it => it.sku.toLowerCase() === sClean);
+                const matchT2 = dccTask2List.find(it => it.sku.toLowerCase() === sClean);
                 if (matchT1) {
-                  dccSubmittedTask1Set.add(pClean);
+                  dccSubmittedTask1Set.add(sClean);
                   matchT1.status = 'DONE';
-                }
-                if (matchT2) {
-                  dccSubmittedTask2Set.add(pClean);
+                } else if (matchT2) {
+                  dccSubmittedTask2Set.add(sClean);
                   matchT2.status = 'DONE';
                 }
-              }
+              });
             }
           }
-        } catch (ePinjamParse) {}
+        } catch (eM) {}
       }
-
-      // 4. Merge locally cached submitted SKUs (Guarantees zero-loss on refresh / offline lag)
-      try {
-        const localSubmittedRaw = localStorage.getItem(DCC_SUBMITTED_CACHE_KEY);
-        if (localSubmittedRaw) {
-          const localArr = JSON.parse(localSubmittedRaw);
-          if (Array.isArray(localArr)) {
-            localArr.forEach(sku => {
-              if (!sku) return;
-              const sClean = String(sku).trim().toLowerCase();
-              dccSubmittedSkuSet.add(sClean);
-              const matchT1 = dccTask1List.find(it => it.sku.toLowerCase() === sClean);
-              const matchT2 = dccTask2List.find(it => it.sku.toLowerCase() === sClean);
-              if (matchT1) {
-                dccSubmittedTask1Set.add(sClean);
-                matchT1.status = 'DONE';
-              } else if (matchT2) {
-                dccSubmittedTask2Set.add(sClean);
-                matchT2.status = 'DONE';
-              }
-            });
-          }
-        }
-      } catch (eM) {}
 
       // 5. Merge items from offline queue
       try {
