@@ -1252,55 +1252,204 @@ function resetMainlistSkuPrompt() {
 // ==============================================================================
 // 📦 BACKUP DCC KE HISTORICAL DATA (KOLOM G TERISI)
 // ==============================================================================
+function cleanDccCellValue(val) {
+  if (val === undefined || val === null) {
+    return "";
+  }
+  if (val instanceof Date) {
+    if (isNaN(val.getTime())) return "";
+    return val;
+  }
+  if (typeof val === "number") {
+    if (isNaN(val) || !isFinite(val)) return "";
+    return val;
+  }
+  if (typeof val === "boolean") {
+    return val;
+  }
+  if (typeof val === "string") {
+    var s = val.trim();
+    if (!s) return "";
+    if (s.charAt(0) === "=" || s.indexOf("#REF!") === 0) {
+      return "'" + s;
+    }
+    return val;
+  }
+  return String(val);
+}
+
 function copyDccToHistorical() {
-  var ss = getSpreadsheet();
-  var source = ss.getSheetByName("Hasil DCC");
-  var target = ss.getSheetByName("Historical Data") || ss.insertSheet("Historical Data");
-
-  if (!source) {
-    return alertUser("❌ Sheet 'Hasil DCC' tidak ditemukan.");
+  var lock = LockService.getDocumentLock();
+  var hasLock = false;
+  try {
+    hasLock = lock.tryLock(30000); // Kunci hingga 30 detik untuk mencegah bentrok proses lain
+  } catch (eLock) {
+    console.warn("LockService notice:", eLock);
   }
 
-  var data = source.getDataRange().getValues();
+  try {
+    var ss = getSpreadsheet();
+    var source = ss.getSheetByName("Hasil DCC");
+    var target = ss.getSheetByName("Historical Data") || ss.insertSheet("Historical Data");
 
-  if (data.length <= 1) {
-    return alertUser("⚠️ Tidak ada data di 'Hasil DCC'.");
+    if (!source) {
+      return alertUser("❌ Sheet 'Hasil DCC' tidak ditemukan di spreadsheet ini.");
+    }
+
+    var data = source.getDataRange().getValues();
+    if (!data || data.length <= 1) {
+      return alertUser("⚠️ Tidak ada data di 'Hasil DCC' untuk di-backup.");
+    }
+
+    var headers = data[0];
+
+    // Filter baris data yang valid & memiliki hasil audit (Fisik Good terisi dan SKU ada)
+    var filteredRows = data.slice(1).filter(function(row) {
+      if (!row || row.length === 0) return false;
+      var sku = String(row[1] || row[17] || "").trim(); // Col B (index 1) atau SKU No
+      var fisikGood = row[6]; // Col G (index 6)
+      var hasFisik = (fisikGood !== undefined && fisikGood !== null && String(fisikGood).trim() !== "");
+      return sku !== "" && hasFisik;
+    });
+
+    if (filteredRows.length === 0) {
+      return alertUser("⚠️ Tidak ada data audit dengan Kolom G (Fisik Good) terisi di 'Hasil DCC' untuk di-backup.");
+    }
+
+    // 1. Matikan filter sementara jika ada di sheet target agar penambahan baris tidak bentrok
+    try {
+      var existingFilter = target.getFilter();
+      if (existingFilter) {
+        existingFilter.remove();
+      }
+    } catch (eFilter) {
+      console.warn("Gagal melepas filter target:", eFilter);
+    }
+
+    // 2. Pastikan Sheet 'Historical Data' memiliki kolom yang cukup
+    var headerRowLength = headers.length + 1; // + 1 untuk kolom BACKUP_TIME
+    var currentCols = target.getMaxColumns();
+    if (currentCols < headerRowLength) {
+      try {
+        target.insertColumnsAfter(currentCols, headerRowLength - currentCols);
+        SpreadsheetApp.flush();
+      } catch (eCol) {
+        console.warn("Gagal expand kolom:", eCol);
+      }
+    }
+
+    // Buat header jika sheet Historical Data masih kosong
+    if (target.getLastRow() === 0) {
+      var headerWithBackupTime = headers.concat(["BACKUP_TIME"]);
+      target.appendRow(headerWithBackupTime);
+      SpreadsheetApp.flush();
+      try {
+        target.getRange(1, 1, 1, headerRowLength)
+          .setBackground("#1E293B")
+          .setFontColor("#F8FAFC")
+          .setFontWeight("bold");
+        target.setFrozenRows(1);
+      } catch (eStyle) {}
+    }
+
+    // 3. Cegah Duplikasi: Ambil kunci unik (SKU + Timestamp Audit) yang sudah ada di Historical Data
+    var existingKeys = {};
+    var lastTargetRow = target.getLastRow();
+    if (lastTargetRow > 1) {
+      try {
+        var targetColsToCheck = Math.max(1, Math.min(target.getLastColumn(), 3));
+        var histData = target.getRange(2, 1, lastTargetRow - 1, targetColsToCheck).getValues();
+        for (var h = 0; h < histData.length; h++) {
+          var hTime = String(histData[h][0] || "").trim();
+          var hSku = String(histData[h][1] || "").trim().toLowerCase();
+          if (hSku || hTime) {
+            existingKeys[hSku + "___" + hTime] = true;
+          }
+        }
+      } catch (eHist) {
+        console.warn("Gagal membaca existingKeys Historical Data, lanjut tanpa dedup:", eHist);
+      }
+    }
+
+    var now = Utilities.formatDate(new Date(), CONFIG.TIMEZONE, "yyyy-MM-dd HH:mm:ss");
+    var rowsToInsert = [];
+    var duplicateCount = 0;
+
+    for (var r = 0; r < filteredRows.length; r++) {
+      var row = filteredRows[r];
+      var rTime = String(row[0] || "").trim();
+      var rSku = String(row[1] || row[17] || "").trim().toLowerCase();
+      var key = rSku + "___" + rTime;
+
+      // Jika belum ada di Historical Data, masukkan ke antrean insert
+      if (!existingKeys[key]) {
+        var fullRow = [];
+        for (var c = 0; c < headers.length; c++) {
+          fullRow.push(cleanDccCellValue(row[c]));
+        }
+        fullRow.push(now); // Kolom BACKUP_TIME
+        rowsToInsert.push(fullRow);
+        existingKeys[key] = true;
+      } else {
+        duplicateCount++;
+      }
+    }
+
+    if (rowsToInsert.length === 0) {
+      return alertUser("ℹ️ Semua data hasil DCC (" + filteredRows.length + " baris) sudah pernah di-backup sebelumnya ke 'Historical Data'.\n\nTidak ada data baru yang perlu ditambahkan.");
+    }
+
+    // 4. Cari baris kosong pertama di paling bawah
+    var targetRow = target.getLastRow() + 1;
+
+    // 5. Pastikan kapasitas baris di sheet Historical Data mencukupi
+    var requiredRows = targetRow + rowsToInsert.length - 1;
+    var currentMaxRows = target.getMaxRows();
+    if (requiredRows > currentMaxRows) {
+      try {
+        var rowsToAdd = (requiredRows - currentMaxRows) + 100; // Tambah buffer 100 baris
+        target.insertRowsAfter(currentMaxRows, rowsToAdd);
+        SpreadsheetApp.flush();
+      } catch (eInsert) {
+        console.warn("insertRowsAfter notice:", eInsert);
+      }
+    }
+
+    // 6. Tulis data: Coba batch setValues terlebih dahulu
+    var batchSuccess = false;
+    try {
+      var chunkSize = 200;
+      for (var i = 0; i < rowsToInsert.length; i += chunkSize) {
+        var chunk = rowsToInsert.slice(i, i + chunkSize);
+        target.getRange(targetRow + i, 1, chunk.length, chunk[0].length).setValues(chunk);
+      }
+      SpreadsheetApp.flush();
+      batchSuccess = true;
+    } catch (errBatch) {
+      console.warn("setValues batch gagal (" + errBatch.message + "), otomatis fallback ke appendRow...", errBatch);
+    }
+
+    // 7. Fallback Aman: Jika batch setValues ditolak oleh Google Sheets, tulis via appendRow
+    if (!batchSuccess) {
+      for (var rIdx = 0; rIdx < rowsToInsert.length; rIdx++) {
+        target.appendRow(rowsToInsert[rIdx]);
+      }
+      SpreadsheetApp.flush();
+    }
+
+    var dupInfo = duplicateCount > 0 ? "\n(" + duplicateCount + " baris duplikat dilewati)" : "";
+    alertUser("✅ Backup DCC berhasil ditambahkan ke sheet 'Historical Data'!\n\n• Baris Baru Ditambahkan: " + rowsToInsert.length + " baris" + dupInfo);
+
+  } catch (err) {
+    var errDetail = "Pesan: " + err.toString() + "\nBaris Error: " + (err.lineNumber || "N/A") + "\nDetail Stack: " + (err.stack || "N/A");
+    console.error("Error copyDccToHistorical:", errDetail);
+    Logger.log("Error copyDccToHistorical:\n" + errDetail);
+    alertUser("❌ Gagal Backup DCC:\n\n" + errDetail);
+  } finally {
+    if (hasLock) {
+      try { lock.releaseLock(); } catch (_) {}
+    }
   }
-
-  var headers = data[0];
-
-  // Filter hanya baris yang Kolom G (Fisik Good / index 6) terisi
-  var filteredRows = data.slice(1).filter(function(row) {
-    return (row[6] !== "" && row[6] !== null);
-  });
-
-  if (filteredRows.length === 0) {
-    return alertUser("⚠️ Tidak ada data dengan Kolom G terisi untuk di-backup.");
-  }
-
-  // Jika sheet Historical Data masih kosong, buatkan header + kolom timestamp
-  if (target.getLastRow() === 0) {
-    target.appendRow(headers.concat(["BACKUP_TIME"]));
-    target.getRange(1, 1, 1, headers.length + 1).setFontWeight("bold");
-  }
-
-  var now = Utilities.formatDate(new Date(), CONFIG.TIMEZONE, "yyyy-MM-dd HH:mm:ss");
-
-  var rows = filteredRows.map(function(r) {
-    return r.concat([now]);
-  });
-
-  // Cari baris kosong pertama di paling bawah
-  var targetRow = target.getLastRow() + 1;
-
-  target.getRange(
-    targetRow,
-    1,
-    rows.length,
-    rows[0].length
-  ).setValues(rows);
-
-  alertUser("✅ Backup DCC berhasil ditambahkan ke sheet 'Historical Data' pada baris " + targetRow + "!\nTotal: " + rows.length + " baris data.");
 }
 
 // ==============================================================================

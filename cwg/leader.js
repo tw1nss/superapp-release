@@ -708,6 +708,41 @@
     }
   }
 
+  // ── Helper: Klasifikasi Kategori Produk (Fresh, Frozen, Tata Rumah, Ambient) ──
+  function getTemperatureCategory(item) {
+    if (!item) return 'Fresh';
+    const rawZone = (item.zone || '').trim();
+    if (rawZone.toUpperCase() === 'FROZEN') return 'Frozen';
+    if (rawZone.toUpperCase() === 'FRESH') return 'Fresh';
+    if (rawZone.toUpperCase() === 'CHILLER') return 'Fresh';
+
+    const rk = (item.rack || '').toUpperCase();
+    if (rk.includes('FROZEN') || rk.includes('FRZ') || rk.includes('BEKU')) return 'Frozen';
+    if (rk.includes('FRESH') || rk.includes('CHILL') || rk.includes('SAYUR') || rk.includes('BUAH')) return 'Fresh';
+    if (rk.includes('SAPU') || rk.includes('PEL') || rk.includes('MOP')) return 'Tata Rumah';
+
+    const name = (item.productName || '').toLowerCase();
+    const frozenKws = ['frozen', 'nugget', 'katsu', 'sosis', 'ice cream', 'ice ', 'es krim', 'wing', 'patty', 'dimsum', 'meltique', 'roll', 'beef slice', 'daging slice', 'dory', 'salmon fillet', 'bakar', 'bumbu kuning', 'bakso', 'fiesta', 'so good', 'kanzler', 'champ', 'sunny gold', 'shabu', 'kornet', 'french fries', 'kentang'];
+    for (let k = 0; k < frozenKws.length; k++) {
+      if (name.includes(frozenKws[k])) return 'Frozen';
+    }
+
+    const nonFoodKws = ['sapu', 'pel ', 'mop', 'ember', 'sikat', 'tisu', 'tissue', 'sabun', 'deterjen', 'rinso', 'sunlight', 'baygon', 'shampoo', 'sampo'];
+    for (let k = 0; k < nonFoodKws.length; k++) {
+      if (name.includes(nonFoodKws[k])) return 'Tata Rumah';
+    }
+
+    const freshKws = ['farm', 'buah', 'sayur', 'tomat', 'jagung', 'jeruk', 'cuciwis', 'egg', 'telur', 'ikan', 'lidah buaya', 'ayam', 'daun', 'pear', 'yogurt', 'roti', 'cabe', 'cabai', 'pisang', 'selada', 'susu', 'apel', 'bawang', 'jamur', 'tahu', 'tempe', 'alpukat', 'semangka', 'melon', 'naga', 'wortel', 'timun', 'brokoli', 'bayam', 'kangkung', 'sawi', 'kol', 'kubis', 'buncis', 'daging', 'keju', 'butter', 'fresh'];
+    for (let k = 0; k < freshKws.length; k++) {
+      if (name.includes(freshKws[k])) return 'Fresh';
+    }
+
+    if (rawZone && rawZone !== 'ALL' && rawZone !== 'Lainnya' && rawZone !== 'Ambient') {
+      return rawZone;
+    }
+    return 'Fresh';
+  }
+
   // ══════════════════════════════════════════════════════════════════════════
   // 3. FILTERING & SEARCH PIPELINE
   // ══════════════════════════════════════════════════════════════════════════
@@ -729,8 +764,13 @@
       }
 
       // 4. Slicer Zone
-      if (currentSlicers.zone !== 'ALL' && item.zone.toUpperCase() !== currentSlicers.zone.toUpperCase()) {
-        return false;
+      if (currentSlicers.zone !== 'ALL') {
+        const targetZ = currentSlicers.zone.toUpperCase();
+        const rawZ = (item.zone || '').toUpperCase();
+        const catZ = getTemperatureCategory(item).toUpperCase();
+        if (targetZ !== rawZ && targetZ !== catZ) {
+          return false;
+        }
       }
 
       // 5. Slicer Shift
@@ -812,23 +852,33 @@
       if (dom.kpiLossLabel) dom.kpiLossLabel.textContent = 'VALUE LDP (LOSS)';
       if (dom.kpiLossValue) dom.kpiLossValue.textContent = `Rp ${ldpLossTotal.toLocaleString('id-ID')}`;
       if (dom.kpiLossSub) {
-        const frozenLoss = ldpItems.filter(i => i.zone === 'Frozen').reduce((s, i) => s + (i.lossValue || 0), 0);
-        const freshLoss = ldpItems.filter(i => i.zone === 'Fresh').reduce((s, i) => s + (i.lossValue || 0), 0);
-        dom.kpiLossSub.textContent = `Frozen: Rp ${(frozenLoss / 1e6).toFixed(2)}M | Fresh: Rp ${(freshLoss / 1e6).toFixed(2)}M`;
+        const frozenLoss = ldpItems.filter(i => getTemperatureCategory(i) === 'Frozen').reduce((s, i) => s + (i.lossValue || 0), 0);
+        const freshLoss = ldpItems.filter(i => getTemperatureCategory(i) === 'Fresh').reduce((s, i) => s + (i.lossValue || 0), 0);
+        dom.kpiLossSub.textContent = `Frozen: Rp ${frozenLoss.toLocaleString('id-ID')} | Fresh: Rp ${freshLoss.toLocaleString('id-ID')}`;
       }
     } else if (activeSidebarMenu === 'LBH') {
       if (dom.kpiLossLabel) dom.kpiLossLabel.textContent = 'NILAI SURPLUS (LBH)';
       if (dom.kpiLossValue) dom.kpiLossValue.textContent = `+Rp ${totalSurplus.toLocaleString('id-ID')}`;
-      if (dom.kpiLossSub) dom.kpiLossSub.textContent = 'Surplus Fisik (Bukan Kerugian)';
+      if (dom.kpiLossSub) {
+        const frozenSurplus = lbhItems.filter(i => getTemperatureCategory(i) === 'Frozen').reduce((s, i) => s + (i.surplusValue || 0), 0);
+        const freshSurplus = lbhItems.filter(i => getTemperatureCategory(i) === 'Fresh').reduce((s, i) => s + (i.surplusValue || 0), 0);
+        dom.kpiLossSub.textContent = `Frozen: +Rp ${frozenSurplus.toLocaleString('id-ID')} | Fresh: +Rp ${freshSurplus.toLocaleString('id-ID')}`;
+      }
     } else if (activeSidebarMenu === 'BADSTOCK') {
       if (dom.kpiLossLabel) dom.kpiLossLabel.textContent = 'VALUE BADSTOCK (LOSS)';
       if (dom.kpiLossValue) dom.kpiLossValue.textContent = `Rp ${badLossTotal.toLocaleString('id-ID')}`;
-      if (dom.kpiLossSub) dom.kpiLossSub.textContent = 'Kerugian Barang Rusak & Kadaluarsa';
+      if (dom.kpiLossSub) {
+        const frozenLoss = badItems.filter(i => getTemperatureCategory(i) === 'Frozen').reduce((s, i) => s + (i.lossValue || 0), 0);
+        const freshLoss = badItems.filter(i => getTemperatureCategory(i) === 'Fresh').reduce((s, i) => s + (i.lossValue || 0), 0);
+        dom.kpiLossSub.textContent = `Frozen: Rp ${frozenLoss.toLocaleString('id-ID')} | Fresh: Rp ${freshLoss.toLocaleString('id-ID')}`;
+      }
     } else {
       if (dom.kpiLossLabel) dom.kpiLossLabel.textContent = 'TOTAL LOSS (LDP & BAD)';
       if (dom.kpiLossValue) dom.kpiLossValue.textContent = `Rp ${totalLoss.toLocaleString('id-ID')}`;
       if (dom.kpiLossSub) {
-        dom.kpiLossSub.textContent = `LDP: Rp ${(ldpLossTotal / 1e6).toFixed(2)}M | Bad: Rp ${(badLossTotal / 1e3).toFixed(0)}k`;
+        const frozenLoss = data.filter(i => (i.category === 'LDP' || i.category === 'BADSTOCK') && getTemperatureCategory(i) === 'Frozen').reduce((s, i) => s + (i.lossValue || 0), 0);
+        const freshLoss = data.filter(i => (i.category === 'LDP' || i.category === 'BADSTOCK') && getTemperatureCategory(i) === 'Fresh').reduce((s, i) => s + (i.lossValue || 0), 0);
+        dom.kpiLossSub.textContent = `Frozen: Rp ${frozenLoss.toLocaleString('id-ID')} | Fresh: Rp ${freshLoss.toLocaleString('id-ID')}`;
       }
     }
 
@@ -839,7 +889,7 @@
     if (dom.badgeCountBad) dom.badgeCountBad.textContent = allAnomalies.filter(i => i.category === 'BADSTOCK').length;
     
     // Bottom left mini loss widget (Real loss from LDP + BADSTOCK only)
-    if (dom.miniLossValue) dom.miniLossValue.textContent = `Rp ${(totalLoss / 1000).toFixed(0)}k`;
+    if (dom.miniLossValue) dom.miniLossValue.textContent = `Rp ${Number(totalLoss || 0).toLocaleString('id-ID')}`;
 
     // Subtitle indicator
     if (dom.headerSubtitle) {
@@ -856,82 +906,106 @@
   // Matches user screenshot: Donut, Horiz Bars, Status Col, Top 5 & Bottom 5
   // ══════════════════════════════════════════════════════════════════════════
 
-  // ── Chart 1: Donut Chart (Minimalist & Monochrome Telemetry) ──
+  // ── Chart 1: Donut Chart (Proporsi Kategori Produk: Fresh vs Frozen) ──
   function renderDonutChart() {
     if (!dom.chartDonutContainer) return;
 
-    const ldpCount = filteredAnomalies.filter(i => i.category === 'LDP').length;
-    const lbhCount = filteredAnomalies.filter(i => i.category === 'LBH').length;
-    const badCount = filteredAnomalies.filter(i => i.category === 'BADSTOCK').length;
-    const total = ldpCount + lbhCount + badCount;
-
+    const total = filteredAnomalies.length;
     if (total === 0) {
-      dom.chartDonutContainer.innerHTML = '<div style="color:#64748b;font-size:0.8rem;">Tidak ada data produk</div>';
+      dom.chartDonutContainer.innerHTML = '<div style="color:#64748b;font-size:0.8rem;text-align:center;padding:24px 0;">Tidak ada data produk</div>';
       return;
     }
 
-    const pLdp = (ldpCount / total) * 100;
-    const pLbh = (lbhCount / total) * 100;
-    const pBad = (badCount / total) * 100;
+    // Agregasi jumlah item dan quantity (pcs) per kategori produk
+    const counts = { 'Fresh': 0, 'Frozen': 0 };
+    const qtyTotals = { 'Fresh': 0, 'Frozen': 0 };
+    const otherCats = [];
+
+    filteredAnomalies.forEach(i => {
+      const cat = getTemperatureCategory(i);
+      const q = Number(i.qty) || 1;
+      if (cat === 'Fresh' || cat === 'Frozen') {
+        counts[cat]++;
+        qtyTotals[cat] += q;
+      } else {
+        if (!counts[cat]) {
+          counts[cat] = 0;
+          qtyTotals[cat] = 0;
+          otherCats.push(cat);
+        }
+        counts[cat]++;
+        qtyTotals[cat] += q;
+      }
+    });
+
+    const displayCategories = ['Fresh', 'Frozen', ...otherCats.filter(c => counts[c] > 0)];
+
+    // Skema warna telemetry (DESIGN.md Aerospace Palette)
+    const categoryColors = {
+      'Fresh': '#10b981',      // Orbital Emerald (Hijau Segar)
+      'Frozen': '#38bdf8',     // Starlight Cyan (Biru Beku)
+      'Tata Rumah': '#a855f7', // Cosmic Purple
+      'Ambient': '#f59e0b',    // Solar Amber
+      'Chiller': '#06b6d4',    // Cyan Teal
+      'Lainnya': '#64748b'     // Muted Slate
+    };
 
     const r = 48;
     const circumference = 2 * Math.PI * r;
 
-    const arcLdp = (pLdp / 100) * circumference;
-    const arcLbh = (pLbh / 100) * circumference;
-    const arcBad = (pBad / 100) * circumference;
+    let currentOffset = 0;
+    let circlesSvg = '';
+    let legendHtml = '';
 
-    const offsetLdp = 0;
-    const offsetLbh = -arcLdp;
-    const offsetBad = -(arcLdp + arcLbh);
+    displayCategories.forEach(cat => {
+      const count = counts[cat] || 0;
+      const qty = qtyTotals[cat] || 0;
+      const pct = total > 0 ? (count / total) * 100 : 0;
+      const roundedPct = Math.round(pct);
+      const color = categoryColors[cat] || '#94a3b8';
+
+      if (count > 0) {
+        const arc = (pct / 100) * circumference;
+        circlesSvg += `
+          <circle cx="65" cy="65" r="${r}" fill="transparent" stroke="${color}" stroke-width="15"
+            stroke-dasharray="${arc} ${circumference}"
+            stroke-dashoffset="${currentOffset}"
+            transform="rotate(-90 65 65)">
+            <title>${cat}: ${count} produk (${qty} pcs • ${roundedPct}%)</title>
+          </circle>
+        `;
+        currentOffset -= arc;
+      }
+
+      legendHtml += `
+        <div class="legend-row" title="${cat}: ${count} produk, ${qty} pcs (${roundedPct}%)">
+          <span style="display:flex;align-items:center;gap:7px;color:#94a3b8;">
+            <span class="legend-indicator" style="background:${color};"></span> ${cat.toUpperCase()}
+          </span>
+          <span class="legend-val">
+            ${count} 
+            <span style="font-size:0.7rem;color:#64748b;font-weight:500;">(${roundedPct}%)</span>
+          </span>
+        </div>
+      `;
+    });
 
     const svgHtml = `
       <div style="display:flex;align-items:center;justify-content:center;width:100%;gap:18px;">
         <svg width="140" height="140" viewBox="0 0 130 130" class="svg-chart">
+          <!-- Background track circle -->
           <circle cx="65" cy="65" r="${r}" fill="transparent" stroke="rgba(255,255,255,0.05)" stroke-width="15"/>
           
-          <!-- LDP Arc (Solar Amber) -->
-          <circle cx="65" cy="65" r="${r}" fill="transparent" stroke="#f59e0b" stroke-width="15"
-            stroke-dasharray="${arcLdp} ${circumference}"
-            stroke-dashoffset="${offsetLdp}"
-            transform="rotate(-90 65 65)" />
+          <!-- Category Segments (Fresh, Frozen, etc.) -->
+          ${circlesSvg}
 
-          <!-- LBH Arc (Astro Sky) -->
-          <circle cx="65" cy="65" r="${r}" fill="transparent" stroke="#38bdf8" stroke-width="15"
-            stroke-dasharray="${arcLbh} ${circumference}"
-            stroke-dashoffset="${offsetLbh}"
-            transform="rotate(-90 65 65)" />
-
-          <!-- BADSTOCK Arc (Crimson Alert) -->
-          <circle cx="65" cy="65" r="${r}" fill="transparent" stroke="#f43f5e" stroke-width="15"
-            stroke-dasharray="${arcBad} ${circumference}"
-            stroke-dashoffset="${offsetBad}"
-            transform="rotate(-90 65 65)" />
-
-          <!-- Center Text -->
+          <!-- Center Metric Text -->
           <text x="65" y="62" text-anchor="middle" font-size="20" font-weight="700" fill="#f8fafc" font-family="JetBrains Mono">${total}</text>
           <text x="65" y="78" text-anchor="middle" font-size="8.5" fill="#64748b" font-family="Inter" font-weight="600" letter-spacing="0.08em">PRODUK</text>
         </svg>
 
         <div class="donut-legend">
-          <div class="legend-row">
-            <span style="display:flex;align-items:center;gap:7px;color:#94a3b8;">
-              <span class="legend-indicator" style="background:#f59e0b;"></span> LDP
-            </span>
-            <span class="legend-val">${ldpCount} <span style="font-size:0.7rem;color:#64748b;font-weight:500;">(${Math.round(pLdp)}%)</span></span>
-          </div>
-          <div class="legend-row">
-            <span style="display:flex;align-items:center;gap:7px;color:#94a3b8;">
-              <span class="legend-indicator" style="background:#38bdf8;"></span> LBH
-            </span>
-            <span class="legend-val">${lbhCount} <span style="font-size:0.7rem;color:#64748b;font-weight:500;">(${Math.round(pLbh)}%)</span></span>
-          </div>
-          <div class="legend-row">
-            <span style="display:flex;align-items:center;gap:7px;color:#94a3b8;">
-              <span class="legend-indicator" style="background:#f43f5e;"></span> BADSTOCK
-            </span>
-            <span class="legend-val">${badCount} <span style="font-size:0.7rem;color:#64748b;font-weight:500;">(${Math.round(pBad)}%)</span></span>
-          </div>
+          ${legendHtml}
         </div>
       </div>
     `;
@@ -939,33 +1013,42 @@
     dom.chartDonutContainer.innerHTML = svgHtml;
   }
 
-  // ── Chart 2: Horizontal Bar Chart (Monochrome Slate Distribution) ──
+  // ── Chart 2: Horizontal Bar Chart (Sebaran Produk per Kategori / Suhu) ──
   function renderRackBarChart() {
     if (!dom.chartRackBarContainer) return;
 
-    // Aggregate by Zone
+    // Aggregate by Category / Zone
     const zoneCounts = {};
     filteredAnomalies.forEach(i => {
-      const z = i.zone || 'Lainnya';
+      const z = getTemperatureCategory(i);
       zoneCounts[z] = (zoneCounts[z] || 0) + (Number(i.qty) || 1);
     });
 
     const entries = Object.entries(zoneCounts).sort((a, b) => b[1] - a[1]);
     if (entries.length === 0) {
-      dom.chartRackBarContainer.innerHTML = '<div style="color:#64748b;font-size:0.8rem;">Data zona kosong</div>';
+      dom.chartRackBarContainer.innerHTML = '<div style="color:#64748b;font-size:0.8rem;text-align:center;padding:24px 0;">Data zona kosong</div>';
       return;
     }
 
     const maxVal = Math.max(...entries.map(e => e[1])) || 1;
 
+    const barColors = {
+      'Fresh': '#10b981',
+      'Frozen': '#38bdf8',
+      'Tata Rumah': '#a855f7',
+      'Ambient': '#f59e0b',
+      'Chiller': '#06b6d4'
+    };
+
     let barsHtml = '<div style="display:flex;flex-direction:column;gap:10px;width:100%;">';
     entries.slice(0, 5).forEach(([zone, qty]) => {
       const pct = Math.round((qty / maxVal) * 100);
+      const color = barColors[zone] || '#38bdf8';
       barsHtml += `
         <div style="display:flex;align-items:center;gap:12px;font-size:0.75rem;">
           <span style="width:75px;color:#94a3b8;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${zone}</span>
           <div style="flex:1;background:rgba(255,255,255,0.04);height:16px;border-radius:3px;overflow:hidden;position:relative;">
-            <div style="width:${pct}%;height:100%;background:#334155;border-radius:3px;transition:width 0.25s ease;"></div>
+            <div style="width:${pct}%;height:100%;background:${color};opacity:0.85;border-radius:3px;transition:width 0.25s ease;"></div>
           </div>
           <span style="width:36px;font-family:JetBrains Mono;font-weight:600;color:#f8fafc;text-align:right;">${qty}</span>
         </div>
@@ -1589,13 +1672,10 @@
                 const rawDate = String(getVal(10) || '');
                 const reason = String(getVal(11) || detailStatus || 'Anomali Stock CWG');
 
-                // Zone: from column 12 (product_type_name) or fallback to rackName
+                // Zone: from column 12 (product_type_name) or smart classification
                 let zone = String(getVal(12) || '').trim();
-                if (!zone) {
-                  if (rackName.toUpperCase().includes('FROZEN')) zone = 'Frozen';
-                  else if (rackName.toUpperCase().includes('FRESH')) zone = 'Fresh';
-                  else if (rackName.toUpperCase().includes('CHILL')) zone = 'Chiller';
-                  else zone = 'Ambient';
+                if (!zone || zone === 'null' || zone === 'undefined') {
+                  zone = getTemperatureCategory({ productName, rack: rackName, zone: '' });
                 }
 
                 const isGantung = reason.toLowerCase().includes('dalam pencarian') ||

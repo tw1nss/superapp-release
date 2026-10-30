@@ -12,7 +12,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="leader.css?v=20261015_monochrome">
+  <link rel="stylesheet" href="leader.css?v=20261030_v2">
 </head>
 <body>
 
@@ -291,11 +291,11 @@
 
         <!-- ── CHARTS ROW 1 (Donut | Horiz Bar by Zone | Status Vertical Col) ── -->
         <section class="charts-grid-row-1">
-          <!-- Chart 1: Donut Distribution -->
+          <!-- Chart 1: Donut Distribution (Fresh vs Frozen) -->
           <div class="chart-card">
             <div class="chart-card-header">
-              <span class="chart-card-title">Proporsi Kategori Produk</span>
-              <span class="chart-card-badge">KATEGORI</span>
+              <span class="chart-card-title">Proporsi Kategori Produk (Fresh &amp; Frozen)</span>
+              <span class="chart-card-badge">FRESH &amp; FROZEN</span>
             </div>
             <div class="chart-container-box" id="chartDonutContainer">
               <!-- SVG Donut Chart rendered via leader.js -->
@@ -748,10 +748,11 @@
         </div>
         <div class="slicer-chips-grid">
           <button type="button" class="slicer-chip-btn active full-width" data-slicer-group="zone" data-slicer-val="ALL">Semua Zona</button>
-          <button type="button" class="slicer-chip-btn" data-slicer-group="zone" data-slicer-val="Chiller">Chiller</button>
+          <button type="button" class="slicer-chip-btn" data-slicer-group="zone" data-slicer-val="Fresh">Fresh</button>
           <button type="button" class="slicer-chip-btn" data-slicer-group="zone" data-slicer-val="Frozen">Frozen</button>
+          <button type="button" class="slicer-chip-btn" data-slicer-group="zone" data-slicer-val="Chiller">Chiller</button>
           <button type="button" class="slicer-chip-btn" data-slicer-group="zone" data-slicer-val="Ambient">Ambient</button>
-          <button type="button" class="slicer-chip-btn" data-slicer-group="zone" data-slicer-val="Tata Rumah">Tata Rumah</button>
+          <button type="button" class="slicer-chip-btn full-width" data-slicer-group="zone" data-slicer-val="Tata Rumah">Tata Rumah</button>
         </div>
       </div>
 
@@ -984,6 +985,6 @@
     </div>
   </div>
 
-  <script src="leader.js?v=20261014_1"></script>
+  <script src="leader.js?v=20261030_v2"></script>
 </body>
 </html>
