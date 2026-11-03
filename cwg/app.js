@@ -3313,6 +3313,12 @@
     window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
     document.documentElement.scrollTop = 0;
     document.body.scrollTop = 0;
+
+    if (window.history && window.history.replaceState) {
+      try {
+        window.history.replaceState(null, '', window.location.pathname);
+      } catch (e) {}
+    }
   };
 
   // ── Android Hardware Back Button Handler ──
@@ -11528,11 +11534,42 @@
     window.print();
   };
 
+  function handleUrlMenuRouting() {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      let target = params.get('menu') || params.get('tab') || window.location.hash.replace(/^#\/?/, '').toLowerCase();
+      if (!target && params.has('barcode')) {
+        target = 'barcode';
+      }
+      if (target) {
+        if (target === 'barcode') {
+          if (typeof window.openAppMenu === 'function') {
+            window.openAppMenu('barcode');
+          }
+        } else if (target === 'msltc') {
+          if (typeof window.openAppMenu === 'function') {
+            window.openAppMenu('barcode');
+            if (typeof window.switchMainMenu === 'function') {
+              window.switchMainMenu('msltc');
+            }
+          }
+        } else if (typeof window.openAppMenu === 'function') {
+          window.openAppMenu(target);
+        }
+      }
+    } catch (e) {
+      console.warn('URL menu routing warning:', e);
+    }
+  }
+
+  window.addEventListener('hashchange', handleUrlMenuRouting);
+
   // ── Init
   (function init() {
     renderHistory();
     loadInitialData();
     updateHomeVersionDisplay();
+    handleUrlMenuRouting();
 
     // Check for updates automatically in background
     setTimeout(() => {

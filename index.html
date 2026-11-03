@@ -22,7 +22,7 @@
         try {
           var savedHub = localStorage.getItem('astro_preferred_hub');
           if (savedHub === 'mtg' || savedHub === 'cwg') {
-            window.location.replace('./' + savedHub + '/');
+            window.location.replace('./' + savedHub + '/' + search + window.location.hash);
           }
         } catch (e) {}
       }
@@ -579,7 +579,7 @@
       try {
         localStorage.setItem('astro_preferred_hub', hubKey);
       } catch (e) {}
-      window.location.href = './' + hubKey + '/';
+      window.location.href = './' + hubKey + '/' + (window.location.search || '') + (window.location.hash || '');
     }
 
     // Highlight current preferred hub if in switch mode

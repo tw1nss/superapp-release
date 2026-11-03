@@ -11585,11 +11585,42 @@
     window.print();
   };
 
+  function handleUrlMenuRouting() {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      let target = params.get('menu') || params.get('tab') || window.location.hash.replace(/^#\/?/, '').toLowerCase();
+      if (!target && params.has('barcode')) {
+        target = 'barcode';
+      }
+      if (target) {
+        if (target === 'barcode') {
+          if (typeof window.openAppMenu === 'function') {
+            window.openAppMenu('barcode');
+          }
+        } else if (target === 'msltc') {
+          if (typeof window.openAppMenu === 'function') {
+            window.openAppMenu('barcode');
+            if (typeof window.switchMainMenu === 'function') {
+              window.switchMainMenu('msltc');
+            }
+          }
+        } else if (typeof window.openAppMenu === 'function') {
+          window.openAppMenu(target);
+        }
+      }
+    } catch (e) {
+      console.warn('URL menu routing warning:', e);
+    }
+  }
+
+  window.addEventListener('hashchange', handleUrlMenuRouting);
+
   // ── Init
   (function init() {
     renderHistory();
     loadInitialData();
     updateHomeVersionDisplay();
+    handleUrlMenuRouting();
 
     // Check for updates automatically in background
     setTimeout(() => {
