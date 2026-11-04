@@ -70,6 +70,58 @@
     }
   }
 
+  async function fetchCloudSlocOverrides(fetchTime) {
+    if (!LIVE_SLOC_BRIDGE_URL) return {};
+    try {
+      const ts = fetchTime || Date.now();
+      const url = LIVE_SLOC_BRIDGE_URL + '?sheet=' + encodeURIComponent('Terima Pengembalian Hub') + '&_t=' + ts;
+      const res = await fetch(url, { cache: 'no-store' });
+      if (!res.ok) return {};
+      const rows = await res.json();
+      if (!Array.isArray(rows)) return {};
+
+      const localOverrides = getCustomSlocOverrides();
+      let changed = false;
+
+      rows.forEach(row => {
+        if (!row) return;
+        const status = String(row['STATUS'] || '').trim();
+        const rawSku = String(row['NOMOR SKU'] || '').trim();
+        if (!rawSku) return;
+
+        if (status === 'MANUAL_SLOC_OVERRIDE') {
+          const rawSloc = String(row['SLOC (LOKASI RAK)'] || '').trim().toUpperCase();
+          if (!rawSloc) return;
+          const rawName = String(row['NAMA PRODUK'] || '').trim();
+          const rawType = String(row['CATATAN'] || '').trim();
+          localOverrides[rawSku] = {
+            sku: rawSku,
+            sloc: rawSloc,
+            productName: rawName || (localOverrides[rawSku] ? localOverrides[rawSku].productName : ''),
+            type: rawType || inferCategoryFromSloc(rawSloc) || 'Fresh',
+            updatedAt: Date.now(),
+            fromCloud: true
+          };
+          changed = true;
+        } else if (status === 'CLEAR_MANUAL_SLOC') {
+          if (localOverrides[rawSku]) {
+            delete localOverrides[rawSku];
+            changed = true;
+          }
+        }
+      });
+
+      if (changed) {
+        try {
+          localStorage.setItem(CUSTOM_SLOC_STORAGE_KEY, JSON.stringify(localOverrides));
+        } catch (eStorage) {}
+      }
+      return localOverrides;
+    } catch (e) {
+      return {};
+    }
+  }
+
   function matchInternalAstroSkuKey(targetMap, querySku) {
     if (!targetMap || !querySku) return null;
     const clean = String(querySku).trim();
@@ -446,6 +498,7 @@
       const masterRows = parseCSV(masterCsv);
       const msltcRows = parseCSV(msltcCsv);
 
+      await fetchCloudSlocOverrides(fetchTime);
       const masterResult = buildMasterMap(masterRows);
       const msltcResult = buildMsltcMap(msltcRows);
 
@@ -1401,7 +1454,7 @@
                 <div class="sloc-main-line">
                   <span class="result-label">SLOC</span>
                   <span class="result-value sloc ${isPlaceholderSloc(item.sloc) ? 'sloc-unassigned' : ''}">${escapeHtml(item.sloc || '-')}</span>
-                  ${item.isCustomOverride ? '<span class="sloc-manual-badge" title="SLOC disetel langsung dari perangkat">MANUAL</span>' : ''}
+                  ${item.isCustomOverride ? '<span class="sloc-manual-badge" title="SLOC disinkronkan ke Cloud Google Sheets (aktif di semua perangkat)">MANUAL</span>' : ''}
                   ${!isPlaceholderSloc(item.sloc) ? `
                   <button type="button" class="btn-sloc-inline-edit no-print" onclick="openManualSlocEditor(${idx}, '${escapeAttr(itemSku)}', '${escapeAttr(item.sloc || '')}')">
                     Ubah Rak
@@ -1581,16 +1634,20 @@
 
       // no-cors is required because Apps Script redirects POST responses to a domain without CORS headers
       if (LIVE_SLOC_BRIDGE_URL) {
+        const effType = type || inferCategoryFromSloc(newSloc) || 'Fresh';
         fetch(LIVE_SLOC_BRIDGE_URL, {
           method: 'POST',
           mode: 'no-cors',
           headers: { 'Content-Type': 'text/plain;charset=utf-8' },
           body: JSON.stringify({
-            action: 'saveCustomSloc',
+            action: 'saveTerimaKembali',
+            customAction: 'saveCustomSloc',
             sku: String(sku).trim(),
-            sloc: newSloc,
             productName: productName || '',
-            type: type || inferCategoryFromSloc(newSloc) || 'Fresh'
+            sloc: newSloc,
+            status: 'MANUAL_SLOC_OVERRIDE',
+            remarks: effType,
+            pic: 'SUPERAPP_SLOC'
           })
         }).catch(() => {});
       }
@@ -1620,7 +1677,23 @@
           .then(r => r.ok ? r.json() : null)
           .catch(() => null);
 
-        const [syncRes, stockJson] = await Promise.all([syncPromise, stockPromise]);
+        const [syncRes, stockJson, cloudOverrides] = await Promise.all([
+          syncPromise,
+          stockPromise,
+          fetchCloudSlocOverrides(ts)
+        ]);
+
+        if (cloudOverrides && Object.keys(cloudOverrides).length > 0) {
+          applyCustomSlocOverridesToMap(dataMap);
+          const matchedCloudKey = matchInternalAstroSkuKey(dataMap, cleanSku);
+          if (matchedCloudKey && dataMap.has(matchedCloudKey)) {
+            const items = dataMap.get(matchedCloudKey);
+            if (items && items.some(it => !isPlaceholderSloc(it.sloc))) {
+              displaySelectedProduct(matchedCloudKey, lastSearchExpiredDate);
+              return;
+            }
+          }
+        }
 
         if (syncRes && syncRes.status === 'success' && syncRes.slocFound) {
           setCustomSlocOverride(cleanSku, syncRes.slocFound, productName, syncRes.typeFound || '');
@@ -15225,6 +15298,8 @@
       // 4. Data Sheet Terima Pengembalian Hub (MTG Terima Stok Masuk Kembali)
       if (Array.isArray(dataTerima)) {
         dataTerima.forEach(row => {
+          const rowStatus = String(row['STATUS'] || '').trim();
+          if (rowStatus === 'MANUAL_SLOC_OVERRIDE' || rowStatus === 'CLEAR_MANUAL_SLOC') return;
           if (row['NOMOR SKU'] || row['TIMESTAMP']) {
             combined.push({
               type: 'terima',
