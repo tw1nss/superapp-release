@@ -540,6 +540,18 @@ function doGet(e) {
     })).setMimeType(ContentService.MimeType.JSON);
   }
 
+  if (param.action === 'syncSlocLive') {
+    var syncRes = syncSlocLiveHandler(param.sku || '');
+    return ContentService.createTextOutput(JSON.stringify(syncRes))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+
+  if (param.action === 'saveCustomSloc') {
+    var saveRes = saveCustomSlocToMasterSheet(param);
+    return ContentService.createTextOutput(JSON.stringify(saveRes))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+
   // Ambil sheet berdasarkan parameter URL (contoh: ?sheet=STOCK UPDATE). Jika kosong, default ke "Hasil DCC"
   var sheetName = param.sheet || "Hasil DCC"; 
   
@@ -714,6 +726,18 @@ function doPost(e) {
         status: "success",
         message: "Auto-pull data DCC Master berhasil diproses!"
       })).setMimeType(ContentService.MimeType.JSON);
+    }
+
+    if (payload.action === 'syncSlocLive') {
+      var syncPostRes = syncSlocLiveHandler(payload.sku || '');
+      return ContentService.createTextOutput(JSON.stringify(syncPostRes))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+
+    if (payload.action === 'saveCustomSloc') {
+      var savePostRes = saveCustomSlocToMasterSheet(payload);
+      return ContentService.createTextOutput(JSON.stringify(savePostRes))
+        .setMimeType(ContentService.MimeType.JSON);
     }
 
     // ==========================================================
@@ -1120,7 +1144,7 @@ function fetchSupersetData(chartId, formDataKey, pageId) {
     if (pageId) {
       urlVariants.push(baseUrl + "superset/explore_json/?dashboard_page_id=" + encodeURIComponent(pageId) + "&slice_id=" + chartId + "&force=true&_t=" + timestamp);
     }
-    urlVariants.push(baseUrl + "superset/explore_json/?form_data=" + encodeURIComponent(JSON.stringify({ slice_id: Number(chartId) })) + "&force=true&_t=" + timestamp);
+    urlVariants.push(baseUrl + "superset/explore_json/?form_data=" + encodeURIComponent(JSON.stringify({ slice_id: Number(chartId), row_limit: 50000 })) + "&force=true&_t=" + timestamp);
     urlVariants.push(baseUrl + "api/v1/chart/" + chartId + "/data/?force=true&_t=" + timestamp);
   }
 
@@ -1351,6 +1375,11 @@ function processToSheet(data, sheetName) {
     });
   });
 
+  try {
+    var activeFilter = sheet.getFilter();
+    if (activeFilter) activeFilter.remove();
+  } catch (eFilter) {}
+
   sheet.clearContents();
 
   sheet.getRange(1, 1, 1, headers.length)
@@ -1367,6 +1396,158 @@ function processToSheet(data, sheetName) {
   } catch (eR) {}
 
   SpreadsheetApp.flush(); // 🚀 WAJIB: Paksa Google Sheets langsung render 1.843 baris ke layar fisik sebelum modal muncul!
+}
+
+function syncSlocLiveHandler(querySku) {
+  var cleanSku = String(querySku || '').trim();
+  var suffixMatch = cleanSku.match(/^10+(\d{3,6})$/);
+  var suffixRegex = suffixMatch ? new RegExp('^10+' + suffixMatch[1] + '$') : null;
+  var updatedSheets = [];
+  var slocFound = '';
+  var typeFound = '';
+  var productNameFound = '';
+
+  function checkRecordsForSku(records) {
+    if (!cleanSku || !Array.isArray(records)) return;
+    for (var i = 0; i < records.length; i++) {
+      var r = records[i];
+      if (!r) continue;
+      var rSku = String(r.sku || r.sku_number || r.SKU || '').trim();
+      var rSloc = String(r.sloc || r.rack_name || r.SLOC || r.master_sloc || '').trim();
+      if (!rSku || !rSloc) continue;
+      if (rSku === cleanSku || (suffixRegex && suffixRegex.test(rSku))) {
+        slocFound = rSloc;
+        typeFound = String(r.type || r.l1_category_name || r.TYPE || '');
+        productNameFound = String(r.product_name || r['product name'] || '');
+        return;
+      }
+    }
+  }
+
+  var slocTargets = [
+    { id: 27916, sheet: "SLOC MASTER", pageId: "4x69tbSms9lxcDJvFjiO-" },
+    { id: 27917, sheet: "STOCK UPDATE", pageId: "LS7AcEEnOypTdotAb3wev" }
+  ];
+
+  slocTargets.forEach(function(t) {
+    try {
+      var data = fetchSupersetData(t.id, "", t.pageId);
+      if (data && data.length > 0) {
+        processToSheet(data, t.sheet);
+        updatedSheets.push(t.sheet);
+        if (!slocFound) checkRecordsForSku(data);
+      }
+    } catch (eSync) {
+      console.warn("syncSlocLive gagal untuk " + t.sheet + ":", eSync.message);
+    }
+  });
+
+  if (!slocFound && cleanSku) {
+    try {
+      var ss = getSpreadsheet();
+      ["SLOC MASTER", "STOCK UPDATE"].forEach(function(sName) {
+        if (slocFound) return;
+        var sh = ss.getSheetByName(sName);
+        if (!sh) return;
+        try {
+          if (sh.getFilter()) sh.getFilter().remove();
+        } catch (eF) {}
+        var vals = sh.getDataRange().getValues();
+        if (vals.length <= 1) return;
+        var hdr = vals[0].map(function(h) { return String(h || '').toLowerCase().trim(); });
+        var skuIdx = hdr.indexOf('sku') !== -1 ? hdr.indexOf('sku') : hdr.indexOf('sku_number');
+        var slocIdx = hdr.indexOf('sloc') !== -1 ? hdr.indexOf('sloc') : hdr.indexOf('rack_name');
+        var nameIdx = hdr.indexOf('product name') !== -1 ? hdr.indexOf('product name') : hdr.indexOf('product_name');
+        var typeIdx = hdr.indexOf('type') !== -1 ? hdr.indexOf('type') : hdr.indexOf('l1_category_name');
+        if (skuIdx === -1 || slocIdx === -1) return;
+        for (var r = 1; r < vals.length; r++) {
+          var rowSku = String(vals[r][skuIdx] || '').trim();
+          var rowSloc = String(vals[r][slocIdx] || '').trim();
+          if (!rowSku || !rowSloc) continue;
+          if (rowSku === cleanSku || (suffixRegex && suffixRegex.test(rowSku))) {
+            slocFound = rowSloc;
+            if (nameIdx !== -1) productNameFound = String(vals[r][nameIdx] || '');
+            if (typeIdx !== -1) typeFound = String(vals[r][typeIdx] || '');
+            break;
+          }
+        }
+      });
+    } catch (eSheetLookup) {}
+  }
+
+  return {
+    status: "success",
+    updatedSheets: updatedSheets,
+    sku: cleanSku,
+    slocFound: slocFound,
+    typeFound: typeFound,
+    productName: productNameFound
+  };
+}
+
+function saveCustomSlocToMasterSheet(payload) {
+  var sku = String(payload.sku || '').trim();
+  var sloc = String(payload.sloc || '').trim().toUpperCase();
+  var productName = String(payload.productName || '').trim();
+  var type = String(payload.type || 'Fresh').trim();
+
+  if (!sku || !sloc) {
+    return { status: "error", message: "SKU dan SLOC wajib diisi." };
+  }
+
+  var ss = getSpreadsheet();
+  var sheet = ss.getSheetByName("SLOC MASTER") || ss.insertSheet("SLOC MASTER");
+  try {
+    if (sheet.getFilter()) sheet.getFilter().remove();
+  } catch (eF) {}
+
+  var lastRow = sheet.getLastRow();
+  if (lastRow === 0) {
+    sheet.appendRow(["sku", "product name", "sloc", "master sloc", "type", "left"]);
+    lastRow = 1;
+  }
+
+  var leftVal = "";
+  var leftMatch = sloc.match(/^L\d+-/i);
+  if (leftMatch) leftVal = leftMatch[0].toUpperCase();
+
+  var suffixMatch = sku.match(/^10+(\d{3,6})$/);
+  var suffixRegex = suffixMatch ? new RegExp('^10+' + suffixMatch[1] + '$') : null;
+  var updatedRow = -1;
+
+  if (lastRow > 1) {
+    var vals = sheet.getRange(2, 1, lastRow - 1, 6).getValues();
+    for (var i = 0; i < vals.length; i++) {
+      var rSku = String(vals[i][0] || '').trim();
+      if (rSku === sku || (suffixRegex && suffixRegex.test(rSku))) {
+        var rowNum = i + 2;
+        var existingName = String(vals[i][1] || '').trim();
+        sheet.getRange(rowNum, 1, 1, 6).setValues([[
+          sku,
+          productName || existingName,
+          sloc,
+          sloc,
+          type || String(vals[i][4] || 'Fresh'),
+          leftVal
+        ]]);
+        updatedRow = rowNum;
+        break;
+      }
+    }
+  }
+
+  if (updatedRow === -1) {
+    sheet.appendRow([sku, productName, sloc, sloc, type, leftVal]);
+    updatedRow = sheet.getLastRow();
+  }
+
+  SpreadsheetApp.flush();
+  return {
+    status: "success",
+    sku: sku,
+    sloc: sloc,
+    row: updatedRow
+  };
 }
 
 // ==============================================================================

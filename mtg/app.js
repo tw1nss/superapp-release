@@ -39,6 +39,99 @@
   let lastSearchResults = null;
   let clockInterval = null;
   let autoSearchTimer = null; // debounce timer for auto-search
+  const LIVE_SLOC_BRIDGE_URL = 'https://script.google.com/macros/s/AKfycbzRhVQZEv3TJwTfUhKKV0QtzexKvMS8mfz-iE72LiVRLKulE4_IlU4IW10rII8k7ICpLQ/exec';
+  const CUSTOM_SLOC_STORAGE_KEY = 'MTG_CUSTOM_SLOC_OVERRIDES_V1';
+  const recentLiveSyncSkuMap = new Map();
+
+  function getCustomSlocOverrides() {
+    try {
+      const raw = localStorage.getItem(CUSTOM_SLOC_STORAGE_KEY);
+      return raw ? (JSON.parse(raw) || {}) : {};
+    } catch (e) {
+      return {};
+    }
+  }
+
+  function setCustomSlocOverride(sku, sloc, productName, type) {
+    if (!sku || !sloc) return;
+    try {
+      const overrides = getCustomSlocOverrides();
+      const cleanSku = String(sku).trim();
+      overrides[cleanSku] = {
+        sku: cleanSku,
+        sloc: String(sloc).trim().toUpperCase(),
+        productName: productName || '',
+        type: type || inferCategoryFromSloc(sloc) || 'Fresh',
+        updatedAt: Date.now()
+      };
+      localStorage.setItem(CUSTOM_SLOC_STORAGE_KEY, JSON.stringify(overrides));
+    } catch (e) {
+      console.warn('Failed to save custom SLOC override:', e);
+    }
+  }
+
+  function matchInternalAstroSkuKey(targetMap, querySku) {
+    if (!targetMap || !querySku) return null;
+    const clean = String(querySku).trim();
+    if (targetMap.has(clean)) return clean;
+    for (const [k] of targetMap) {
+      if (k.toLowerCase().trim() === clean.toLowerCase()) return k;
+    }
+    const m = clean.match(/^10+(\d{3,6})$/);
+    if (m) {
+      const suffixRegex = new RegExp('^10+' + m[1] + '$');
+      for (const [k] of targetMap) {
+        if (suffixRegex.test(k.trim())) return k;
+      }
+    }
+    return null;
+  }
+
+  function applyCustomSlocOverridesToMap(targetMap, targetMasterArray) {
+    if (!targetMap) return;
+    const overrides = getCustomSlocOverrides();
+    const keys = Object.keys(overrides);
+    if (keys.length === 0) return;
+
+    keys.forEach(skuKey => {
+      const ov = overrides[skuKey];
+      if (!ov || !ov.sloc) return;
+      const matchedKey = matchInternalAstroSkuKey(targetMap, skuKey) || skuKey;
+      let left = '';
+      const lm = ov.sloc.match(/^L\d+-/i);
+      if (lm) left = lm[0];
+
+      const newItem = {
+        sku: matchedKey,
+        sloc: ov.sloc,
+        productName: ov.productName || '',
+        masterSloc: ov.sloc,
+        type: ov.type || inferCategoryFromSloc(ov.sloc) || 'Fresh',
+        left: left,
+        qty: '',
+        isCustomOverride: true
+      };
+
+      if (targetMap.has(matchedKey)) {
+        const existing = targetMap.get(matchedKey);
+        if (existing && existing.length > 0 && !newItem.productName) {
+          newItem.productName = existing[0].productName || '';
+        }
+        const filtered = existing.filter(it => !isPlaceholderSloc(it.sloc) && it.sloc !== ov.sloc);
+        targetMap.set(matchedKey, [newItem, ...filtered]);
+      } else {
+        targetMap.set(matchedKey, [newItem]);
+      }
+
+      if (matchedKey !== skuKey) {
+        targetMap.set(skuKey, [{ ...newItem, sku: skuKey }]);
+      }
+
+      if (Array.isArray(targetMasterArray)) {
+        targetMasterArray.push([matchedKey, newItem]);
+      }
+    });
+  }
 
   // ── High-Performance Utilities ──
   function debounce(func, wait = 160) {
@@ -234,6 +327,8 @@
       items.sort((a, b) => compareSlocNatural(a.sloc || a.masterSloc, b.sloc || b.masterSloc));
     }
 
+    applyCustomSlocOverridesToMap(map, masterArray);
+
     return { map, count, masterArray };
   }
 
@@ -407,6 +502,7 @@
         if (!map.has(sku)) map.set(sku, []);
         map.get(sku).push(item);
       });
+      applyCustomSlocOverridesToMap(map);
       dataMap = map;
 
       // Rehydrate MSLTC Map
@@ -573,7 +669,20 @@
     const lowerQuery = cleaned.toLowerCase().replace(/[^a-z0-9]/g, ' ').replace(/\s+/g, ' ').trim();
     const queryWords = lowerQuery.split(' ').filter(w => w.length > 0);
 
-    // 1. Direct SKU check in Master Data map
+    // 1. Direct or flexible internal SKU check in Master Data map
+    const flexMasterKey = matchInternalAstroSkuKey(dataMap, cleaned);
+    if (flexMasterKey && dataMap.has(flexMasterKey)) {
+      const items = [...dataMap.get(flexMasterKey)].map(it => {
+        const msInfo = getMsltcInfo(it.sku || flexMasterKey, it.productName);
+        return {
+          ...it,
+          msltcDays: (msInfo && msInfo.msltcDays !== undefined && msInfo.msltcDays !== null) ? msInfo.msltcDays : (it.msltcDays || 0),
+          type: (msInfo && msInfo.type) ? msInfo.type : (it.type || 'Fresh')
+        };
+      });
+      items.sort((a, b) => compareSlocNatural(a.sloc || a.masterSloc, b.sloc || b.masterSloc));
+      return items;
+    }
     if (dataMap.has(cleaned)) {
       const items = [...dataMap.get(cleaned)].map(it => {
         const msInfo = getMsltcInfo(it.sku || cleaned, it.productName);
@@ -601,9 +710,12 @@
       }
     }
 
-    // 2. Direct SKU check in MSLTC map
+    // 2. Direct or flexible internal SKU check in MSLTC map
     let msltcFound = null;
-    if (msltcMap.has(cleaned)) {
+    const flexMsltcKey = matchInternalAstroSkuKey(msltcMap, cleaned);
+    if (flexMsltcKey && msltcMap.has(flexMsltcKey)) {
+      msltcFound = msltcMap.get(flexMsltcKey);
+    } else if (msltcMap.has(cleaned)) {
       msltcFound = msltcMap.get(cleaned);
     } else {
       for (const [key, value] of msltcMap) {
@@ -1054,7 +1166,17 @@
     lastSearchExpiredDate = expDate;
 
     let results = null;
-    if (dataMap.has(sku)) {
+    const matchedMasterSku = matchInternalAstroSkuKey(dataMap, sku);
+    if (matchedMasterSku && dataMap.has(matchedMasterSku)) {
+      results = [...dataMap.get(matchedMasterSku)].map(it => {
+        const msInfo = getMsltcInfo(it.sku || matchedMasterSku, it.productName);
+        return {
+          ...it,
+          msltcDays: (msInfo && msInfo.msltcDays !== undefined && msInfo.msltcDays !== null) ? msInfo.msltcDays : (it.msltcDays || 0),
+          type: (msInfo && msInfo.type) ? msInfo.type : (it.type || 'Fresh')
+        };
+      });
+    } else if (dataMap.has(sku)) {
       results = [...dataMap.get(sku)].map(it => {
         const msInfo = getMsltcInfo(it.sku || sku, it.productName);
         return {
@@ -1275,9 +1397,59 @@
                 <span class="result-label">Expired</span>
                 <span class="result-value" style="color: #f59e0b; font-weight: 700;">📅 ${escapeHtml(expiredDisplayStr)}</span>
               </div>` : ''}
-              <div class="result-info-row">
-                <span class="result-label">SLOC</span>
-                <span class="result-value sloc">${escapeHtml(item.sloc || '-')}</span>
+              <div class="result-info-row sloc-row-container ${isPlaceholderSloc(item.sloc) ? 'sloc-missing-state' : ''}">
+                <div class="sloc-main-line">
+                  <span class="result-label">SLOC</span>
+                  <span class="result-value sloc ${isPlaceholderSloc(item.sloc) ? 'sloc-unassigned' : ''}">${escapeHtml(item.sloc || '-')}</span>
+                  ${item.isCustomOverride ? '<span class="sloc-manual-badge" title="SLOC disetel langsung dari perangkat">MANUAL</span>' : ''}
+                  ${!isPlaceholderSloc(item.sloc) ? `
+                  <button type="button" class="btn-sloc-inline-edit no-print" onclick="openManualSlocEditor(${idx}, '${escapeAttr(itemSku)}', '${escapeAttr(item.sloc || '')}')">
+                    Ubah Rak
+                  </button>` : ''}
+                </div>
+                ${isPlaceholderSloc(item.sloc) ? `
+                <div class="sloc-live-actions no-print">
+                  <button type="button" id="btnLiveSync_${idx}" class="btn-sloc-live-sync" onclick="triggerLiveSlocSync(${idx}, '${escapeAttr(itemSku)}', '${escapeAttr(item.productName || '')}', false)">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                      <polyline points="23 4 23 10 17 10"></polyline>
+                      <polyline points="1 20 1 14 7 14"></polyline>
+                      <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+                    </svg>
+                    <span>Tarik SLOC Live</span>
+                  </button>
+                  <button type="button" class="btn-sloc-manual-set" onclick="openManualSlocEditor(${idx}, '${escapeAttr(itemSku)}', '')">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M12 20h9"></path>
+                      <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
+                    </svg>
+                    <span>Isi SLOC Manual</span>
+                  </button>
+                </div>` : ''}
+                <div id="slocLiveStatus_${idx}" class="sloc-live-status hidden no-print" role="status" aria-live="polite"></div>
+                <div id="slocManualEditor_${idx}" class="sloc-manual-editor hidden no-print">
+                  <label for="slocManualInput_${idx}" class="sloc-editor-label">Kode Rak SLOC Baru (Hub MTG)</label>
+                  <div class="sloc-editor-input-group">
+                    <input
+                      type="text"
+                      id="slocManualInput_${idx}"
+                      class="sloc-editor-input"
+                      placeholder="Contoh: L1-CHL-CC7-T6-4"
+                      value="${escapeAttr(isPlaceholderSloc(item.sloc) ? '' : (item.sloc || ''))}"
+                      autocomplete="off"
+                      autocapitalize="characters"
+                      spellcheck="false"
+                      onkeydown="handleManualSlocKeydown(event, ${idx}, '${escapeAttr(itemSku)}', '${escapeAttr(item.productName || '')}', '${escapeAttr(item.type || 'Fresh')}')"
+                    />
+                  </div>
+                  <div class="sloc-editor-btns">
+                    <button type="button" class="btn-sloc-save" onclick="saveManualSloc(${idx}, '${escapeAttr(itemSku)}', '${escapeAttr(item.productName || '')}', '${escapeAttr(item.type || 'Fresh')}')">
+                      Simpan &amp; Buat QR
+                    </button>
+                    <button type="button" class="btn-sloc-cancel" onclick="closeManualSlocEditor(${idx})">
+                      Batal
+                    </button>
+                  </div>
+                </div>
               </div>
               ${item.type ? `
               <div class="result-info-row">
@@ -1344,8 +1516,173 @@
           }
         }
       }
+
+      if (!hasValidSloc && results.length <= 2) {
+        const lastSyncTs = recentLiveSyncSkuMap.get(itemSku) || 0;
+        if (Date.now() - lastSyncTs > 90000) {
+          recentLiveSyncSkuMap.set(itemSku, Date.now());
+          setTimeout(() => {
+            if (typeof window.triggerLiveSlocSync === 'function') {
+              window.triggerLiveSlocSync(idx, itemSku, item.productName || '', true);
+            }
+          }, 150);
+        }
+      }
     });
   }
+
+    window.openManualSlocEditor = function (idx, sku, currentSloc) {
+      const editor = document.getElementById(`slocManualEditor_${idx}`);
+      const input = document.getElementById(`slocManualInput_${idx}`);
+      if (!editor || !input) return;
+      editor.classList.remove('hidden');
+      if (currentSloc && !isPlaceholderSloc(currentSloc)) {
+        input.value = currentSloc;
+      }
+      setTimeout(() => {
+        input.focus();
+        input.select();
+      }, 30);
+    };
+
+    window.closeManualSlocEditor = function (idx) {
+      const editor = document.getElementById(`slocManualEditor_${idx}`);
+      if (editor) editor.classList.add('hidden');
+    };
+
+    window.handleManualSlocKeydown = function (event, idx, sku, productName, type) {
+      if (!event) return;
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        window.saveManualSloc(idx, sku, productName, type);
+      } else if (event.key === 'Escape') {
+        event.preventDefault();
+        window.closeManualSlocEditor(idx);
+      }
+    };
+
+    window.saveManualSloc = function (idx, sku, productName, type) {
+      const input = document.getElementById(`slocManualInput_${idx}`);
+      if (!input) return;
+      const newSloc = (input.value || '').trim().toUpperCase();
+      if (!newSloc) {
+        input.focus();
+        return;
+      }
+
+      setCustomSlocOverride(sku, newSloc, productName, type);
+      applyCustomSlocOverridesToMap(dataMap);
+
+      if (lastSearchQuery) {
+        displaySelectedProduct(sku, lastSearchExpiredDate);
+      } else {
+        performSearch(sku);
+      }
+
+      // no-cors is required because Apps Script redirects POST responses to a domain without CORS headers
+      if (LIVE_SLOC_BRIDGE_URL) {
+        fetch(LIVE_SLOC_BRIDGE_URL, {
+          method: 'POST',
+          mode: 'no-cors',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify({
+            action: 'saveCustomSloc',
+            sku: String(sku).trim(),
+            sloc: newSloc,
+            productName: productName || '',
+            type: type || inferCategoryFromSloc(newSloc) || 'Fresh'
+          })
+        }).catch(() => {});
+      }
+    };
+
+    window.triggerLiveSlocSync = async function (idx, sku, productName, isAuto = false) {
+      const statusEl = document.getElementById(`slocLiveStatus_${idx}`);
+      const btnEl = document.getElementById(`btnLiveSync_${idx}`);
+      const cleanSku = String(sku || '').trim();
+      recentLiveSyncSkuMap.set(cleanSku, Date.now());
+
+      if (statusEl) {
+        statusEl.className = 'sloc-live-status no-print';
+        statusEl.textContent = isAuto
+          ? 'Mengecek SLOC terbaru langsung dari server Superset...'
+          : 'Menarik SLOC terbaru dari Superset & menyinkronkan data...';
+      }
+      if (btnEl) btnEl.disabled = true;
+
+      try {
+        const ts = Date.now();
+        const syncPromise = fetch(`${LIVE_SLOC_BRIDGE_URL}?action=syncSlocLive&sku=${encodeURIComponent(cleanSku)}&_t=${ts}`, { cache: 'no-store' })
+          .then(r => r.ok ? r.json() : null)
+          .catch(() => null);
+
+        const stockPromise = fetch(`${LIVE_SLOC_BRIDGE_URL}?sheet=${encodeURIComponent('STOCK UPDATE')}&_t=${ts}`, { cache: 'no-store' })
+          .then(r => r.ok ? r.json() : null)
+          .catch(() => null);
+
+        const [syncRes, stockJson] = await Promise.all([syncPromise, stockPromise]);
+
+        if (syncRes && syncRes.status === 'success' && syncRes.slocFound) {
+          setCustomSlocOverride(cleanSku, syncRes.slocFound, productName, syncRes.typeFound || '');
+          applyCustomSlocOverridesToMap(dataMap);
+          displaySelectedProduct(cleanSku, lastSearchExpiredDate);
+          return;
+        }
+
+        if (Array.isArray(stockJson) && stockJson.length > 0) {
+          const suffixMatch = cleanSku.match(/^10+(\d{3,6})$/);
+          const suffixRegex = suffixMatch ? new RegExp('^10+' + suffixMatch[1] + '$') : null;
+          const cleanName = (productName || '').toLowerCase().trim();
+
+          const foundRow = stockJson.find(r => {
+            if (!r || !r.rack_name) return false;
+            const rSku = String(r.sku_number || '').trim();
+            if (rSku === cleanSku) return true;
+            if (suffixRegex && suffixRegex.test(rSku)) return true;
+            if (cleanName && cleanName.length >= 6 && String(r.product_name || '').toLowerCase().includes(cleanName)) return true;
+            return false;
+          });
+
+          if (foundRow && foundRow.rack_name) {
+            const resolvedSloc = String(foundRow.rack_name).trim();
+            setCustomSlocOverride(cleanSku, resolvedSloc, foundRow.product_name || productName, foundRow.l1_category_name || '');
+            applyCustomSlocOverridesToMap(dataMap);
+            displaySelectedProduct(cleanSku, lastSearchExpiredDate);
+            return;
+          }
+        }
+
+        if (!isAuto) {
+          await fetch(`${LIVE_SLOC_BRIDGE_URL}?action=autoPullData&_t=${Date.now()}`, { cache: 'no-store' }).catch(() => null);
+        }
+
+        await fetchSheetData(true);
+
+        const matchedKey = matchInternalAstroSkuKey(dataMap, cleanSku);
+        if (matchedKey && dataMap.has(matchedKey)) {
+          const items = dataMap.get(matchedKey);
+          if (items && items.some(it => !isPlaceholderSloc(it.sloc))) {
+            displaySelectedProduct(matchedKey, lastSearchExpiredDate);
+            return;
+          }
+        }
+
+        const currentStatusEl = document.getElementById(`slocLiveStatus_${idx}`);
+        if (currentStatusEl) {
+          currentStatusEl.className = 'sloc-live-status status-warn no-print';
+          currentStatusEl.textContent = 'SLOC untuk SKU ini belum terdaftar di Superset MTG. Gunakan tombol "Isi SLOC Manual" di atas untuk langsung membuat QR Rak.';
+        }
+      } catch (err) {
+        const currentStatusEl = document.getElementById(`slocLiveStatus_${idx}`);
+        if (currentStatusEl) {
+          currentStatusEl.className = 'sloc-live-status status-warn no-print';
+          currentStatusEl.textContent = 'Gagal menghubungi server Superset. Gunakan "Isi SLOC Manual" untuk membuat QR Rak secara instan.';
+        }
+      } finally {
+        const currentBtnEl = document.getElementById(`btnLiveSync_${idx}`);
+        if (currentBtnEl) currentBtnEl.disabled = false;
+      }
+    };
 
   // ══════════════════════════════════════════════
   //  MSLTC REALTIME EXPIRATION RENDERING
@@ -2504,6 +2841,11 @@
 
   refreshBtn.addEventListener('click', async function () {
     await clearCache();
+    if (LIVE_SLOC_BRIDGE_URL) {
+      fetch(`${LIVE_SLOC_BRIDGE_URL}?action=syncSlocLive&_t=${Date.now()}`, { cache: 'no-store' })
+        .then(() => fetchSheetData(true))
+        .catch(() => {});
+    }
     fetchSheetData(false);
   });
 

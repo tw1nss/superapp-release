@@ -11490,3 +11490,231 @@ select.dcc-field-input option {
   -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain;
 }
+
+
+.result-info-row.sloc-row-container {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+}
+
+.sloc-main-line {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.result-value.sloc.sloc-unassigned {
+  color: #fbbf24;
+}
+
+.sloc-manual-badge {
+  font-size: 0.68rem;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  color: #34d399;
+  background: rgba(16, 185, 129, 0.14);
+  border: 1px solid rgba(52, 211, 153, 0.45);
+  padding: 2px 7px;
+  border-radius: 4px;
+  letter-spacing: 0.04em;
+}
+
+.btn-sloc-inline-edit {
+  background: #0f172a;
+  color: #38bdf8;
+  border: 1px solid rgba(56, 189, 248, 0.45);
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  min-height: 32px;
+  transition: background 0.15s ease, transform 0.15s ease;
+}
+
+.btn-sloc-inline-edit:hover {
+  background: rgba(56, 189, 248, 0.15);
+}
+
+.btn-sloc-inline-edit:active {
+  transform: scale(0.97);
+}
+
+.sloc-live-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  width: 100%;
+}
+
+.btn-sloc-live-sync,
+.btn-sloc-manual-set {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 42px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  background: #0f172a;
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.15s ease;
+}
+
+.btn-sloc-live-sync {
+  color: #38bdf8;
+  border: 1px solid rgba(56, 189, 248, 0.55);
+}
+
+.btn-sloc-live-sync:hover:not(:disabled) {
+  background: rgba(56, 189, 248, 0.14);
+}
+
+.btn-sloc-live-sync:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+.btn-sloc-manual-set {
+  color: #fbbf24;
+  border: 1px solid rgba(251, 191, 36, 0.55);
+}
+
+.btn-sloc-manual-set:hover {
+  background: rgba(251, 191, 36, 0.14);
+}
+
+.btn-sloc-live-sync:active:not(:disabled),
+.btn-sloc-manual-set:active {
+  transform: scale(0.97);
+}
+
+.btn-sloc-inline-edit:focus-visible,
+.btn-sloc-live-sync:focus-visible,
+.btn-sloc-manual-set:focus-visible,
+.btn-sloc-save:focus-visible,
+.btn-sloc-cancel:focus-visible {
+  outline: 2px solid #38bdf8;
+  outline-offset: 2px;
+}
+
+.sloc-live-status {
+  font-size: 0.78rem;
+  color: #f8fafc;
+  background: rgba(15, 23, 42, 0.9);
+  border: 1px solid rgba(56, 189, 248, 0.35);
+  border-radius: 6px;
+  padding: 8px 10px;
+  text-align: center;
+  line-height: 1.4;
+}
+
+.sloc-live-status.status-warn {
+  border-color: rgba(251, 191, 36, 0.45);
+  color: #fbbf24;
+}
+
+.sloc-live-status.status-ok {
+  border-color: rgba(52, 211, 153, 0.45);
+  color: #34d399;
+}
+
+.sloc-manual-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: #0a0f1d;
+  border: 1px solid rgba(56, 189, 248, 0.45);
+  border-radius: 8px;
+  padding: 12px;
+  width: 100%;
+}
+
+.sloc-editor-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #f8fafc;
+  text-align: left;
+}
+
+.sloc-editor-input-group {
+  width: 100%;
+}
+
+.sloc-editor-input {
+  width: 100%;
+  min-height: 42px;
+  background: #05070e;
+  color: #f8fafc;
+  border: 1px solid rgba(148, 163, 184, 0.45);
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-family: var(--font-mono);
+  font-size: 0.92rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.sloc-editor-input:focus-visible {
+  outline: 2px solid #38bdf8;
+  outline-offset: 1px;
+  border-color: #38bdf8;
+}
+
+.sloc-editor-btns {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+}
+
+.btn-sloc-save {
+  min-height: 42px;
+  padding: 8px 14px;
+  border-radius: 6px;
+  border: none;
+  background: #38bdf8;
+  color: #05070e;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+.btn-sloc-save:hover {
+  opacity: 0.92;
+}
+
+.btn-sloc-save:active {
+  transform: scale(0.97);
+}
+
+.btn-sloc-cancel {
+  min-height: 42px;
+  padding: 8px 14px;
+  border-radius: 6px;
+  border: 1px solid rgba(148, 163, 184, 0.4);
+  background: #0f172a;
+  color: #f8fafc;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+@media (max-width: 420px) {
+  .sloc-live-actions,
+  .sloc-editor-btns {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media print {
+  .no-print {
+    display: none !important;
+  }
+}
