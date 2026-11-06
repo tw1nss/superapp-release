@@ -1,6 +1,6 @@
 /**
  * =========================================================================
- * 🚀 FINAL COMBINED SCRIPT: DCC MASTER ALL-IN-ONE + SUPERSET + API + PINJAMAN CWG (HUB CAWANG)
+ * 🚀 FINAL COMBINED SCRIPT: DCC MASTER ALL-IN-ONE + SUPERSET + API CWG (HUB CAWANG)
  * =========================================================================
  * Spreadsheet: Dashboard STK CWG 2K26
  * URL: https://docs.google.com/spreadsheets/d/1T6YcctafqzppSyblW17Gm8zXBrwyXJKi81niF66CXCQ/edit
@@ -22,11 +22,7 @@
  *      catat 21 kolom ke 'Hasil DCC', dan langsung update status 'DONE' di 'Mainlist SKU'.
  *    - doGet: Bulk read super cepat untuk konsumsi data API frontend (?sheet=...).
  *
- * 4. 📦 PINJAMAN & PENGEMBALIAN BARANG MTG:
- *    - Form Peminjaman Barang MTG -> Sheet 'Pinjaman Barang CWG' (8 Kolom)
- *    - Form Pengembalian Barang CWG -> Sheet 'Pengembalian Barang CWG' (10 Kolom + Bukti Foto Drive)
- *
- * 5. 📦 BACKUP & MAINTENANCE:
+ * 4. 📦 BACKUP & MAINTENANCE:
  *    - copyDccToHistorical: Backup otomatis data 'Hasil DCC' (Kolom G terisi) ke 'Historical Data'.
  *    - bersihkanBarisKosong: Bersihkan baris kosong berlebih di 'Historical Data'.
  *    - hapus: Reset/bersihkan data kolom di 'Hasil DCC'.
@@ -40,7 +36,7 @@
 var CONFIG = {
   BASE_URL: "https://dash.astronauts.id/",
   TARGET_FILE_ID: "1T6YcctafqzppSyblW17Gm8zXBrwyXJKi81niF66CXCQ",
-  EVIDENCE_FOLDER_ID: "", // 📁 Folder Google Drive Bukti Foto DCC & Pinjaman
+  EVIDENCE_FOLDER_ID: "", // 📁 Folder Google Drive Bukti Foto DCC
   MAX_RETRY: 3,
   RETRY_DELAY: 2000,
   TIMEZONE: "Asia/Jakarta"
@@ -103,7 +99,7 @@ function onOpen() {
 
 function reloadAllMenus() {
   onOpen();
-  alertUser('✅ Semua Menu Berhasil Dimuat Ulang!\n\nMenu yang aktif:\n1. 📈 Superset Control\n2. 📊 DCC Control\n3. 📦 Pinjaman CWG\n4. 📦 Koli Inbound Control\n5. 🧹 ED Sweeper Control\n6. ⚡ ED Correction Control\n7. 📅 Jadwal Kerja CWG');
+  alertUser('✅ Semua Menu Berhasil Dimuat Ulang!\n\nMenu yang aktif:\n1. 📈 Superset Control\n2. 📊 DCC Control\n3. 📦 Koli Inbound Control\n4. 🧹 ED Sweeper Control\n5. ⚡ ED Correction Control\n6. 📅 Jadwal Kerja CWG');
 }
 
 function buildSupersetMenu(ui) {
@@ -150,21 +146,7 @@ function buildDccMenu(ui) {
     .addItem('🛑 Matikan Auto-Pull DCC (10 Menit)', 'removeAutoPullDccTriggerPrompt')
     .addItem('ℹ️ Cek Status Timer Auto-Pull', 'checkAutoPullDccStatusPrompt')
     .addSeparator()
-    .addItem('📋 Siapkan 4 Sheet Pinjaman & Pengembalian', 'setupPinjamanSheets')
-    .addSeparator()
     .addItem('🔄 Muat Ulang Semua Menu Toolbar', 'reloadAllMenus')
-    .addToUi();
-
-  // Panggil menu Pinjaman CWG tersendiri agar selalu muncul
-  try {
-    buildPinjamanMenu(ui);
-  } catch (ePinjam) {}
-}
-
-function buildPinjamanMenu(ui) {
-  if (!ui) ui = SpreadsheetApp.getUi();
-  ui.createMenu('📦 Pinjaman CWG')
-    .addItem('📋 Siapkan Format 4 Sheet Pinjaman & Pengembalian', 'setupPinjamanSheets')
     .addToUi();
 }
 
@@ -522,15 +504,6 @@ function removeSupersetAutoSyncTriggerPrompt() {
 function doGet(e) {
   var param = (e && e.parameter) ? e.parameter : {};
 
-  // Setup 4 sheet pinjaman jika dipanggil via URL / webhook (?action=setupPinjamanSheets)
-  if (param.action === 'setupPinjamanSheets' || param.action === 'setupSheets') {
-    setupPinjamanSheets();
-    return ContentService.createTextOutput(JSON.stringify({
-      status: "success",
-      message: "4 Sheet Pinjaman & Pengembalian MTG berhasil dibuat & diformat!"
-    })).setMimeType(ContentService.MimeType.JSON);
-  }
-
   // Trigger auto-pull data DCC via URL / webhook (?action=autoPullData)
   if (param.action === 'autoPullData' || param.action === 'autopulldata' || param.action === 'autoPullDcc') {
     autoPullDataDccMaster();
@@ -710,14 +683,6 @@ function doPost(e) {
     }
 
     // ==========================================================
-    // 🛠️ 0. ROUTER DATA RECOVERY DARI PINJAMAN JIKA DIPANGGIL
-    // ==========================================================
-    if (payload.action === 'recoverMisplacedDcc' || payload.action === 'fixMisplacedDcc') {
-      var recRes = recoverMisplacedDccFromPinjaman();
-      return ContentService.createTextOutput(JSON.stringify(recRes)).setMimeType(ContentService.MimeType.JSON);
-    }
-
-    // ==========================================================
     // ⏱️ ROUTER AUTO-PULL DATA DCC MASTER JIKA DIPANGGIL VIA POST
     // ==========================================================
     if (payload.action === 'autoPullData' || payload.action === 'autopulldata' || payload.action === 'autoPullDcc') {
@@ -741,32 +706,7 @@ function doPost(e) {
     }
 
     // ==========================================================
-    // 📦 1. ROUTER PINJAMAN & PENGEMBALIAN BARANG MTG (4 ALUR LENGKAP)
-    // ==========================================================
-    if (
-      payload.module === 'pinjaman' ||
-      payload.action === 'savePinjamKeHub' ||
-      payload.action === 'saveKembalikanKeHub' ||
-      payload.action === 'savePinjeminKeHub' ||
-      payload.action === 'saveTerimaKembali' ||
-      payload.action === 'savePinjamanBarang' ||
-      payload.action === 'savePengembalianBarang' ||
-      payload.formType === 'pinjam' ||
-      payload.formType === 'kembali' ||
-      payload.formType === 'pinjemin' ||
-      payload.formType === 'terima' ||
-      payload.type === 'pinjam' ||
-      payload.type === 'kembali' ||
-      payload.type === 'pinjemin' ||
-      payload.type === 'terima'
-    ) {
-      if (typeof handlePinjamanSubmit === 'function') {
-        return handlePinjamanSubmit(payload);
-      }
-    }
-
-    // ==========================================================
-    // 🧹 2. ROUTER ED SWEEPER / ED CORRECTION
+    // 🧹 1. ROUTER ED SWEEPER / ED CORRECTION
     // ==========================================================
     if (payload.action === 'saveEdsResult' || payload.module === 'eds' || payload.module === 'ed_sweeper') {
       if (typeof handleEdsSubmit === 'function') {
@@ -775,7 +715,7 @@ function doPost(e) {
     }
 
     // ==========================================================
-    // 📊 3. ROUTER DCC AUTOFILL SUPERVISOR TASK
+    // 📊 2. ROUTER DCC AUTOFILL SUPERVISOR TASK
     // ==========================================================
     if (payload.action === 'autoFillSupervisorTask' || payload.action === 'autoFillDcc') {
       if (typeof executeAutoFillTask === 'function') {
@@ -975,151 +915,6 @@ function handleDccSubmit(payload) {
       status: 'error',
       message: error.toString()
     })).setMimeType(ContentService.MimeType.JSON);
-  }
-}
-
-/**
- * 🛠️ DATA RECOVERY UTILITY:
- * Memindahkan audit DCC yang sempat salah masuk ke sheet 'Pinjaman Barang CWG'
- * kembali ke sheet 'Hasil DCC' dan update status 'DONE' di 'Mainlist SKU'.
- */
-function recoverMisplacedDccFromPinjaman() {
-  try {
-    var ss = getSpreadsheet();
-    var pinjamSheet = ss.getSheetByName('Pinjaman Barang CWG');
-    if (!pinjamSheet || pinjamSheet.getLastRow() < 2) {
-      return { status: 'info', message: 'Sheet Pinjaman Barang CWG kosong atau tidak ditemukan.' };
-    }
-
-    var hasilDccSheet = ss.getSheetByName('Hasil DCC') || ss.insertSheet('Hasil DCC');
-    if (hasilDccSheet.getLastRow() === 0) {
-      hasilDccSheet.appendRow([
-        "Timestamp", "SKU Number", "Nama SKU ", "SLOC Existing", "SLOC Actual",
-        "Expired Date", "Fisik Good", "Fisik Bad", "Sales (jika ada)",
-        "Reason SLOC", "Reason Bad", "Evidance 1", "Evidance 2",
-        "Evidance Link 1", "Evidance Link 2", "Fisik/System", "MSLTC",
-        "SKU No", "Input by", "Label Barcode Product", "Label Sloc"
-      ]);
-    }
-
-    var mainlistSheet = ss.getSheetByName('Mainlist SKU') || ss.getSheetByName('Mainlist Sku');
-    var mainMap = {};
-    if (mainlistSheet && mainlistSheet.getLastRow() > 1) {
-      var mData = mainlistSheet.getRange(2, 1, mainlistSheet.getLastRow() - 1, 16).getValues();
-      for (var m = 0; m < mData.length; m++) {
-        var mRow = mData[m];
-        var s = String(mRow[2] || '').trim().toLowerCase();
-        if (s) {
-          mainMap[s] = {
-            rowIdx: m + 2,
-            productName: String(mRow[3] || '').trim(),
-            sloc: String(mRow[4] || '').trim(),
-            qtySys: Number(mRow[5]) || 0
-          };
-        }
-      }
-    }
-
-    var pinjamData = pinjamSheet.getDataRange().getValues();
-    var rowsToMigrate = [];
-    var rowIndicesToDelete = [];
-
-    for (var i = 1; i < pinjamData.length; i++) {
-      var row = pinjamData[i];
-      var timeStr = String(row[0] || '').trim();
-      var jenisStr = String(row[1] || '').trim();
-      var skuStr = String(row[2] || '').trim();
-      var picStr = String(row[7] || '').trim();
-      var driveLink = String(row[9] || '').trim();
-
-      if (skuStr === '999999999999' || (!skuStr && !picStr)) {
-        rowIndicesToDelete.push(i + 1);
-        continue;
-      }
-
-      if ((jenisStr.includes('Pinjam') || jenisStr.includes('CWG') || jenisStr.includes('MTG')) && (picStr || skuStr)) {
-        var sLower = skuStr.toLowerCase();
-        var itemInfo = mainMap[sLower] || {};
-        var pName = itemInfo.productName || String(row[3] || '').trim();
-        var sloc = itemInfo.sloc || String(row[4] || '').trim() || 'Match';
-        var fisikGood = Number(row[5]) || 1;
-
-        var dccRow = [
-          timeStr || Utilities.formatDate(new Date(), CONFIG.TIMEZONE, "dd/MM/yyyy HH:mm:ss"),
-          skuStr,
-          pName,
-          sloc,
-          'Match',
-          '',
-          fisikGood,
-          '0',
-          '0',
-          '',
-          '',
-          '',
-          '',
-          driveLink,
-          '',
-          String(fisikGood),
-          '',
-          skuStr,
-          picStr || 'Petugas CWG',
-          'Ada',
-          'Ada'
-        ];
-
-        rowsToMigrate.push({
-          dccRow: dccRow,
-          sku: skuStr,
-          fisikGood: fisikGood,
-          sloc: sloc,
-          pic: picStr || 'Petugas CWG',
-          itemInfo: itemInfo
-        });
-
-        rowIndicesToDelete.push(i + 1);
-      }
-    }
-
-    // 1. Tulis ke Hasil DCC
-    for (var r = 0; r < rowsToMigrate.length; r++) {
-      var item = rowsToMigrate[r];
-      appendToFirstEmptyRow(hasilDccSheet, item.dccRow);
-
-      // 2. Update status ke Mainlist SKU jika ada
-      if (mainlistSheet && item.itemInfo && item.itemInfo.rowIdx) {
-        var tRow = item.itemInfo.rowIdx;
-        var fg = item.fisikGood;
-        var sysQ = item.itemInfo.qtySys || 0;
-        var diff = fg - sysQ;
-        mainlistSheet.getRange(tRow, 8).setValue(fg);
-        mainlistSheet.getRange(tRow, 9).setValue(0);
-        mainlistSheet.getRange(tRow, 10).setValue(fg);
-        mainlistSheet.getRange(tRow, 11).setValue(diff);
-        mainlistSheet.getRange(tRow, 12).setValue(item.sloc);
-        mainlistSheet.getRange(tRow, 13).setValue('MATCH');
-        mainlistSheet.getRange(tRow, 14).setValue(item.pic);
-        mainlistSheet.getRange(tRow, 15).setValue('DONE');
-        mainlistSheet.getRange(tRow, 16).setValue('Sesuai');
-      }
-    }
-
-    // 3. Hapus baris dari Pinjaman Barang CWG dari indeks terbesar
-    rowIndicesToDelete.sort(function(a, b) { return b - a; });
-    for (var d = 0; d < rowIndicesToDelete.length; d++) {
-      pinjamSheet.deleteRow(rowIndicesToDelete[d]);
-    }
-
-    return {
-      status: 'success',
-      message: 'Berhasil memindahkan ' + rowsToMigrate.length + ' data audit DCC dari sheet Pinjaman Barang CWG ke sheet Hasil DCC & update Mainlist SKU!',
-      migratedCount: rowsToMigrate.length
-    };
-  } catch (err) {
-    return {
-      status: 'error',
-      message: 'Gagal recovery data: ' + err.toString()
-    };
   }
 }
 
@@ -1874,55 +1669,204 @@ function resetMainlistSkuPrompt() {
 // ==============================================================================
 // 📦 BACKUP DCC KE HISTORICAL DATA (KOLOM G TERISI)
 // ==============================================================================
+function cleanDccCellValue(val) {
+  if (val === undefined || val === null) {
+    return "";
+  }
+  if (val instanceof Date) {
+    if (isNaN(val.getTime())) return "";
+    return val;
+  }
+  if (typeof val === "number") {
+    if (isNaN(val) || !isFinite(val)) return "";
+    return val;
+  }
+  if (typeof val === "boolean") {
+    return val;
+  }
+  if (typeof val === "string") {
+    var s = val.trim();
+    if (!s) return "";
+    if (s.charAt(0) === "=" || s.indexOf("#REF!") === 0) {
+      return "'" + s;
+    }
+    return val;
+  }
+  return String(val);
+}
+
 function copyDccToHistorical() {
-  var ss = getSpreadsheet();
-  var source = ss.getSheetByName("Hasil DCC");
-  var target = ss.getSheetByName("Historical Data") || ss.insertSheet("Historical Data");
-
-  if (!source) {
-    return alertUser("❌ Sheet 'Hasil DCC' tidak ditemukan.");
+  var lock = LockService.getDocumentLock();
+  var hasLock = false;
+  try {
+    hasLock = lock.tryLock(30000); // Kunci hingga 30 detik untuk mencegah bentrok proses lain
+  } catch (eLock) {
+    console.warn("LockService notice:", eLock);
   }
 
-  var data = source.getDataRange().getValues();
+  try {
+    var ss = getSpreadsheet();
+    var source = ss.getSheetByName("Hasil DCC");
+    var target = ss.getSheetByName("Historical Data") || ss.insertSheet("Historical Data");
 
-  if (data.length <= 1) {
-    return alertUser("⚠️ Tidak ada data di 'Hasil DCC'.");
+    if (!source) {
+      return alertUser("❌ Sheet 'Hasil DCC' tidak ditemukan di spreadsheet ini.");
+    }
+
+    var data = source.getDataRange().getValues();
+    if (!data || data.length <= 1) {
+      return alertUser("⚠️ Tidak ada data di 'Hasil DCC' untuk di-backup.");
+    }
+
+    var headers = data[0];
+
+    // Filter baris data yang valid & memiliki hasil audit (Fisik Good terisi dan SKU ada)
+    var filteredRows = data.slice(1).filter(function(row) {
+      if (!row || row.length === 0) return false;
+      var sku = String(row[1] || row[17] || "").trim(); // Col B (index 1) atau SKU No
+      var fisikGood = row[6]; // Col G (index 6)
+      var hasFisik = (fisikGood !== undefined && fisikGood !== null && String(fisikGood).trim() !== "");
+      return sku !== "" && hasFisik;
+    });
+
+    if (filteredRows.length === 0) {
+      return alertUser("⚠️ Tidak ada data audit dengan Kolom G (Fisik Good) terisi di 'Hasil DCC' untuk di-backup.");
+    }
+
+    // 1. Matikan filter sementara jika ada di sheet target agar penambahan baris tidak bentrok
+    try {
+      var existingFilter = target.getFilter();
+      if (existingFilter) {
+        existingFilter.remove();
+      }
+    } catch (eFilter) {
+      console.warn("Gagal melepas filter target:", eFilter);
+    }
+
+    // 2. Pastikan Sheet 'Historical Data' memiliki kolom yang cukup
+    var headerRowLength = headers.length + 1; // + 1 untuk kolom BACKUP_TIME
+    var currentCols = target.getMaxColumns();
+    if (currentCols < headerRowLength) {
+      try {
+        target.insertColumnsAfter(currentCols, headerRowLength - currentCols);
+        SpreadsheetApp.flush();
+      } catch (eCol) {
+        console.warn("Gagal expand kolom:", eCol);
+      }
+    }
+
+    // Buat header jika sheet Historical Data masih kosong
+    if (target.getLastRow() === 0) {
+      var headerWithBackupTime = headers.concat(["BACKUP_TIME"]);
+      target.appendRow(headerWithBackupTime);
+      SpreadsheetApp.flush();
+      try {
+        target.getRange(1, 1, 1, headerRowLength)
+          .setBackground("#1E293B")
+          .setFontColor("#F8FAFC")
+          .setFontWeight("bold");
+        target.setFrozenRows(1);
+      } catch (eStyle) {}
+    }
+
+    // 3. Cegah Duplikasi: Ambil kunci unik (SKU + Timestamp Audit) yang sudah ada di Historical Data
+    var existingKeys = {};
+    var lastTargetRow = target.getLastRow();
+    if (lastTargetRow > 1) {
+      try {
+        var targetColsToCheck = Math.max(1, Math.min(target.getLastColumn(), 3));
+        var histData = target.getRange(2, 1, lastTargetRow - 1, targetColsToCheck).getValues();
+        for (var h = 0; h < histData.length; h++) {
+          var hTime = String(histData[h][0] || "").trim();
+          var hSku = String(histData[h][1] || "").trim().toLowerCase();
+          if (hSku || hTime) {
+            existingKeys[hSku + "___" + hTime] = true;
+          }
+        }
+      } catch (eHist) {
+        console.warn("Gagal membaca existingKeys Historical Data, lanjut tanpa dedup:", eHist);
+      }
+    }
+
+    var now = Utilities.formatDate(new Date(), CONFIG.TIMEZONE, "yyyy-MM-dd HH:mm:ss");
+    var rowsToInsert = [];
+    var duplicateCount = 0;
+
+    for (var r = 0; r < filteredRows.length; r++) {
+      var row = filteredRows[r];
+      var rTime = String(row[0] || "").trim();
+      var rSku = String(row[1] || row[17] || "").trim().toLowerCase();
+      var key = rSku + "___" + rTime;
+
+      // Jika belum ada di Historical Data, masukkan ke antrean insert
+      if (!existingKeys[key]) {
+        var fullRow = [];
+        for (var c = 0; c < headers.length; c++) {
+          fullRow.push(cleanDccCellValue(row[c]));
+        }
+        fullRow.push(now); // Kolom BACKUP_TIME
+        rowsToInsert.push(fullRow);
+        existingKeys[key] = true;
+      } else {
+        duplicateCount++;
+      }
+    }
+
+    if (rowsToInsert.length === 0) {
+      return alertUser("ℹ️ Semua data hasil DCC (" + filteredRows.length + " baris) sudah pernah di-backup sebelumnya ke 'Historical Data'.\n\nTidak ada data baru yang perlu ditambahkan.");
+    }
+
+    // 4. Cari baris kosong pertama di paling bawah
+    var targetRow = target.getLastRow() + 1;
+
+    // 5. Pastikan kapasitas baris di sheet Historical Data mencukupi
+    var requiredRows = targetRow + rowsToInsert.length - 1;
+    var currentMaxRows = target.getMaxRows();
+    if (requiredRows > currentMaxRows) {
+      try {
+        var rowsToAdd = (requiredRows - currentMaxRows) + 100; // Tambah buffer 100 baris
+        target.insertRowsAfter(currentMaxRows, rowsToAdd);
+        SpreadsheetApp.flush();
+      } catch (eInsert) {
+        console.warn("insertRowsAfter notice:", eInsert);
+      }
+    }
+
+    // 6. Tulis data: Coba batch setValues terlebih dahulu
+    var batchSuccess = false;
+    try {
+      var chunkSize = 200;
+      for (var i = 0; i < rowsToInsert.length; i += chunkSize) {
+        var chunk = rowsToInsert.slice(i, i + chunkSize);
+        target.getRange(targetRow + i, 1, chunk.length, chunk[0].length).setValues(chunk);
+      }
+      SpreadsheetApp.flush();
+      batchSuccess = true;
+    } catch (errBatch) {
+      console.warn("setValues batch gagal (" + errBatch.message + "), otomatis fallback ke appendRow...", errBatch);
+    }
+
+    // 7. Fallback Aman: Jika batch setValues ditolak oleh Google Sheets, tulis via appendRow
+    if (!batchSuccess) {
+      for (var rIdx = 0; rIdx < rowsToInsert.length; rIdx++) {
+        target.appendRow(rowsToInsert[rIdx]);
+      }
+      SpreadsheetApp.flush();
+    }
+
+    var dupInfo = duplicateCount > 0 ? "\n(" + duplicateCount + " baris duplikat dilewati)" : "";
+    alertUser("✅ Backup DCC berhasil ditambahkan ke sheet 'Historical Data'!\n\n• Baris Baru Ditambahkan: " + rowsToInsert.length + " baris" + dupInfo);
+
+  } catch (err) {
+    var errDetail = "Pesan: " + err.toString() + "\nBaris Error: " + (err.lineNumber || "N/A") + "\nDetail Stack: " + (err.stack || "N/A");
+    console.error("Error copyDccToHistorical:", errDetail);
+    Logger.log("Error copyDccToHistorical:\n" + errDetail);
+    alertUser("❌ Gagal Backup DCC:\n\n" + errDetail);
+  } finally {
+    if (hasLock) {
+      try { lock.releaseLock(); } catch (_) {}
+    }
   }
-
-  var headers = data[0];
-
-  // Filter hanya baris yang Kolom G (Fisik Good / index 6) terisi
-  var filteredRows = data.slice(1).filter(function(row) {
-    return (row[6] !== "" && row[6] !== null);
-  });
-
-  if (filteredRows.length === 0) {
-    return alertUser("⚠️ Tidak ada data dengan Kolom G terisi untuk di-backup.");
-  }
-
-  // Jika sheet Historical Data masih kosong, buatkan header + kolom timestamp
-  if (target.getLastRow() === 0) {
-    target.appendRow(headers.concat(["BACKUP_TIME"]));
-    target.getRange(1, 1, 1, headers.length + 1).setFontWeight("bold");
-  }
-
-  var now = Utilities.formatDate(new Date(), CONFIG.TIMEZONE, "yyyy-MM-dd HH:mm:ss");
-
-  var rows = filteredRows.map(function(r) {
-    return r.concat([now]);
-  });
-
-  // Cari baris kosong pertama di paling bawah
-  var targetRow = target.getLastRow() + 1;
-
-  target.getRange(
-    targetRow,
-    1,
-    rows.length,
-    rows[0].length
-  ).setValues(rows);
-
-  alertUser("✅ Backup DCC berhasil ditambahkan ke sheet 'Historical Data' pada baris " + targetRow + "!\nTotal: " + rows.length + " baris data.");
 }
 
 // ==============================================================================
@@ -3138,290 +3082,3 @@ function alertUser(msg) {
   }
 }
 
-// ==============================================================================
-// 📦 PINJAMAN & PENGEMBALIAN BARANG MTG (4 ALUR LENGKAP)
-// ==============================================================================
-/**
- * 1. MTG Pinjam ke Hub Lain
- * 2. MTG Kembalikan ke Hub Lain
- * 3. MTG Pinjemin ke Hub Lain (Keluar)
- * 4. MTG Terima Pengembalian dari Hub Lain (Masuk Kembali)
- */
-function handlePinjamanSubmit(payload) {
-  try {
-    var ss = getSpreadsheet();
-    var timezone = (CONFIG && CONFIG.TIMEZONE) ? CONFIG.TIMEZONE : "Asia/Jakarta";
-    var timestamp = Utilities.formatDate(new Date(), timezone, "dd/MM/yyyy HH:mm:ss");
-
-    var action = String(payload.action || '').trim();
-    var formType = String(payload.formType || '').trim();
-    var transType = String(payload.type || '').trim();
-
-    // Deteksi 4 Flow Transaksi:
-    var isPinjamKeHub = (action === 'savePinjamKeHub' || action === 'savePinjamanBarang' || formType === 'pinjam' || transType === 'pinjam');
-    var isKembalikanKeHub = (action === 'saveKembalikanKeHub' || action === 'savePengembalianBarang' || formType === 'kembali' || transType === 'kembali');
-    var isPinjeminKeHub = (action === 'savePinjeminKeHub' || formType === 'pinjemin' || transType === 'pinjemin');
-    var isTerimaKembali = (action === 'saveTerimaKembali' || formType === 'terima' || transType === 'terima');
-
-    // Default fallback jika tidak ada yang cocok
-    if (!isPinjamKeHub && !isKembalikanKeHub && !isPinjeminKeHub && !isTerimaKembali) {
-      if (action.toLowerCase().includes('terima')) isTerimaKembali = true;
-      else if (action.toLowerCase().includes('pinjemin')) isPinjeminKeHub = true;
-      else if (action.toLowerCase().includes('kembali')) isKembalikanKeHub = true;
-      else isPinjamKeHub = true;
-    }
-
-    var jenisLabel = '';
-    var statusLabel = '';
-    var sheetTargetName = '';
-
-    if (isPinjamKeHub) {
-      jenisLabel = 'MTG Pinjam ke Hub Lain';
-      statusLabel = payload.status || 'DIPINJAM';
-      sheetTargetName = ss.getSheetByName('Pinjam ke Hub Lain') ? 'Pinjam ke Hub Lain' : 'Pinjaman Barang CWG';
-    } else if (isKembalikanKeHub) {
-      jenisLabel = 'MTG Kembalikan ke Hub Lain';
-      statusLabel = payload.status || 'DIKEMBALIKAN';
-      sheetTargetName = ss.getSheetByName('Kembalikan ke Hub Lain') ? 'Kembalikan ke Hub Lain' : 'Pengembalian Barang CWG';
-    } else if (isPinjeminKeHub) {
-      jenisLabel = 'MTG Pinjemin ke Hub Lain';
-      statusLabel = payload.status || 'DIPINJAMKAN';
-      sheetTargetName = 'Pinjemin ke Hub Lain';
-    } else if (isTerimaKembali) {
-      jenisLabel = 'MTG Terima Pengembalian dari Hub Lain';
-      statusLabel = payload.status || 'DITERIMA KEMBALI';
-      sheetTargetName = 'Terima Pengembalian Hub';
-    }
-
-    var sheet = ss.getSheetByName(sheetTargetName) || ss.insertSheet(sheetTargetName);
-
-    var sku = String(payload.sku || payload.skuNo || '').trim();
-    var productName = String(payload.productName || payload.namaProduk || '').trim();
-    var sloc = String(payload.sloc || payload.rack || '').trim();
-    var qty = Number(payload.qty || 1);
-    var hub = String(payload.hub || payload.hubTujuan || payload.hubAsal || '').trim();
-    var kondisi = String(payload.kondisi || payload.kondisiBarang || 'Good').trim();
-    var pic = String(payload.pic || payload.picPetugas || payload.petugas || '').trim();
-    var picHub = String(payload.picHub || payload.driver || payload.picDriver || '').trim();
-    var remarks = String(payload.remarks || payload.catatan || '').trim();
-
-    // ── UPLOAD FOTO KE GOOGLE DRIVE JIKA ADA EVIDENCE ──
-    var drivePhotoUrl = '';
-    if (payload.imageBase64) {
-      try {
-        var folder;
-        var folderId = (CONFIG && CONFIG.EVIDENCE_FOLDER_ID) || "1RtRFC7XfgLNr7EV76rRn-hScNYW4hOb3";
-        try {
-          folder = DriveApp.getFolderById(folderId);
-        } catch (errF) {}
-        if (!folder) {
-          var folderName = 'PINJAMAN_CWG_EVIDENCE';
-          var folders = DriveApp.getFoldersByName(folderName);
-          folder = folders.hasNext() ? folders.next() : DriveApp.createFolder(folderName);
-          folder.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
-        }
-
-        var dateStr = Utilities.formatDate(new Date(), timezone, "yyyyMMdd_HHmmss");
-        var prefix = isPinjeminKeHub ? 'PINJEMIN_' : (isTerimaKembali ? 'TERIMA_' : (isKembalikanKeHub ? 'KEMBALI_' : 'PINJAM_'));
-        var skuClean = sku || 'NOSKU';
-        var fileName = prefix + skuClean + '_' + dateStr + '.jpg';
-        var cleanBase64 = payload.imageBase64.replace(/^data:image\/(png|jpeg|jpg);base64,/, "");
-        var decoded = Utilities.base64Decode(cleanBase64);
-        var blob = Utilities.newBlob(decoded, 'image/jpeg', fileName);
-        var file = folder.createFile(blob);
-        file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
-        drivePhotoUrl = file.getUrl();
-      } catch (errUpload) {
-        console.warn('Gagal upload bukti foto ke Drive:', errUpload);
-      }
-    }
-
-    var rowObj = {
-      timestamp: timestamp,
-      jenis: jenisLabel,
-      sku: sku,
-      productName: productName,
-      sloc: sloc,
-      qty: qty,
-      hub: hub,
-      kondisi: kondisi,
-      pic: pic,
-      picHub: picHub,
-      photoUrl: drivePhotoUrl,
-      status: statusLabel,
-      remarks: remarks
-    };
-
-    var headerColor = '#0284C7';
-    var defaultHeaders = [];
-
-    if (sheetTargetName === 'Pinjemin ke Hub Lain') {
-      headerColor = '#D97706'; // Amber / Oranye
-      defaultHeaders = [
-        'TIMESTAMP', 'JENIS TRANSAKSI', 'NOMOR SKU', 'NAMA PRODUK', 'SLOC (LOKASI RAK)', 
-        'QTY', 'HUB PEMINJAM (TUJUAN)', 'PIC PETUGAS MTG', 'PIC / DRIVER HUB', 'BUKTI FOTO (DRIVE)', 'STATUS', 'CATATAN'
-      ];
-    } else if (sheetTargetName === 'Terima Pengembalian Hub') {
-      headerColor = '#7C3AED'; // Ungu / Violet
-      defaultHeaders = [
-        'TIMESTAMP', 'JENIS TRANSAKSI', 'NOMOR SKU', 'NAMA PRODUK', 'SLOC (LOKASI RAK)', 
-        'QTY', 'HUB ASAL PENGEMBALIAN', 'KONDISI BARANG', 'PIC PETUGAS MTG', 'PIC / DRIVER HUB', 'BUKTI FOTO (DRIVE)', 'STATUS', 'CATATAN'
-      ];
-    } else if (sheetTargetName.indexOf('Pengembalian') !== -1 || sheetTargetName.indexOf('Kembalikan') !== -1) {
-      headerColor = '#059669'; // Hijau Emerald
-      defaultHeaders = [
-        'TIMESTAMP', 'JENIS TRANSAKSI', 'NOMOR SKU', 'NAMA PRODUK', 'SLOC (LOKASI RAK)', 
-        'QTY', 'HUB TARGET PENGEMBALIAN', 'KONDISI BARANG', 'PIC PETUGAS MTG', 'PIC / DRIVER HUB', 'BUKTI FOTO (DRIVE)', 'STATUS', 'CATATAN'
-      ];
-    } else {
-      headerColor = '#0284C7'; // Biru Sky
-      defaultHeaders = [
-        'TIMESTAMP', 'JENIS TRANSAKSI', 'NOMOR SKU', 'NAMA PRODUK', 'SLOC (LOKASI RAK)', 
-        'QTY', 'HUB TARGET PINJAM', 'PIC PETUGAS MTG', 'PIC / DRIVER HUB', 'BUKTI FOTO (DRIVE)', 'STATUS', 'CATATAN'
-      ];
-    }
-
-    writePinjamanRowByHeaders(sheet, defaultHeaders, rowObj, headerColor);
-
-    return ContentService.createTextOutput(JSON.stringify({
-      status: 'success',
-      message: 'Transaksi "' + jenisLabel + '" SKU ' + sku + ' berhasil dicatat ke sheet "' + sheetTargetName + '"!',
-      jenis: jenisLabel,
-      sheet: sheetTargetName,
-      sku: sku,
-      productName: productName,
-      qty: qty,
-      hub: hub,
-      pic: pic,
-      photoUrl: drivePhotoUrl,
-      timestamp: timestamp
-    })).setMimeType(ContentService.MimeType.JSON);
-
-  } catch (err) {
-    return ContentService.createTextOutput(JSON.stringify({
-      status: 'error',
-      message: 'Gagal memproses data pinjaman: ' + err.toString()
-    })).setMimeType(ContentService.MimeType.JSON);
-  }
-}
-
-/**
- * Helper fleksibel menulis baris Pinjaman sesuai header sheet yang aktif
- */
-function writePinjamanRowByHeaders(sheet, headerDefs, rowObj, headerBgColor) {
-  // Jika sheet masih kosong
-  if (sheet.getLastRow() === 0 || (sheet.getLastRow() === 1 && !sheet.getRange(1, 1).getValue())) {
-    sheet.getRange(1, 1, 1, headerDefs.length).setValues([headerDefs]);
-    sheet.getRange(1, 1, 1, headerDefs.length)
-      .setBackground(headerBgColor || '#0284c7')
-      .setFontColor('#FFFFFF')
-      .setFontWeight('bold')
-      .setHorizontalAlignment('center')
-      .setVerticalAlignment('middle');
-    sheet.setRowHeight(1, 36);
-    sheet.setFrozenRows(1);
-  }
-
-  var curHeaders = sheet.getRange(1, 1, 1, Math.max(sheet.getLastColumn(), headerDefs.length)).getValues()[0];
-
-  // Jika kolom header lama lebih sedikit dari header baru, perbarui baris 1
-  if (curHeaders.filter(Boolean).length < headerDefs.length) {
-    sheet.getRange(1, 1, 1, headerDefs.length).setValues([headerDefs]);
-    sheet.getRange(1, 1, 1, headerDefs.length)
-      .setBackground(headerBgColor || '#0284c7')
-      .setFontColor('#FFFFFF')
-      .setFontWeight('bold')
-      .setHorizontalAlignment('center')
-      .setVerticalAlignment('middle');
-    sheet.setRowHeight(1, 36);
-    sheet.setFrozenRows(1);
-    curHeaders = headerDefs;
-  }
-
-  var rowArr = [];
-  for (var c = 0; c < curHeaders.length; c++) {
-    var h = String(curHeaders[c] || '').trim().toUpperCase();
-    if (!h) {
-      rowArr.push('');
-      continue;
-    }
-    if (h.indexOf('TIMESTAMP') !== -1 || h.indexOf('WAKTU') !== -1) rowArr.push(rowObj.timestamp || '');
-    else if (h.indexOf('JENIS') !== -1) rowArr.push(rowObj.jenis || '');
-    else if (h.indexOf('SKU') !== -1) rowArr.push(rowObj.sku || '');
-    else if (h.indexOf('PRODUK') !== -1 || h.indexOf('NAMA') !== -1) rowArr.push(rowObj.productName || '');
-    else if (h.indexOf('SLOC') !== -1 || h.indexOf('RAK') !== -1) rowArr.push(rowObj.sloc || '');
-    else if (h.indexOf('QTY') !== -1) rowArr.push(rowObj.qty !== undefined ? rowObj.qty : '');
-    else if (h.indexOf('HUB') !== -1 && h.indexOf('DRIVER') === -1) rowArr.push(rowObj.hub || '');
-    else if (h.indexOf('KONDISI') !== -1) rowArr.push(rowObj.kondisi || 'Good');
-    else if (h.indexOf('PETUGAS') !== -1 || h.indexOf('PEMINJAM') !== -1 || h.indexOf('PENGEMBALIAN') !== -1 || (h.indexOf('PIC') !== -1 && h.indexOf('DRIVER') === -1)) rowArr.push(rowObj.pic || '');
-    else if (h.indexOf('DRIVER') !== -1 || (h.indexOf('PIC') !== -1 && h.indexOf('HUB') !== -1)) rowArr.push(rowObj.picHub || '');
-    else if (h.indexOf('FOTO') !== -1 || h.indexOf('DRIVE') !== -1 || h.indexOf('BUKTI') !== -1) rowArr.push(rowObj.photoUrl || '');
-    else if (h.indexOf('STATUS') !== -1) rowArr.push(rowObj.status || '');
-    else if (h.indexOf('CATATAN') !== -1 || h.indexOf('REMARKS') !== -1) rowArr.push(rowObj.remarks || '');
-    else rowArr.push('');
-  }
-
-  appendToFirstEmptyRow(sheet, rowArr);
-}
-
-// Helper Setup Header Manual jika dibutuhkan dari Menu Google Sheets (4 Alur Transaksi)
-function setupPinjamanSheets() {
-  var ss = getSpreadsheet();
-  
-  var sheetConfigs = [
-    {
-      name: 'Pinjaman Barang CWG',
-      color: '#0284c7',
-      headers: [
-        'TIMESTAMP', 'JENIS TRANSAKSI', 'NOMOR SKU', 'NAMA PRODUK', 'SLOC (LOKASI RAK)', 
-        'QTY', 'HUB TARGET PINJAM', 'PIC PETUGAS MTG', 'PIC / DRIVER HUB', 'BUKTI FOTO (DRIVE)', 'STATUS', 'CATATAN'
-      ]
-    },
-    {
-      name: 'Pengembalian Barang CWG',
-      color: '#059669',
-      headers: [
-        'TIMESTAMP', 'JENIS TRANSAKSI', 'NOMOR SKU', 'NAMA PRODUK', 'SLOC (LOKASI RAK)', 
-        'QTY', 'HUB TARGET PENGEMBALIAN', 'KONDISI BARANG', 'PIC PETUGAS MTG', 'PIC / DRIVER HUB', 'BUKTI FOTO (DRIVE)', 'STATUS', 'CATATAN'
-      ]
-    },
-    {
-      name: 'Pinjemin ke Hub Lain',
-      color: '#D97706',
-      headers: [
-        'TIMESTAMP', 'JENIS TRANSAKSI', 'NOMOR SKU', 'NAMA PRODUK', 'SLOC (LOKASI RAK)', 
-        'QTY', 'HUB PEMINJAM (TUJUAN)', 'PIC PETUGAS MTG', 'PIC / DRIVER HUB', 'BUKTI FOTO (DRIVE)', 'STATUS', 'CATATAN'
-      ]
-    },
-    {
-      name: 'Terima Pengembalian Hub',
-      color: '#7C3AED',
-      headers: [
-        'TIMESTAMP', 'JENIS TRANSAKSI', 'NOMOR SKU', 'NAMA PRODUK', 'SLOC (LOKASI RAK)', 
-        'QTY', 'HUB ASAL PENGEMBALIAN', 'KONDISI BARANG', 'PIC PETUGAS MTG', 'PIC / DRIVER HUB', 'BUKTI FOTO (DRIVE)', 'STATUS', 'CATATAN'
-      ]
-    }
-  ];
-
-  for (var i = 0; i < sheetConfigs.length; i++) {
-    var conf = sheetConfigs[i];
-    var sheet = ss.getSheetByName(conf.name);
-    if (!sheet) {
-      sheet = ss.insertSheet(conf.name);
-      SpreadsheetApp.flush();
-    }
-    var numCols = conf.headers.length;
-    sheet.getRange(1, 1, 1, numCols).setValues([conf.headers]);
-    sheet.getRange(1, 1, 1, numCols)
-      .setBackground(conf.color)
-      .setFontColor('#FFFFFF')
-      .setFontWeight('bold')
-      .setHorizontalAlignment('center')
-      .setVerticalAlignment('middle');
-    sheet.setRowHeight(1, 36);
-    try { sheet.setFrozenRows(1); } catch (eF) {}
-    SpreadsheetApp.flush();
-  }
-
-  alertUser('✅ 4 Sheet Transaksi Pinjaman & Pengembalian MTG berhasil dibuat & diformat:\n1. Pinjaman Barang CWG (Biru)\n2. Pengembalian Barang CWG (Hijau)\n3. Pinjemin ke Hub Lain (Oranye)\n4. Terima Pengembalian Hub (Ungu)');
-}

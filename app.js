@@ -3423,7 +3423,7 @@
 
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('./sw.js?v=108')
+      navigator.serviceWorker.register('./sw.js?v=121')
         .then(reg => {
           console.log('[PWA] Service Worker registered:', reg.scope);
           try { reg.update(); } catch(e) {}

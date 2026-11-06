@@ -2,12 +2,12 @@
  * Service Worker for QR SLOC & MSLTC Generator MTG (Android PWA)
  */
 
-const CACHE_NAME = 'superapp-mtg-pwa-v120';
+const CACHE_NAME = 'superapp-mtg-pwa-v121';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
   './style.css?v=117',
-  './app.js?v=120',
+  './app.js?v=121',
   './qrcode.min.js',
   './manifest.json',
   './app-logo.jpg',
@@ -54,7 +54,7 @@ self.addEventListener('fetch', (event) => {
 
   // Network-first: Always try network to get newest OTA changes
   event.respondWith(
-    fetch(event.request)
+    fetch(event.request, { cache: 'no-cache' })
       .then((networkResponse) => {
         if (networkResponse && networkResponse.status === 200 && networkResponse.type === 'basic') {
           const responseToCache = networkResponse.clone();
