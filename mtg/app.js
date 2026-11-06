@@ -3578,26 +3578,6 @@
       if (typeof window.initEdcFlatpickr === 'function') window.initEdcFlatpickr();
       if (typeof window.initEdcInputListeners === 'function') window.initEdcInputListeners();
       if (typeof window.fetchEdCorrectionData === 'function') window.fetchEdCorrectionData(true);
-    } else if (menu === 'pinjaman' || menu === 'faq') {
-      if (typeof window.openFaqLockModal === 'function') {
-        window.openFaqLockModal();
-      } else if (typeof openFaqLockModal === 'function') {
-        openFaqLockModal();
-      } else if (typeof openPinjamanWorkspaceDirect === 'function') {
-        openPinjamanWorkspaceDirect();
-      } else {
-        hideAllWorkspaces();
-        const pnjWs = document.getElementById('pinjamanWorkspace');
-        if (pnjWs) {
-          pnjWs.classList.remove('hidden');
-          pnjWs.scrollTop = 0;
-        }
-        const bBtn = document.getElementById('backToMenuBtn');
-        if (bBtn) bBtn.classList.add('hidden');
-        if (typeof window.initPinjamanModule === 'function') {
-          window.initPinjamanModule();
-        }
-      }
     } else if (menu === 'retur') {
       alert('Fitur Retur Task sedang disiapkan.');
     } else {
@@ -3674,13 +3654,6 @@
     const dccLockModal = document.getElementById('dccLockModal');
     if (dccLockModal && !dccLockModal.classList.contains('hidden')) {
       closeDccLockModal();
-      return true;
-    }
-
-    // 0.05. Close FAQ Lock modal if open
-    const faqLockModal = document.getElementById('faqLockModal');
-    if (faqLockModal && !faqLockModal.classList.contains('hidden')) {
-      closeFaqLockModal();
       return true;
     }
 
@@ -4398,72 +4371,6 @@
 
     applyDccShift(selectedDccShift);
     fetchDccMainList();
-  };
-
-  // ── FAQ (Pinjaman) Security Lock ──
-  const FAQ_PIN_DEFAULT = '071107';
-
-  window.openFaqLockModal = function () {
-    const modal = document.getElementById('faqLockModal');
-    const pinInput = document.getElementById('faqPinInput');
-    const pinError = document.getElementById('faqPinError');
-    if (pinError) pinError.classList.add('hidden');
-    if (pinInput) {
-      pinInput.value = '';
-      if (!pinInput.dataset.enterBound) {
-        pinInput.dataset.enterBound = 'true';
-        pinInput.addEventListener('keydown', (e) => {
-          if (e.key === 'Enter') {
-            e.preventDefault();
-            verifyAndEnterFaq();
-          }
-        });
-      }
-      setTimeout(() => pinInput.focus(), 150);
-    }
-    if (modal) modal.classList.remove('hidden');
-  };
-
-  window.closeFaqLockModal = function (e) {
-    if (e && e.target !== e.currentTarget && !e.target.classList.contains('dcc-lock-btn-cancel')) return;
-    const modal = document.getElementById('faqLockModal');
-    if (modal) modal.classList.add('hidden');
-  };
-
-  window.toggleFaqPinVisibility = function () {
-    const pinInput = document.getElementById('faqPinInput');
-    const eyeBtn = document.getElementById('faqPinEyeBtn');
-    if (!pinInput) return;
-    if (pinInput.type === 'password') {
-      pinInput.type = 'text';
-      if (eyeBtn) eyeBtn.textContent = '🔒';
-    } else {
-      pinInput.type = 'password';
-      if (eyeBtn) eyeBtn.textContent = '👁️';
-    }
-  };
-
-  window.verifyAndEnterFaq = function () {
-    const pinInput = document.getElementById('faqPinInput');
-    const pinError = document.getElementById('faqPinError');
-    const enteredPin = (pinInput ? pinInput.value : '').trim();
-
-    if (enteredPin !== FAQ_PIN_DEFAULT) {
-      if (pinError) {
-        pinError.textContent = '❌ PIN salah! Silakan coba lagi.';
-        pinError.classList.remove('hidden');
-      }
-      if (pinInput) {
-        pinInput.focus();
-        pinInput.classList.add('shake');
-        setTimeout(() => pinInput.classList.remove('shake'), 400);
-      }
-      return;
-    }
-
-    if (pinError) pinError.classList.add('hidden');
-    closeFaqLockModal();
-    openPinjamanWorkspaceDirect();
   };
 
   window.openPinjamanWorkspaceDirect = function () {
